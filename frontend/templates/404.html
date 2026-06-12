@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Not found{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center text-center py-20">
+  <p class="text-7xl font-bold text-zinc-800 tracking-tight mb-4">404</p>
+  <h1 class="text-xl font-semibold text-zinc-200 mb-2">Page not found</h1>
+  <p class="text-sm text-zinc-500 mb-8">This page doesn't exist or was moved.</p>
+  <a href="/"
+     hx-get="/"
+     hx-target="#main-content"
+     hx-select="#main-content"
+     hx-push-url="true"
+     hx-swap="innerHTML"
+     hx-indicator="#htmx-indicator"
+     class="btn-primary">Go home</a>
+</div>
+{% endblock %}

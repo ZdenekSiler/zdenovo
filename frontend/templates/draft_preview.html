@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Preview: {{ draft.title }}{% endblock %}
+
+{% block content %}
+<!-- Draft banner -->
+<div class="flex items-center justify-between gap-4 mb-8 px-4 py-3 rounded-lg bg-yellow-900/20 border border-yellow-800/40">
+  <div class="flex items-center gap-2">
+    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-900/60 text-yellow-400 border border-yellow-800/50 uppercase tracking-wide">Draft Preview</span>
+    <span class="text-xs text-zinc-500">This post is not yet published.</span>
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/admin/drafts" class="btn-ghost text-xs">Back to drafts</a>
+    <button
+      hx-post="/api/drafts/{{ draft.id }}/approve"
+      hx-on::after-request="window.location.href='/blog/{{ draft.slug }}'"
+      hx-confirm="Publish this post to the live blog?"
+      class="btn-primary text-xs">
+      Approve &amp; Publish
+    </button>
+    <button
+      hx-delete="/api/drafts/{{ draft.id }}"
+      hx-on::after-request="window.location.href='/admin/drafts'"
+      hx-confirm="Reject and delete this draft permanently?"
+      class="text-xs text-red-500 hover:text-red-400 transition-colors px-2 py-1">
+      Reject
+    </button>
+  </div>
+</div>
+
+<article>
+  <header class="mb-10">
+    <div class="flex flex-wrap gap-1.5 mb-4">
+      {% for t in draft.tags %}
+      <span class="tag-btn">{{ t }}</span>
+      {% endfor %}
+    </div>
+
+    <h1 class="text-2xl font-bold tracking-tight text-zinc-100 leading-snug mb-4">
+      {{ draft.title }}
+    </h1>
+
+    <div class="flex items-center gap-3 text-xs text-zinc-600 pb-6 border-b border-zinc-800/60">
+      <span>Zdenek</span>
+      <span class="text-zinc-800">·</span>
+      <time>{{ draft.date | dateformat }}</time>
+      <span class="text-zinc-800">·</span>
+      <span>{{ draft.reading_time }} min read</span>
+      <span class="text-zinc-800">·</span>
+      <span class="text-zinc-700">topic: {{ draft.topic_id }}</span>
+    </div>
+  </header>
+
+  {% if draft.summary %}
+  <p class="text-base text-zinc-400 leading-relaxed mb-8 pb-8 border-b border-zinc-800/60">
+    {{ draft.summary }}
+  </p>
+  {% endif %}
+
+  {% if draft.image %}
+  <img src="{{ draft.image }}" alt="{{ draft.title }}" class="post-hero" loading="lazy">
+  {% endif %}
+
+  <div class="prose-custom">
+    {{ draft.content | markdown | safe }}
+  </div>
+</article>
+{% endblock %}

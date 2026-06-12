@@ -1,0 +1,251 @@
+/* ─── HTMX loading bar ─── */
+.htmx-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 9999;
+  background: transparent;
+  overflow: hidden;
+}
+.htmx-indicator::after {
+  content: '';
+  display: block;
+  height: 100%;
+  background: #6366f1;
+  width: 40%;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  animation: htmx-slide 1.2s ease-in-out infinite;
+}
+.htmx-indicator.htmx-request::after {
+  opacity: 1;
+}
+@keyframes htmx-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+/* ─── Nav link ─── */
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #71717a;
+  border-radius: 0.375rem;
+  transition: color 120ms ease, background-color 120ms ease;
+  text-decoration: none;
+}
+.nav-link:hover {
+  color: #f4f4f5;
+  background-color: #27272a;
+}
+.nav-link.active {
+  color: #f4f4f5;
+  background-color: #27272a;
+}
+
+/* ─── Buttons ─── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1.125rem;
+  background-color: #6366f1;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  transition: background-color 150ms ease;
+  text-decoration: none;
+}
+.btn-primary:hover { background-color: #4f46e5; }
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1.125rem;
+  color: #a1a1aa;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  border: 1px solid #3f3f46;
+  transition: color 150ms ease, border-color 150ms ease;
+  text-decoration: none;
+}
+.btn-ghost:hover { color: #f4f4f5; border-color: #71717a; }
+
+/* ─── Card ─── */
+.card {
+  padding: 1.25rem;
+  border: 1px solid #27272a;
+  border-radius: 0.75rem;
+  background-color: #18181b;
+  transition: border-color 150ms ease;
+}
+.card:hover { border-color: #3f3f46; }
+
+/* ─── Tag (static display) ─── */
+.tag {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  border-radius: 9999px;
+  background-color: #27272a;
+  color: #71717a;
+}
+
+/* ─── Tag button (HTMX-clickable filter) ─── */
+.tag-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  border-radius: 9999px;
+  background-color: transparent;
+  color: #71717a;
+  border: 1px solid #3f3f46;
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+  text-decoration: none;
+}
+.tag-btn:hover {
+  color: #a5b4fc;
+  border-color: #6366f1;
+  background-color: #6366f120;
+}
+.tag-btn.active {
+  color: #a5b4fc;
+  border-color: #6366f1;
+  background-color: #6366f120;
+}
+
+/* ─── Section heading ─── */
+.section-heading {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #52525b;
+  margin-bottom: 1.25rem;
+}
+
+/* ─── Skill card ─── */
+.skill-card {
+  padding: 1rem;
+  border: 1px solid #27272a;
+  border-radius: 0.75rem;
+  background-color: #18181b;
+}
+
+/* ─── Prose (blog post body) ─── */
+.prose-custom {
+  font-size: 0.9375rem;
+  line-height: 1.85;
+  color: #a1a1aa;
+}
+.prose-custom p { margin-bottom: 1.25rem; }
+.prose-custom p:last-child { margin-bottom: 0; }
+
+.prose-custom h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #f4f4f5;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #27272a;
+}
+.prose-custom h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e4e4e7;
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+.prose-custom ul { list-style: disc; padding-left: 1.5rem; margin-bottom: 1.25rem; }
+.prose-custom ol { list-style: decimal; padding-left: 1.5rem; margin-bottom: 1.25rem; }
+.prose-custom li { margin-bottom: 0.375rem; }
+
+.prose-custom code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125em;
+  background-color: #27272a;
+  color: #a5b4fc;
+  padding: 0.15em 0.4em;
+  border-radius: 0.25rem;
+}
+.prose-custom pre {
+  background-color: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 0.625rem;
+  padding: 1.25rem;
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+}
+.prose-custom pre code {
+  background: transparent;
+  padding: 0;
+  color: #d4d4d8;
+  font-size: 0.8125rem;
+}
+.prose-custom a { color: #818cf8; text-decoration: underline; text-underline-offset: 3px; }
+.prose-custom a:hover { color: #a5b4fc; }
+.prose-custom strong { color: #e4e4e7; font-weight: 600; }
+.prose-custom blockquote {
+  border-left: 3px solid #3f3f46;
+  padding-left: 1rem;
+  margin: 1.5rem 0;
+  color: #71717a;
+  font-style: italic;
+}
+
+/* ─── Post image thumbnail (blog list) ─── */
+.post-thumb {
+  width: 96px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  flex-shrink: 0;
+  border: 1px solid #27272a;
+  transition: border-color 150ms ease;
+}
+.group:hover .post-thumb { border-color: #3f3f46; }
+
+/* ─── Post hero image (post detail) ─── */
+.post-hero {
+  width: 100%;
+  max-height: 340px;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  border: 1px solid #27272a;
+  margin-bottom: 2rem;
+}
+
+/* ─── Divider ─── */
+.divider { border-color: #27272a; }
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+/* ─── Selection ─── */
+::selection { background-color: #4f46e5; color: #fff; }
+
+/* ─── Fade-in on HTMX swap ─── */
+#main-content { animation: fade-in 180ms ease; }
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Blog{% endblock %}
+
+{% block sidebar_extra %}
+<div class="p-4 border-b border-zinc-800/60">
+  <p class="text-[10px] font-semibold tracking-widest uppercase text-zinc-600 mb-3 px-2">Filter by tag</p>
+  <div class="flex flex-wrap gap-1.5 px-2">
+    <a href="/blog"
+       hx-get="/blog"
+       hx-target="#posts-list"
+       hx-select="#posts-list"
+       hx-swap="outerHTML"
+       hx-push-url="true"
+       hx-indicator="#htmx-indicator"
+       class="tag-btn {% if not current_tag %}active{% endif %}">all</a>
+    {% for t in all_tags %}
+    <a href="/blog?tag={{ t }}"
+       hx-get="/blog?tag={{ t }}"
+       hx-target="#posts-list"
+       hx-select="#posts-list"
+       hx-swap="outerHTML"
+       hx-push-url="true"
+       hx-indicator="#htmx-indicator"
+       class="tag-btn {% if current_tag == t %}active{% endif %}">{{ t }}</a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="mb-10">
+  <p class="section-heading">Writing</p>
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">Blog</h1>
+  <p class="text-sm text-zinc-500">
+    {% if current_tag %}
+      Posts tagged <span class="text-indigo-400">{{ current_tag }}</span> — <a href="/blog" hx-get="/blog" hx-target="#posts-list" hx-select="#posts-list" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#htmx-indicator" class="text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors">clear filter</a>
+    {% else %}
+      Notes on software engineering, tooling, and things I've learned the hard way.
+    {% endif %}
+  </p>
+</div>
+
+<div id="posts-list" class="space-y-6">
+  {% if posts %}
+    {% for post in posts %}
+    <article class="group">
+      <a href="/blog/{{ post.slug }}"
+         hx-get="/blog/{{ post.slug }}"
+         hx-target="#main-content"
+         hx-select="#main-content"
+         hx-push-url="true"
+         hx-swap="innerHTML"
+         hx-indicator="#htmx-indicator"
+         class="block">
+        <div class="flex gap-4 items-start">
+          {% if post.image %}
+          <img src="{{ post.image }}" alt="{{ post.title }}" class="post-thumb" loading="lazy">
+          {% endif %}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3 mb-1.5">
+              <time class="text-xs text-zinc-600">{{ post.date | dateformat }}</time>
+              <span class="text-zinc-800">·</span>
+              <span class="text-xs text-zinc-600">{{ post.reading_time }} min read</span>
+            </div>
+            <h2 class="text-base font-semibold text-zinc-200 group-hover:text-indigo-400 transition-colors leading-snug mb-1.5">
+              {{ post.title }}
+            </h2>
+            <p class="text-xs text-zinc-500 leading-relaxed mb-3">{{ post.summary }}</p>
+            <div class="flex flex-wrap gap-1.5">
+              {% for t in post.tags %}
+              <span class="tag">{{ t }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </a>
+      {% if not loop.last %}<hr class="border-zinc-800/60 mt-6" />{% endif %}
+    </article>
+    {% endfor %}
+  {% else %}
+    <p class="text-sm text-zinc-600 py-12 text-center">No posts found for this tag.</p>
+  {% endif %}
+
+  {% if total_pages > 1 %}
+  <nav class="flex items-center justify-between pt-8 mt-4 border-t border-zinc-800/60" aria-label="Pagination">
+    {% set prev_url = "/blog?page=" ~ (page - 1) ~ ("&tag=" ~ current_tag if current_tag else "") %}
+    {% set next_url = "/blog?page=" ~ (page + 1) ~ ("&tag=" ~ current_tag if current_tag else "") %}
+
+    {% if page > 1 %}
+    <a href="{{ prev_url }}"
+       hx-get="{{ prev_url }}"
+       hx-target="#posts-list"
+       hx-select="#posts-list"
+       hx-swap="outerHTML"
+       hx-push-url="true"
+       hx-indicator="#htmx-indicator"
+       class="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-indigo-400 transition-colors">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m15 18-6-6 6-6"/>
+      </svg>
+      Newer
+    </a>
+    {% else %}<span></span>{% endif %}
+
+    <span class="text-xs text-zinc-600">Page {{ page }} of {{ total_pages }}</span>
+
+    {% if page < total_pages %}
+    <a href="{{ next_url }}"
+       hx-get="{{ next_url }}"
+       hx-target="#posts-list"
+       hx-select="#posts-list"
+       hx-swap="outerHTML"
+       hx-push-url="true"
+       hx-indicator="#htmx-indicator"
+       class="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-indigo-400 transition-colors">
+      Older
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m9 18 6-6-6-6"/>
+      </svg>
+    </a>
+    {% else %}<span></span>{% endif %}
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

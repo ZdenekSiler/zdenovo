@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<section class="mb-16">
+  <div class="inline-flex items-center gap-2 text-xs font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-full px-3 py-1 mb-6">
+    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+    Available for new projects
+  </div>
+  <h1 class="text-3xl font-bold tracking-tight text-zinc-100 mb-4 leading-snug">
+    Building reliable software,<br>one layer at a time.
+  </h1>
+  <p class="text-zinc-400 leading-relaxed mb-8 text-sm max-w-lg">
+    I'm Zdenek — a software engineer specialising in Python backends, developer tooling, and AI-assisted workflows. Based in Prague.
+  </p>
+  <div class="flex gap-3">
+    <a href="/projects"
+       hx-get="/projects"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-push-url="true"
+       hx-swap="innerHTML"
+       hx-indicator="#htmx-indicator"
+       class="btn-primary">View projects</a>
+    <a href="/blog"
+       hx-get="/blog"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-push-url="true"
+       hx-swap="innerHTML"
+       hx-indicator="#htmx-indicator"
+       class="btn-ghost">Read the blog</a>
+  </div>
+</section>
+
+<!-- Stats row -->
+<section class="mb-16 grid grid-cols-3 gap-4">
+  {% for value, label in [("8+", "Years experience"), ("20+", "Projects shipped"), ("∞", "Coffee consumed")] %}
+  <div class="card text-center">
+    <p class="text-2xl font-bold text-zinc-100 mb-1">{{ value }}</p>
+    <p class="text-xs text-zinc-500">{{ label }}</p>
+  </div>
+  {% endfor %}
+</section>
+
+<!-- About -->
+<section class="mb-16">
+  <p class="section-heading">About</p>
+  <div class="prose-custom">
+    <p>
+      I build backend systems in Python, distributed infrastructure, and developer tooling. I care about code that's easy to delete, tests that catch real bugs, and documentation that doesn't lie.
+    </p>
+    <p>
+      Currently focused on AI-assisted development workflows and open-source tooling. Previously at startups in fintech and logistics.
+    </p>
+    <p>
+      When I'm not writing code, I'm cycling in the mountains or making espresso that's slightly too strong.
+    </p>
+  </div>
+</section>
+
+<!-- Skills -->
+<section>
+  <p class="section-heading">Skills</p>
+  <div class="grid grid-cols-2 gap-3">
+    {% set skill_groups = [
+      ("Languages", ["Python", "TypeScript", "SQL", "Bash"]),
+      ("Backend", ["FastAPI", "PostgreSQL", "Redis", "SQLite"]),
+      ("Infrastructure", ["Docker", "GitHub Actions", "Linux", "Nginx"]),
+      ("Tooling", ["mypy", "pytest", "ruff", "Claude Code"]),
+    ] %}
+    {% for group, skills in skill_groups %}
+    <div class="skill-card">
+      <h3 class="text-[10px] font-semibold tracking-widest text-indigo-400 uppercase mb-2.5">{{ group }}</h3>
+      <div class="flex flex-wrap gap-1.5">
+        {% for skill in skills %}
+        <span class="tag">{{ skill }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+{% endblock %}

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "claude-code-repo-best-practices",
+    "title_hint": "Structuring a Claude Code Repository for Maximum AI Leverage",
+    "description": "A practical guide to organising a Claude Code project so you get the most out of its built-in capabilities: custom skills (/design, /implement, /simplify), parallel subagents, CLAUDE.md context files, rules/, and the design-then-implement workflow. Covers folder layout, what to put in CLAUDE.md vs rules/ vs docs/, how to write good skill prompts, and when to decompose work into parallel subagents.",
+    "audience": "Software engineers who are new to Claude Code and want to go beyond basic usage — they already know how to run the CLI but haven't yet structured their repo to take full advantage of it.",
+    "tone": "practical, opinionated, tutorial-style with concrete examples",
+    "tags": ["claude-code", "ai-tooling", "developer-workflow", "best-practices"],
+    "outline": [
+      "Why repo structure matters for AI-assisted development — context windows, discoverability, prompt quality",
+      "CLAUDE.md: the single most important file — what to include (architecture, commands, conventions), what to leave out, the 200-line limit rule",
+      "rules/ directory: separating stable conventions (code-style, testing, git) from the main CLAUDE.md to keep it concise",
+      "docs/ directory: architecture.md, workflows.md, and specs/ for design artefacts",
+      "Custom skills: /design, /implement, /simplify — when to trigger each, how to write skill prompts that use Explore and Plan subagents effectively",
+      "Parallel subagents: the design-then-implement pattern, how to decompose a spec into independent tasks, avoiding context bleed between agents",
+      "The full workflow end-to-end: branch → /design → review spec → /implement → /simplify → test → commit",
+      "Common mistakes: putting too much in CLAUDE.md, skipping /design for non-trivial features, not isolating tests"
+    ]
+  }
+]

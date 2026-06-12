@@ -1,0 +1,122 @@
+[
+  {
+    "id": "fastapi-dependency-injection",
+    "title_hint": "FastAPI Dependency Injection: The Right Way",
+    "description": "A practical guide to FastAPI's dependency injection system — why it exists, how it works, and patterns for keeping your routes thin and your logic testable.",
+    "audience": "Python developers building REST APIs with FastAPI",
+    "tone": "practical, opinionated, example-driven",
+    "tags": ["fastapi", "python", "backend", "architecture"],
+    "outline": [
+      "What dependency injection actually solves",
+      "FastAPI's Depends() — the basics",
+      "Sharing DB connections and service objects",
+      "Overriding dependencies in tests",
+      "Common pitfalls and how to avoid them"
+    ]
+  },
+  {
+    "id": "sqlite-for-production",
+    "title_hint": "SQLite in Production: When It's the Right Call",
+    "description": "SQLite gets dismissed as a toy database, but for many production workloads it outperforms Postgres in simplicity, latency, and cost. Here's when to use it and how.",
+    "audience": "Backend developers choosing a database for a small-to-medium web app",
+    "tone": "data-driven, pragmatic, contrarian",
+    "tags": ["sqlite", "database", "backend", "architecture"],
+    "outline": [
+      "The SQLite stigma — and why it's mostly wrong",
+      "Read-heavy workloads where SQLite excels",
+      "WAL mode: enabling concurrent reads and writes",
+      "Backup strategies: Litestream and .dump",
+      "When you actually need Postgres"
+    ]
+  },
+  {
+    "id": "python-async-pitfalls",
+    "title_hint": "Python Async/Await: The Traps Nobody Warns You About",
+    "description": "async/await looks simple until you hit blocking calls, event loop conflicts, or subtle concurrency bugs. This post maps the landmines so you can avoid them.",
+    "audience": "Python developers new to async programming or debugging async bugs",
+    "tone": "candid, technical, example-heavy with code snippets",
+    "tags": ["python", "async", "concurrency", "debugging"],
+    "outline": [
+      "How the event loop actually works",
+      "Blocking the loop with sync I/O — the #1 mistake",
+      "asyncio.gather vs asyncio.TaskGroup",
+      "Running sync code in a thread pool",
+      "Testing async code with pytest-asyncio"
+    ]
+  },
+  {
+    "id": "docker-multi-stage-builds",
+    "title_hint": "Docker Multi-Stage Builds for Lean Python Images",
+    "description": "A production Python Docker image shouldn't weigh 1 GB. Multi-stage builds let you compile, install, and copy only what you need — here's how to do it with uv.",
+    "audience": "Python developers containerising their apps for the first time or optimising existing images",
+    "tone": "step-by-step tutorial, practical, includes full Dockerfile examples",
+    "tags": ["docker", "python", "devops", "tooling"],
+    "outline": [
+      "Why image size matters in production",
+      "The builder stage: installing deps with uv",
+      "The runtime stage: copy .venv, nothing else",
+      "Layer caching: ordering instructions for speed",
+      "Scanning for vulnerabilities with docker scout"
+    ]
+  },
+  {
+    "id": "uv-python-package-manager",
+    "title_hint": "uv: The Python Package Manager That Changes Everything",
+    "description": "uv replaces pip, pip-tools, virtualenv, and pyenv in a single Rust binary that runs 10-100x faster. Here's what it does differently and why it matters.",
+    "audience": "Python developers frustrated with slow installs, complex tooling, or dependency hell",
+    "tone": "enthusiastic but measured, benchmark-driven, practical migration tips",
+    "tags": ["python", "tooling", "uv", "packaging"],
+    "outline": [
+      "The fragmented Python packaging landscape",
+      "uv's resolver: why it's so fast",
+      "uv sync, uv add, uv run — daily workflow",
+      "Lockfiles and reproducible builds",
+      "Migrating from pip + requirements.txt"
+    ]
+  },
+  {
+    "id": "htmx-patterns",
+    "title_hint": "HTMX Patterns That Replace 80% of Your JavaScript",
+    "description": "HTMX lets you build dynamic UIs with almost no JS by putting hypermedia back in control. These five patterns cover the majority of real-world interactivity needs.",
+    "audience": "Backend developers who want richer UIs without learning a JS framework",
+    "tone": "practical, pattern-oriented, includes HTML snippets",
+    "tags": ["htmx", "frontend", "html", "web"],
+    "outline": [
+      "Inline form submission and server-rendered feedback",
+      "Infinite scroll and load-more pagination",
+      "Live search with hx-trigger and debounce",
+      "Optimistic UI with hx-swap and CSS transitions",
+      "Out-of-band swaps for updating multiple page regions"
+    ]
+  },
+  {
+    "id": "anthropic-tool-use",
+    "title_hint": "Structured Outputs with Anthropic Tool Use",
+    "description": "The best way to get reliable JSON from Claude isn't prompt engineering — it's tool use. Here's how to define a tool schema and extract structured data every time.",
+    "audience": "Developers integrating Claude into apps who need predictable, structured output",
+    "tone": "technical, tutorial-style with full Python code examples",
+    "tags": ["anthropic", "claude", "ai", "python"],
+    "outline": [
+      "Why plain prompts fail for structured output",
+      "Defining a tool schema: types, descriptions, required fields",
+      "Forcing tool use with tool_choice",
+      "Extracting and validating the tool_use block",
+      "Error handling: missing fields, max_tokens, API errors"
+    ]
+  },
+  {
+    "id": "tailwind-css-without-build",
+    "title_hint": "Tailwind CSS Without a Build Step: CDN, Play CDN, and Trade-offs",
+    "description": "You don't always need a Node.js pipeline to use Tailwind. The Play CDN covers many use cases. Here's when it's fine and when you'll eventually need a build.",
+    "audience": "Backend developers and indie hackers building simple sites without a JS build system",
+    "tone": "balanced, honest about trade-offs, practical advice for picking the right approach",
+    "tags": ["tailwind", "css", "frontend", "tooling"],
+    "outline": [
+      "What the Play CDN actually does at runtime",
+      "Performance implications: when it matters, when it doesn't",
+      "Custom config via the CDN — what's possible",
+      "The tipping point: when to add a build step",
+      "Minimal Vite setup for Tailwind without full SPA overhead"
+    ]
+  }
+]

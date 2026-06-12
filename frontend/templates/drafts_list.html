@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Draft Posts{% endblock %}
+
+{% block content %}
+<div class="mb-10">
+  <p class="section-heading">Admin</p>
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">Draft Posts</h1>
+  <p class="text-sm text-zinc-500">AI-generated posts awaiting review. Approve to publish, or reject to discard.</p>
+</div>
+
+<div class="mb-6 flex items-center justify-between">
+  <span class="text-xs text-zinc-600">{{ drafts | length }} draft{% if drafts | length != 1 %}s{% endif %}</span>
+  <button
+    hx-post="/api/drafts/generate"
+    hx-swap="none"
+    hx-on::after-request="window.location.reload()"
+    class="btn-primary text-xs">
+    Generate today's drafts
+  </button>
+</div>
+
+{% if drafts %}
+<div class="space-y-3">
+  {% for draft in drafts %}
+  <div id="draft-{{ draft.id }}" class="card flex items-start gap-4">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 mb-1">
+        {% if draft.status == 'pending' %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-900/40 text-yellow-400 border border-yellow-800/50">pending</span>
+        {% elif draft.status == 'approved' %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-900/40 text-green-400 border border-green-800/50">approved</span>
+        {% else %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-800 text-zinc-500 border border-zinc-700">rejected</span>
+        {% endif %}
+        <span class="text-[10px] text-zinc-600">{{ draft.topic_id }}</span>
+      </div>
+      <a href="/admin/drafts/{{ draft.id }}" class="text-sm font-semibold text-zinc-200 hover:text-indigo-400 transition-colors leading-snug block mb-1">
+        {{ draft.title }}
+      </a>
+      <div class="flex items-center gap-3 text-[10px] text-zinc-600">
+        <time>{{ draft.generated_at | dateformat }}</time>
+        <span class="text-zinc-800">·</span>
+        <span>{{ draft.reading_time }} min read</span>
+        <span class="text-zinc-800">·</span>
+        <div class="flex flex-wrap gap-1">
+          {% for t in draft.tags %}<span class="tag">{{ t }}</span>{% endfor %}
+        </div>
+      </div>
+    </div>
+
+    {% if draft.status == 'pending' %}
+    <div class="flex items-center gap-2 shrink-0">
+      <a href="/admin/drafts/{{ draft.id }}" class="btn-ghost text-xs">Preview</a>
+      <button
+        hx-post="/api/drafts/{{ draft.id }}/approve"
+        hx-target="#draft-{{ draft.id }}"
+        hx-swap="outerHTML"
+        hx-confirm="Publish this post to the blog?"
+        class="btn-primary text-xs">
+        Approve
+      </button>
+      <button
+        hx-delete="/api/drafts/{{ draft.id }}"
+        hx-target="#draft-{{ draft.id }}"
+        hx-swap="outerHTML"
+        hx-confirm="Reject and delete this draft?"
+        class="text-xs text-red-500 hover:text-red-400 transition-colors px-2 py-1">
+        Reject
+      </button>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-16">
+  <p class="text-sm text-zinc-600 mb-4">No drafts yet.</p>
+  <p class="text-xs text-zinc-700">Click "Generate today's drafts" to create 3 posts from the topic pool.</p>
+</div>
+{% endif %}
+{% endblock %}

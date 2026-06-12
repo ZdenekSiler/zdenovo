@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(uv *)",
+      "Read(**)",
+      "Edit(src/**)",
+      "Edit(docs/**)",
+      "Edit(.claude/**)",
+      "Edit(backend/**)",
+      "Edit(frontend/**)",
+      "Write(backend/**)",
+      "Write(frontend/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(sudo rm *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[hook] modified: $(echo $CLAUDE_TOOL_INPUT | jq -r '.file_path // empty' 2>/dev/null)\""
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

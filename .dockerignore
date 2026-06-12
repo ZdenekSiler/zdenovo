@@ -1,0 +1,25 @@
+# Python artifacts
+backend/.venv/
+backend/__pycache__/
+backend/*.py[cod]
+backend/*.db
+**/__pycache__/
+**/*.pyc
+
+# Tests (not needed in image)
+backend/tests/
+
+# Deployment / infra (not needed inside the app image)
+nginx/
+scripts/
+Makefile
+docker-compose*.yml
+.env
+.env.*
+.env.example
+
+# Dev / editor
+.claude/
+.git/
+*.log
+docs/

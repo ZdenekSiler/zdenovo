@@ -1,0 +1,29 @@
+[
+  {
+    "slug": "why-i-switched-to-type-hints",
+    "title": "Why I Switched to Type Hints in Every Python Project",
+    "date": "2025-11-10",
+    "summary": "Type hints changed how I write Python. Here's what convinced me and how to add them without slowing down.",
+    "tags": ["python", "tooling"],
+    "image": "https://picsum.photos/seed/typehints/800/400",
+    "content": "Type hints in Python are often dismissed as optional ceremony. I used to agree — until I spent three hours debugging a function that expected a list but received a single string.\n\n## The Turning Point\n\nThe bug was subtle: the function iterated over its argument, so passing a string just iterated over characters. No exception was raised. The output was silently wrong.\n\nA single annotation would have caught it at the call site with a linter:\n\n```python\ndef process_items(items: list[str]) -> None:\n    ...\n```\n\n## What I Changed\n\nI added `mypy` to every project and enabled strict mode. The first run flagged 23 issues across a codebase I thought was clean.\n\n## Was It Worth It?\n\nYes. The upfront investment pays back within days on any project longer than a weekend hack."
+  },
+  {
+    "slug": "designing-with-subagents",
+    "title": "Designing Software with AI Subagents",
+    "date": "2025-12-05",
+    "summary": "How I use parallel AI agents to separate design from implementation — and why it produces better code than jumping straight to a prompt.",
+    "tags": ["ai", "workflow"],
+    "image": "https://picsum.photos/seed/subagents/800/400",
+    "content": "The fastest way to get bad AI-generated code is to write a one-line prompt and ship whatever comes back.\n\nThe better approach is to separate design from implementation — the same discipline we apply to human engineering work.\n\n## The Workflow\n\n1. **Design** — a Plan agent researches the codebase and writes a spec\n2. **Implement** — parallel subagents each own one slice of the spec\n3. **Simplify** — a final pass removes anything unnecessary\n\n## Why Parallel Subagents?\n\nIndependent modules don't need to coordinate. Spawning agents for the backend, frontend, and tests simultaneously is faster than doing them sequentially — and the separation enforces clean boundaries.\n\n## The Result\n\nCode that's easier to review, closer to spec, and simpler than a single-pass generation."
+  },
+  {
+    "slug": "htmx-is-enough",
+    "title": "HTMX Is Enough for Most Web Apps",
+    "date": "2026-01-18",
+    "summary": "Before reaching for React, consider whether a small amount of HTMX and server-rendered HTML would get you there faster.",
+    "tags": ["frontend", "web"],
+    "image": "https://picsum.photos/seed/htmxweb/800/400",
+    "content": "Every new web project seems to start with `npm create vite@latest`. But for most internal tools and content sites, that's overkill.\n\n## What HTMX Gives You\n\n- Partial page updates from any HTML attribute\n- No build step\n- Server sends HTML, not JSON\n- Works with any backend language\n\n## Where It Fits\n\nHTMX shines for: dashboards, admin panels, form-heavy apps, and any site where SEO matters. It doesn't replace React for highly interactive SPAs, but those are rarer than we pretend.\n\n## The Trade-off\n\nYou give up the React ecosystem. You gain simplicity, faster initial load, and server-side logic that stays in one language."
+  }
+]
