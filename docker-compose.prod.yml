@@ -6,6 +6,7 @@ services:
       - db_data:/data
     environment:
       - DB_DIR=/data
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     networks:
       - internal
     healthcheck:
