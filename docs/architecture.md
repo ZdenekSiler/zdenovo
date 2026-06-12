@@ -37,20 +37,8 @@ zdenovo/
         └── js/main.js              # Active nav highlight
 ```
 
-## Import Conventions
-
-Group imports stdlib → third-party → internal (blank line between groups), no unused
-imports. "Internal" imports map directly to the module layout above:
-
-- `db` — connection/schema helpers, available to every router and `data/` module
-- `data.posts`, `data.projects` — read-only query helpers for HTML routes
-- `routers.posts_api`, `routers.generate_api`, `routers.drafts_api` — APIRouter modules
-  mounted in `main.py`
-
-`generate_api.py` and `drafts_api.py` import from `posts_api` (`PostOut`, `_slugify`) and
-from each other (`drafts_api` imports `PostBrief`, `_build_brief_message`, `_call_claude`
-from `generate_api`) — keep this one-directional (drafts depends on generate, generate
-depends on posts) to avoid circular imports.
+For where new code should go, import/dependency direction, and the checklist for adding
+a module or endpoint, see @.claude/rules/architecture.md.
 
 ## Backend ↔ Frontend Communication
 
@@ -165,10 +153,3 @@ no bundler.
 Draft generation (manual or scheduled) writes to a separate `drafts` table with an
 approval step, rather than writing directly to `posts` — generated content is always
 reviewed before it's published.
-
-## Adding a New Module
-
-1. Add routes to `main.py` or a new file under `backend/routers/`
-2. Add DB tables/helpers to `db.py` if persistence is needed
-3. Add templates under `frontend/templates/`
-4. Document the new endpoints here

@@ -58,6 +58,7 @@ See `docs/deployment.md` for full deployment guide.
 ## Code Conventions
 
 - @.claude/rules/code-style.md — formatting and naming
+- @.claude/rules/architecture.md — where code goes, module/import rules, API conventions
 - @.claude/rules/testing.md — test structure and coverage
 - @.claude/rules/git.md — branches, commits, PRs
 

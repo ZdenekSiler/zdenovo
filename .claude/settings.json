@@ -3,15 +3,13 @@
   "permissions": {
     "allow": [
       "Bash(git *)",
-      "Bash(npm *)",
-      "Bash(npx *)",
       "Bash(uv *)",
       "Read(**)",
-      "Edit(src/**)",
       "Edit(docs/**)",
       "Edit(.claude/**)",
       "Edit(backend/**)",
       "Edit(frontend/**)",
+      "Write(docs/**)",
       "Write(backend/**)",
       "Write(frontend/**)"
     ],

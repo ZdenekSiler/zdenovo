@@ -45,10 +45,18 @@ Rules:
 - Title follows commit message format
 - Include a description of what changed and why
 - Link to the relevant spec in `docs/specs/` if applicable
-- All tests must pass before merging
-- At least one review required
+- All tests must pass before merging (`cd backend && uv run pytest`)
+- This is a solo-maintained project — self-review the diff before merging instead of waiting on a reviewer
 
 ## Protected Branches
 
-- `main` — production, protected, requires PR
-- `develop` — integration branch, requires PR
+- `main` — production. The server runs `git pull` on this branch via `make deploy`, so only merge tested, working code.
+
+## Secrets
+
+- Never commit `.env` (gitignored) — it holds `ANTHROPIC_API_KEY`, `CERTBOT_EMAIL`,
+  `SERVER_HOST`, and other production credentials.
+- New environment variables go in `.env.example` with a placeholder value, never a
+  real one.
+- Never display, log, or echo the contents of `.env` — including in command output
+  or commit messages.

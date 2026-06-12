@@ -22,7 +22,7 @@ Review the code changes made in this session and improve their quality.
 
 3. **Fix issues found** — make targeted edits. Do not refactor code that wasn't changed.
 
-4. **Verify** — ensure the code still works after simplification (check for broken references).
+4. **Verify** — check for broken references, then run `cd backend && uv run pytest` and confirm it stays green (per `.claude/rules/testing.md`).
 
 5. **Summarize** what was simplified and why.
 

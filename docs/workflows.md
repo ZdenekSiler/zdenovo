@@ -79,24 +79,5 @@ git commit -m "feat: add my-feature"
 git push origin feature/my-feature
 ```
 
-## Test Layout
-
-```
-backend/tests/
-├── conftest.py          # test_db and client fixtures
-├── test_db.py           # db.py unit tests
-├── test_data.py         # data/posts.py and data/projects.py
-├── test_api.py          # /api/posts CRUD endpoints
-└── test_routes.py       # HTML page routes + HTMX structure
-```
-
-Each test file mirrors the module it covers. All tests use isolated
-SQLite databases via the `test_db` fixture — no shared state.
-
-## Skill Reference
-
-| Skill | Trigger | Output |
-|-------|---------|--------|
-| `/design <feature>` | Manual | `docs/specs/<feature>.md` |
-| `/implement <feature>` | Manual after design | Code changes across relevant files |
-| `/simplify` | Manual after implementing | In-place code improvements |
+For test file layout and conventions, see @.claude/rules/testing.md. For the skill
+reference table (trigger, output), see the "Custom Skills" section of `CLAUDE.md`.

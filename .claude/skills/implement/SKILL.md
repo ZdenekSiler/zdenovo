@@ -33,6 +33,7 @@ You are the implementation coordinator. Your job is to implement a feature that 
 8. **Run a final check**:
    - Are all files from the spec created/modified?
    - Do tests exist for the new code?
+   - Do all tests pass? (`cd backend && uv run pytest`)
    - Does the code follow `.claude/rules/code-style.md`?
 
 9. **Report to the user**: what was implemented, what files changed, next step is `/simplify`.

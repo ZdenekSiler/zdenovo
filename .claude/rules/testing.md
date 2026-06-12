@@ -7,6 +7,20 @@
 - **pytest-cov** — coverage (`uv run pytest --cov`)
 - Tests live in `backend/tests/`, named `test_<module>.py`
 
+## Test Layout
+
+```
+backend/tests/
+├── conftest.py          # test_db and client fixtures
+├── test_db.py           # db.py unit tests
+├── test_data.py         # data/posts.py and data/projects.py
+├── test_api.py          # /api/posts CRUD endpoints
+└── test_routes.py       # HTML page routes + HTMX structure
+```
+
+Each test file mirrors the module it covers. Add a new `test_<module>.py` here when
+adding a new `routers/` or `data/` module (see @.claude/rules/architecture.md).
+
 ## Fixtures
 
 Define shared setup in `conftest.py`. Always isolate the database:
