@@ -59,4 +59,8 @@
     {{ post.content | markdown | safe }}
   </div>
 </article>
+
+<section id="comments-section" class="mt-16 pt-8 border-t border-zinc-800/60">
+  {% include "comments_section.html" %}
+</section>
 {% endblock %}

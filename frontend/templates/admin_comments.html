@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Comments{% endblock %}
+
+{% block content %}
+<div class="mb-10">
+  <p class="section-heading">Admin</p>
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">Comments</h1>
+  <p class="text-sm text-zinc-500">All reader comments. Delete any that need moderation.</p>
+</div>
+
+<div class="mb-6">
+  <span class="text-xs text-zinc-600">{{ comments | length }} comment{% if comments | length != 1 %}s{% endif %}</span>
+</div>
+
+{% if comments %}
+<div class="space-y-3">
+  {% for c in comments %}
+  <div id="comment-{{ c.id }}" class="card flex items-start gap-4">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2 mb-1 flex-wrap">
+        <span class="text-sm font-semibold text-zinc-200">{{ c.author }}</span>
+        <span class="text-zinc-800">·</span>
+        <a href="/blog/{{ c.post_slug }}" class="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors">{{ c.post_slug }}</a>
+        <span class="text-zinc-800">·</span>
+        <time class="text-[10px] text-zinc-600">{{ c.created_at | dateformat }}</time>
+      </div>
+      <p class="text-xs text-zinc-500 leading-relaxed">{{ c.body[:120] }}{% if c.body | length > 120 %}…{% endif %}</p>
+    </div>
+    <button
+      hx-delete="/api/comments/{{ c.id }}"
+      hx-target="#comment-{{ c.id }}"
+      hx-swap="outerHTML"
+      hx-confirm="Delete this comment?"
+      class="shrink-0 text-xs text-red-500 hover:text-red-400 transition-colors px-2 py-1">
+      Delete
+    </button>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-16">
+  <p class="text-sm text-zinc-600">No comments yet.</p>
+</div>
+{% endif %}
+{% endblock %}

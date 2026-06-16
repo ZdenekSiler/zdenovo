@@ -1,0 +1,47 @@
+<p class="section-heading">Comments</p>
+<h2 class="text-lg font-semibold text-zinc-100 mb-6">
+  {{ comments | length }} comment{% if comments | length != 1 %}s{% endif %}
+</h2>
+
+{% if comments %}
+<div class="space-y-4 mb-10">
+  {% for c in comments %}
+  <div class="card">
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-sm font-semibold text-zinc-200">{{ c.author }}</span>
+      <time class="text-[10px] text-zinc-600">{{ c.created_at | dateformat }}</time>
+    </div>
+    <p class="text-sm text-zinc-400 leading-relaxed">{{ c.body }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="text-sm text-zinc-600 mb-10">No comments yet. Be the first.</p>
+{% endif %}
+
+<div class="card">
+  <p class="text-xs font-semibold text-zinc-400 mb-4">Leave a comment</p>
+  <form
+    hx-post="/blog/{{ slug }}/comments"
+    hx-target="#comments-section"
+    hx-swap="innerHTML"
+    class="space-y-3">
+    <input
+      type="text"
+      name="author"
+      placeholder="Your name"
+      maxlength="80"
+      required
+      class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
+    <textarea
+      name="body"
+      placeholder="Leave a comment..."
+      maxlength="2000"
+      required
+      rows="4"
+      class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60 resize-none"></textarea>
+    <div class="flex justify-end">
+      <button type="submit" class="btn-primary text-xs">Post comment</button>
+    </div>
+  </form>
+</div>

@@ -1,5 +1,7 @@
 import json
+import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import mistune
@@ -15,7 +17,8 @@ from fastapi.templating import Jinja2Templates
 
 from data.posts import get_all_tags, get_post_by_slug, get_posts_page, total_pages
 from data.projects import get_all_projects
-from db import draft_row_to_dict, get_conn, init_db
+from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
+from routers.comments_api import router as comments_router
 from routers.drafts_api import generate_daily_drafts, router as drafts_router
 from routers.generate_api import router as generate_router
 from routers.posts_api import router as posts_router
@@ -39,6 +42,7 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend" / "static"), na
 
 templates = Jinja2Templates(directory=BASE_DIR / "frontend" / "templates")
 
+app.include_router(comments_router)
 app.include_router(drafts_router)
 app.include_router(generate_router)
 app.include_router(posts_router)
@@ -92,7 +96,12 @@ async def post(request: Request, slug: str):
     article = get_post_by_slug(slug)
     if article is None:
         return templates.TemplateResponse(request, "404.html", status_code=404)
-    return templates.TemplateResponse(request, "post.html", {"post": article})
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM comments WHERE post_slug = ? ORDER BY created_at ASC", (slug,)
+        ).fetchall()
+    comments = [comment_row_to_dict(r) for r in rows]
+    return templates.TemplateResponse(request, "post.html", {"post": article, "comments": comments, "slug": slug})
 
 
 # ─── Admin pages ──────────────────────────────────────────────────────────────
@@ -115,6 +124,35 @@ async def admin_draft_preview(request: Request, draft_id: str):
         return templates.TemplateResponse(request, "404.html", status_code=404)
     draft = draft_row_to_dict(row)
     return templates.TemplateResponse(request, "draft_preview.html", {"draft": draft})
+
+
+@app.post("/blog/{slug}/comments", response_class=HTMLResponse)
+async def submit_comment(request: Request, slug: str, author: str = Form(...), body: str = Form(...)):
+    article = get_post_by_slug(slug)
+    if article is None:
+        return templates.TemplateResponse(request, "404.html", status_code=404)
+    if author.strip() and body.strip():
+        with get_conn() as conn:
+            conn.execute(
+                "INSERT INTO comments (id, post_slug, author, body, created_at) VALUES (?, ?, ?, ?, ?)",
+                (str(uuid.uuid4()), slug, author.strip()[:80], body.strip()[:2000], datetime.now(timezone.utc).isoformat()),
+            )
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM comments WHERE post_slug = ? ORDER BY created_at ASC", (slug,)
+        ).fetchall()
+    comments = [comment_row_to_dict(r) for r in rows]
+    return templates.TemplateResponse(request, "comments_section.html", {"comments": comments, "slug": slug})
+
+
+@app.get("/admin/comments", response_class=HTMLResponse)
+async def admin_comments(request: Request):
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM comments ORDER BY created_at DESC"
+        ).fetchall()
+    comments = [comment_row_to_dict(r) for r in rows]
+    return templates.TemplateResponse(request, "admin_comments.html", {"comments": comments})
 
 
 @app.post("/admin/drafts/{draft_id}", response_class=HTMLResponse)

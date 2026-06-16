@@ -99,6 +99,7 @@ def update_post(slug: str, body: PostIn):
 @router.delete("/{slug}", status_code=204)
 def delete_post(slug: str):
     with get_conn() as conn:
+        conn.execute("DELETE FROM comments WHERE post_slug = ?", (slug,))
         result = conn.execute(
             "DELETE FROM posts WHERE slug = ?", (slug,)
         )

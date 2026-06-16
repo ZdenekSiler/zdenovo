@@ -50,6 +50,15 @@ def init_db() -> None:
                 status       TEXT NOT NULL DEFAULT 'pending'
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS comments (
+                id         TEXT PRIMARY KEY,
+                post_slug  TEXT NOT NULL,
+                author     TEXT NOT NULL,
+                body       TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
         conn.execute(
             "UPDATE posts SET image = 'https://picsum.photos/seed/' || slug || '/800/400' WHERE image IS NULL"
         )
@@ -85,4 +94,10 @@ def draft_row_to_dict(row: sqlite3.Row) -> dict:
     d["date"] = date.fromisoformat(d["date"])
     d["generated_at"] = datetime.fromisoformat(d["generated_at"])
     d["reading_time"] = max(1, len(d["content"].split()) // 200)
+    return d
+
+
+def comment_row_to_dict(row: sqlite3.Row) -> dict:
+    d = dict(row)
+    d["created_at"] = datetime.fromisoformat(d["created_at"])
     return d
