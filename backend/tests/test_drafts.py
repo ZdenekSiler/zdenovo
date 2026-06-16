@@ -180,19 +180,19 @@ def test_delete_draft_not_found(client):
 
 # ─── Admin HTML pages ─────────────────────────────────────────────────────────
 
-def test_admin_drafts_page_returns_200(client):
-  resp = client.get("/admin/drafts")
+def test_admin_drafts_page_returns_200(admin_client):
+  resp = admin_client.get("/admin/drafts")
   assert resp.status_code == 200
   assert b"Draft Posts" in resp.content
 
 
-def test_admin_draft_preview_returns_200(client, monkeypatch):
-  draft_id = _insert_draft(client, monkeypatch)
-  resp = client.get(f"/admin/drafts/{draft_id}")
+def test_admin_draft_preview_returns_200(admin_client, monkeypatch):
+  draft_id = _insert_draft(admin_client, monkeypatch)
+  resp = admin_client.get(f"/admin/drafts/{draft_id}")
   assert resp.status_code == 200
   assert b"Draft Preview" in resp.content
 
 
-def test_admin_draft_preview_not_found(client):
-  resp = client.get("/admin/drafts/nonexistent-id")
+def test_admin_draft_preview_not_found(admin_client):
+  resp = admin_client.get("/admin/drafts/nonexistent-id")
   assert resp.status_code == 404

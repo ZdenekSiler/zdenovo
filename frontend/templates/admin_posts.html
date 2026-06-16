@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Published Posts{% endblock %}
+
+{% block content %}
+<div class="mb-10">
+  <p class="section-heading">Admin</p>
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">Published Posts</h1>
+  <p class="text-sm text-zinc-500">Manage live posts. "Move to draft" unpublishes and returns the post to the draft queue for editing.</p>
+</div>
+
+<!-- Stats strip -->
+<div class="grid grid-cols-3 gap-3 mb-8">
+  <div class="card text-center">
+    <p class="text-2xl font-bold text-indigo-400">{{ posts | length }}</p>
+    <p class="text-[11px] text-zinc-500 mt-0.5">Published</p>
+  </div>
+  <a href="/admin/drafts" class="card text-center hover:border-zinc-700 transition-colors">
+    <p class="text-2xl font-bold text-yellow-400">{{ pending_count }}</p>
+    <p class="text-[11px] text-zinc-500 mt-0.5">Pending drafts</p>
+  </a>
+  <a href="/admin/comments" class="card text-center hover:border-zinc-700 transition-colors">
+    <p class="text-2xl font-bold text-zinc-300">{{ comment_count }}</p>
+    <p class="text-[11px] text-zinc-500 mt-0.5">Comments</p>
+  </a>
+</div>
+
+{% if posts %}
+<div class="space-y-3">
+  {% for p in posts %}
+  <div id="post-{{ p.slug }}" class="card flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+    <div class="flex-1 min-w-0">
+      <a href="/blog/{{ p.slug }}" class="text-sm font-semibold text-zinc-200 hover:text-indigo-400 transition-colors leading-snug block mb-1">
+        {{ p.title }}
+      </a>
+      <div class="flex items-center gap-3 text-[10px] text-zinc-600 flex-wrap">
+        <time>{{ p.date | dateformat }}</time>
+        <span class="text-zinc-800">·</span>
+        <span>{{ p.reading_time }} min read</span>
+        {% if p.tags %}
+        <span class="text-zinc-800">·</span>
+        <div class="flex flex-wrap gap-1">
+          {% for t in p.tags %}<span class="tag">{{ t }}</span>{% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="flex items-center gap-2 sm:shrink-0">
+      <a href="/blog/{{ p.slug }}" class="btn-ghost text-xs">View</a>
+      <button
+        hx-post="/api/posts/{{ p.slug }}/unpublish"
+        hx-target="#post-{{ p.slug }}"
+        hx-swap="outerHTML"
+        hx-confirm="Move '{{ p.title }}' back to drafts? Comments on this post will be removed."
+        class="btn-ghost text-xs text-yellow-400 hover:text-yellow-300 border-yellow-900/40 hover:border-yellow-700/60">
+        Move to draft
+      </button>
+      <button
+        hx-delete="/api/posts/{{ p.slug }}"
+        hx-target="#post-{{ p.slug }}"
+        hx-swap="outerHTML"
+        hx-confirm="Delete '{{ p.title }}'? This also removes all comments and cannot be undone."
+        class="text-xs text-red-500 hover:text-red-400 transition-colors px-2 py-1">
+        Delete
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-16">
+  <p class="text-sm text-zinc-600">No published posts yet.</p>
+</div>
+{% endif %}
+{% endblock %}

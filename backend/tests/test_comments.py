@@ -109,14 +109,14 @@ def test_post_detail_includes_comments_section(client):
   assert b"comments-section" in resp.content
 
 
-def test_admin_comments_returns_200(client):
-  resp = client.get("/admin/comments")
+def test_admin_comments_returns_200(admin_client):
+  resp = admin_client.get("/admin/comments")
   assert resp.status_code == 200
 
 
-def test_admin_comments_lists_comments(client):
-  _insert_comment(client, author="Dave", body="Testing")
-  resp = client.get("/admin/comments")
+def test_admin_comments_lists_comments(admin_client):
+  _insert_comment(admin_client, author="Dave", body="Testing")
+  resp = admin_client.get("/admin/comments")
   assert b"Dave" in resp.content
 
 

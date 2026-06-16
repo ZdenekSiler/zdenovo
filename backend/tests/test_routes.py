@@ -132,6 +132,18 @@ def test_blog_pagination_second_page_has_prev_link(client, monkeypatch):
     assert b"page=1" in r.content
 
 
+# ── About ─────────────────────────────────────────────────────────────────────
+
+def test_about_returns_200(client):
+    r = client.get("/about")
+    assert r.status_code == 200
+
+
+def test_about_is_html(client):
+    r = client.get("/about")
+    assert "text/html" in r.headers["content-type"]
+
+
 # ── Images ────────────────────────────────────────────────────────────────────
 
 def test_blog_list_shows_post_images(client):

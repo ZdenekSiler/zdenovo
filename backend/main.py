@@ -1,4 +1,6 @@
 import json
+import os
+import secrets
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -7,15 +9,15 @@ from pathlib import Path
 import mistune
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import RedirectResponse
-
-load_dotenv()  # no-op if .env absent; prod uses system env vars
-from fastapi.responses import HTMLResponse
+from fastapi import Depends, FastAPI, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
-from data.posts import get_all_tags, get_post_by_slug, get_posts_page, total_pages
+load_dotenv()  # no-op if .env absent; prod uses system env vars
+
+from data.posts import get_all_posts, get_all_tags, get_post_by_slug, get_posts_page, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
 from routers.comments_api import router as comments_router
@@ -38,6 +40,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="zdenovo", lifespan=lifespan)
 
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ.get("SECRET_KEY", "dev-insecure-key-change-in-prod"),
+    session_cookie="zdenovo_session",
+    max_age=60 * 60 * 24 * 7,  # 7 days
+    https_only=False,           # set True in prod behind HTTPS
+)
+
 app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend" / "static"), name="static")
 
 templates = Jinja2Templates(directory=BASE_DIR / "frontend" / "templates")
@@ -55,6 +65,56 @@ def _fmt_date(d) -> str:
 
 templates.env.filters["dateformat"] = _fmt_date
 templates.env.filters["markdown"] = mistune.html
+
+
+# ─── Auth ─────────────────────────────────────────────────────────────────────
+
+def _is_admin(request: Request) -> bool:
+    return request.session.get("admin") is True
+
+
+def require_admin(request: Request) -> None:
+    if not _is_admin(request):
+        raise _AdminRequired(next_url=str(request.url.path))
+
+
+class _AdminRequired(Exception):
+    def __init__(self, next_url: str = "/admin/posts"):
+        self.next_url = next_url
+
+
+@app.exception_handler(_AdminRequired)
+async def _admin_required_handler(request: Request, exc: _AdminRequired):
+    return RedirectResponse(f"/admin/login?next={exc.next_url}", status_code=303)
+
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page(request: Request, next: str = "/admin/posts"):
+    if _is_admin(request):
+        return RedirectResponse(next, status_code=303)
+    return templates.TemplateResponse(request, "admin_login.html", {"next": next})
+
+
+@app.post("/admin/login")
+async def admin_login(
+    request: Request,
+    password: str = Form(...),
+    next: str = Form("/admin/posts"),
+):
+    admin_password = os.environ.get("ADMIN_PASSWORD", "")
+    if admin_password and secrets.compare_digest(password.encode(), admin_password.encode()):
+        request.session["admin"] = True
+        return RedirectResponse(next if next.startswith("/admin") else "/admin/posts", status_code=303)
+    return templates.TemplateResponse(
+        request, "admin_login.html", {"next": next, "error": "Wrong password."},
+        status_code=401,
+    )
+
+
+@app.post("/admin/logout")
+async def admin_logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/admin/login", status_code=303)
 
 
 # ─── HTML pages ───────────────────────────────────────────────────────────────
@@ -104,28 +164,6 @@ async def post(request: Request, slug: str):
     return templates.TemplateResponse(request, "post.html", {"post": article, "comments": comments, "slug": slug})
 
 
-# ─── Admin pages ──────────────────────────────────────────────────────────────
-
-@app.get("/admin/drafts", response_class=HTMLResponse)
-async def admin_drafts(request: Request):
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM drafts ORDER BY generated_at DESC"
-        ).fetchall()
-    drafts = [draft_row_to_dict(r) for r in rows]
-    return templates.TemplateResponse(request, "drafts_list.html", {"drafts": drafts})
-
-
-@app.get("/admin/drafts/{draft_id}", response_class=HTMLResponse)
-async def admin_draft_preview(request: Request, draft_id: str):
-    with get_conn() as conn:
-        row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
-    if row is None:
-        return templates.TemplateResponse(request, "404.html", status_code=404)
-    draft = draft_row_to_dict(row)
-    return templates.TemplateResponse(request, "draft_preview.html", {"draft": draft})
-
-
 @app.post("/blog/{slug}/comments", response_class=HTMLResponse)
 async def submit_comment(request: Request, slug: str, author: str = Form(...), body: str = Form(...)):
     article = get_post_by_slug(slug)
@@ -145,8 +183,50 @@ async def submit_comment(request: Request, slug: str, author: str = Form(...), b
     return templates.TemplateResponse(request, "comments_section.html", {"comments": comments, "slug": slug})
 
 
+# ─── Admin pages ──────────────────────────────────────────────────────────────
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_root(request: Request, _: None = Depends(require_admin)):
+    return RedirectResponse("/admin/posts")
+
+
+@app.get("/admin/posts", response_class=HTMLResponse)
+async def admin_posts(request: Request, _: None = Depends(require_admin)):
+    posts = get_all_posts()
+    with get_conn() as conn:
+        pending_count = conn.execute(
+            "SELECT COUNT(*) FROM drafts WHERE status = 'pending'"
+        ).fetchone()[0]
+        comment_count = conn.execute("SELECT COUNT(*) FROM comments").fetchone()[0]
+    return templates.TemplateResponse(request, "admin_posts.html", {
+        "posts": posts,
+        "pending_count": pending_count,
+        "comment_count": comment_count,
+    })
+
+
+@app.get("/admin/drafts", response_class=HTMLResponse)
+async def admin_drafts(request: Request, _: None = Depends(require_admin)):
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM drafts ORDER BY generated_at DESC"
+        ).fetchall()
+    drafts = [draft_row_to_dict(r) for r in rows]
+    return templates.TemplateResponse(request, "drafts_list.html", {"drafts": drafts})
+
+
+@app.get("/admin/drafts/{draft_id}", response_class=HTMLResponse)
+async def admin_draft_preview(request: Request, draft_id: str, _: None = Depends(require_admin)):
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
+    if row is None:
+        return templates.TemplateResponse(request, "404.html", status_code=404)
+    draft = draft_row_to_dict(row)
+    return templates.TemplateResponse(request, "draft_preview.html", {"draft": draft})
+
+
 @app.get("/admin/comments", response_class=HTMLResponse)
-async def admin_comments(request: Request):
+async def admin_comments(request: Request, _: None = Depends(require_admin)):
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM comments ORDER BY created_at DESC"
@@ -163,6 +243,7 @@ async def admin_draft_edit(
     summary: str = Form(...),
     content: str = Form(...),
     tags: str = Form(""),
+    _: None = Depends(require_admin),
 ):
     tags_list = [t.strip() for t in tags.split(",") if t.strip()]
     with get_conn() as conn:

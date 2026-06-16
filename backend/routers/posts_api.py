@@ -1,6 +1,7 @@
 import json
 import re
-from datetime import date as Date
+import uuid
+from datetime import date as Date, datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -100,8 +101,26 @@ def update_post(slug: str, body: PostIn):
 def delete_post(slug: str):
     with get_conn() as conn:
         conn.execute("DELETE FROM comments WHERE post_slug = ?", (slug,))
-        result = conn.execute(
-            "DELETE FROM posts WHERE slug = ?", (slug,)
-        )
+        result = conn.execute("DELETE FROM posts WHERE slug = ?", (slug,))
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Post not found")
+
+
+@router.post("/{slug}/unpublish", status_code=204)
+def unpublish_post(slug: str):
+    """Move a published post back to drafts (status=pending) and remove it from posts."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM posts WHERE slug = ?", (slug,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Post not found")
+        post = row_to_dict(row)
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            """INSERT INTO drafts (id, slug, title, date, summary, tags, content, image,
+               generated_at, topic_id, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', 'pending')""",
+            (str(uuid.uuid4()), post["slug"], post["title"], post["date"].isoformat(),
+             post["summary"], json.dumps(post["tags"]), post["content"], post["image"], now),
+        )
+        conn.execute("DELETE FROM comments WHERE post_slug = ?", (slug,))
+        conn.execute("DELETE FROM posts WHERE slug = ?", (slug,))

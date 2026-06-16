@@ -124,3 +124,47 @@ def test_delete_post_removes_it(client):
 def test_delete_post_missing_returns_404(client):
     r = client.delete("/api/posts/no-such-post")
     assert r.status_code == 404
+
+
+# ── POST /api/posts/{slug}/unpublish ─────────────────────────────────────────
+
+def test_unpublish_returns_204(client):
+    client.post("/api/posts", json=_NEW_POST)
+    r = client.post("/api/posts/hello-world/unpublish")
+    assert r.status_code == 204
+
+
+def test_unpublish_removes_from_posts(client):
+    client.post("/api/posts", json=_NEW_POST)
+    client.post("/api/posts/hello-world/unpublish")
+    r = client.get("/api/posts/hello-world")
+    assert r.status_code == 404
+
+
+def test_unpublish_creates_pending_draft(client):
+    client.post("/api/posts", json=_NEW_POST)
+    client.post("/api/posts/hello-world/unpublish")
+    drafts = client.get("/api/drafts").json()
+    assert any(d["slug"] == "hello-world" and d["status"] == "pending" for d in drafts)
+
+
+def test_unpublish_preserves_title_and_content(client):
+    client.post("/api/posts", json=_NEW_POST)
+    client.post("/api/posts/hello-world/unpublish")
+    drafts = client.get("/api/drafts").json()
+    draft = next(d for d in drafts if d["slug"] == "hello-world")
+    assert draft["title"] == _NEW_POST["title"]
+    assert draft["content"] == _NEW_POST["content"]
+
+
+def test_unpublish_removes_comments(client):
+    client.post("/api/posts", json=_NEW_POST)
+    client.post("/api/comments", json={"post_slug": "hello-world", "author": "X", "body": "hi"})
+    client.post("/api/posts/hello-world/unpublish")
+    comments = client.get("/api/comments?post_slug=hello-world").json()
+    assert comments == []
+
+
+def test_unpublish_not_found_returns_404(client):
+    r = client.post("/api/posts/no-such-post/unpublish")
+    assert r.status_code == 404

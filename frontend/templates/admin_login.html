@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Login — Zdenovo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body class="min-h-full bg-zinc-950 text-zinc-100 font-sans antialiased flex items-center justify-center">
+
+  <div class="w-full max-w-sm px-6">
+    <!-- Brand -->
+    <a href="/" class="block text-center text-base font-black tracking-widest uppercase bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent select-none mb-8">
+      Zdenovo
+    </a>
+
+    <div class="card">
+      <p class="section-heading mb-1">Admin</p>
+      <h1 class="text-lg font-bold text-zinc-100 mb-6">Sign in</h1>
+
+      {% if error %}
+      <div class="mb-4 px-3 py-2 rounded-lg bg-red-900/30 border border-red-800/50 text-xs text-red-400">
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <form method="POST" action="/admin/login" class="space-y-4">
+        <input type="hidden" name="next" value="{{ next }}">
+        <div>
+          <label for="password" class="block text-xs text-zinc-400 mb-1.5">Password</label>
+          <input
+            id="password"
+            type="password"
+            name="password"
+            autofocus
+            required
+            class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
+        </div>
+        <button type="submit" class="btn-primary w-full text-sm justify-center">
+          Sign in
+        </button>
+      </form>
+    </div>
+
+    <p class="text-center text-[11px] text-zinc-700 mt-6">
+      <a href="/" class="hover:text-zinc-500 transition-colors">← Back to site</a>
+    </p>
+  </div>
+
+</body>
+</html>
