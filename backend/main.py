@@ -58,6 +58,11 @@ async def home(request: Request):
     return templates.TemplateResponse(request, "index.html")
 
 
+@app.get("/about", response_class=HTMLResponse)
+async def about(request: Request):
+    return templates.TemplateResponse(request, "about.html")
+
+
 @app.get("/projects", response_class=HTMLResponse)
 async def projects(request: Request):
     return templates.TemplateResponse(
