@@ -64,4 +64,39 @@
     {{ draft.content | markdown | safe }}
   </div>
 </article>
+
+<!-- Edit form -->
+<section class="mt-16 pt-8 border-t border-zinc-800/60">
+  <p class="section-heading">Edit before publishing</p>
+  <form method="POST" action="/admin/drafts/{{ draft.id }}" class="space-y-5">
+
+    <div>
+      <label class="block text-[10px] font-semibold tracking-widest uppercase text-zinc-500 mb-1.5">Title</label>
+      <input type="text" name="title" value="{{ draft.title }}"
+        class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500/60">
+    </div>
+
+    <div>
+      <label class="block text-[10px] font-semibold tracking-widest uppercase text-zinc-500 mb-1.5">Summary</label>
+      <textarea name="summary" rows="2"
+        class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500/60 resize-none">{{ draft.summary }}</textarea>
+    </div>
+
+    <div>
+      <label class="block text-[10px] font-semibold tracking-widest uppercase text-zinc-500 mb-1.5">Tags <span class="text-zinc-700 normal-case font-normal">(comma-separated)</span></label>
+      <input type="text" name="tags" value="{{ draft.tags | join(', ') }}"
+        class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500/60">
+    </div>
+
+    <div>
+      <label class="block text-[10px] font-semibold tracking-widest uppercase text-zinc-500 mb-1.5">Content <span class="text-zinc-700 normal-case font-normal">(Markdown)</span></label>
+      <textarea name="content" rows="24"
+        class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-300 font-mono focus:outline-none focus:border-indigo-500/60 resize-y">{{ draft.content }}</textarea>
+    </div>
+
+    <div class="flex justify-end">
+      <button type="submit" class="btn-primary text-xs">Save changes</button>
+    </div>
+  </form>
+</section>
 {% endblock %}

@@ -1,10 +1,12 @@
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import mistune
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import RedirectResponse
 
 load_dotenv()  # no-op if .env absent; prod uses system env vars
 from fastapi.responses import HTMLResponse
@@ -113,3 +115,21 @@ async def admin_draft_preview(request: Request, draft_id: str):
         return templates.TemplateResponse(request, "404.html", status_code=404)
     draft = draft_row_to_dict(row)
     return templates.TemplateResponse(request, "draft_preview.html", {"draft": draft})
+
+
+@app.post("/admin/drafts/{draft_id}", response_class=HTMLResponse)
+async def admin_draft_edit(
+    request: Request,
+    draft_id: str,
+    title: str = Form(...),
+    summary: str = Form(...),
+    content: str = Form(...),
+    tags: str = Form(""),
+):
+    tags_list = [t.strip() for t in tags.split(",") if t.strip()]
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE drafts SET title=?, summary=?, content=?, tags=? WHERE id=?",
+            (title, summary, content, json.dumps(tags_list), draft_id),
+        )
+    return RedirectResponse(f"/admin/drafts/{draft_id}", status_code=303)

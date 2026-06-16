@@ -22,7 +22,7 @@ def _make_mock_client(post_data: dict = None):
   return mock_client
 
 
-def test_generate_returns_draft_post(client, monkeypatch):
+def test_generate_saves_to_drafts(client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
   mock_client = _make_mock_client()
@@ -41,11 +41,15 @@ def test_generate_returns_draft_post(client, monkeypatch):
   assert data["content"]
   assert data["date"]
   assert data["image"] is None
+  assert data["status"] == "pending"
+  assert data["topic_id"] == "freeform"
+  assert data["id"]
 
-  # Confirm post was NOT saved to DB
-  list_resp = client.get("/api/posts")
-  slugs = [p["slug"] for p in list_resp.json()]
-  assert "python-type-hints-explained" not in slugs
+  # Saved to drafts, not posts
+  drafts = client.get("/api/drafts").json()
+  assert any(d["slug"] == "python-type-hints-explained" for d in drafts)
+  posts = client.get("/api/posts").json()
+  assert not any(p["slug"] == "python-type-hints-explained" for p in posts)
 
 
 def test_generate_with_tag_hints(client, monkeypatch):
@@ -62,7 +66,6 @@ def test_generate_with_tag_hints(client, monkeypatch):
     )
 
   assert resp.status_code == 201
-  # Verify the tag hints were forwarded to Claude
   call_kwargs = mock_client.messages.create.call_args
   user_content = call_kwargs.kwargs["messages"][0]["content"]
   assert "python" in user_content
@@ -102,7 +105,6 @@ def test_generate_claude_api_error(client, monkeypatch):
 def test_generate_no_tool_block_returns_422(client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
-  # Claude returns a text block instead of a tool_use block
   text_block = MagicMock()
   text_block.type = "text"
   mock_message = MagicMock()
@@ -154,7 +156,7 @@ def test_list_briefs_claude_code_entry_exists(client):
   assert "claude-code-repo-best-practices" in ids
 
 
-def test_generate_from_brief_returns_draft_post(client, monkeypatch):
+def test_generate_from_brief_saves_to_drafts(client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
   mock_client = _make_mock_client()
@@ -166,6 +168,15 @@ def test_generate_from_brief_returns_draft_post(client, monkeypatch):
   assert data["slug"]
   assert data["title"]
   assert data["content"]
+  assert data["status"] == "pending"
+  assert data["topic_id"] == "claude-code-repo-best-practices"
+  assert data["id"]
+
+  # Saved to drafts, not posts
+  drafts = client.get("/api/drafts").json()
+  assert any(d["id"] == data["id"] for d in drafts)
+  posts = client.get("/api/posts").json()
+  assert not any(p["slug"] == data["slug"] for p in posts)
 
 
 def test_generate_from_brief_builds_rich_prompt(client, monkeypatch):
@@ -177,7 +188,6 @@ def test_generate_from_brief_builds_rich_prompt(client, monkeypatch):
 
   call_kwargs = mock_client.messages.create.call_args
   user_content = call_kwargs.kwargs["messages"][0]["content"]
-  # Brief fields should all appear in the prompt
   assert "Title hint:" in user_content
   assert "Target audience:" in user_content
   assert "Tone:" in user_content
@@ -191,15 +201,3 @@ def test_generate_from_brief_not_found(client, monkeypatch):
 
   assert resp.status_code == 404
   assert "nonexistent-brief-id" in resp.json()["detail"]
-
-
-def test_generate_from_brief_not_saved_to_db(client, monkeypatch):
-  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-
-  mock_client = _make_mock_client()
-  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
-    client.post("/api/posts/generate/claude-code-repo-best-practices")
-
-  list_resp = client.get("/api/posts")
-  slugs = [p["slug"] for p in list_resp.json()]
-  assert "python-type-hints-explained" not in slugs

@@ -1,14 +1,18 @@
 import json
 import random
-import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from db import draft_row_to_dict, get_conn, row_to_dict
-from routers.generate_api import PostBrief, _build_brief_message, _call_claude
+from routers.generate_api import (
+  DraftOut,
+  PostBrief,
+  _build_brief_message,
+  _call_claude,
+  _insert_draft,
+)
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
@@ -18,19 +22,11 @@ DAILY_COUNT = 3
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
 
-class DraftOut(BaseModel):
-  id: str
-  slug: str
-  title: str
-  summary: str
-  tags: list[str]
-  content: str
-  date: str
-  image: str | None = None
-  generated_at: str
-  topic_id: str
-  status: str
-  reading_time: int
+class DraftPatch(BaseModel):
+  title: str | None = None
+  summary: str | None = None
+  content: str | None = None
+  tags: list[str] | None = None
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -64,25 +60,7 @@ def generate_daily_drafts() -> int:
   generated = 0
   for topic in chosen:
     post = _call_claude(_build_brief_message(topic))
-    now = datetime.now(timezone.utc).isoformat()
-    with get_conn() as conn:
-      conn.execute(
-        """INSERT INTO drafts
-           (id, slug, title, date, summary, tags, content, image, generated_at, topic_id, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')""",
-        (
-          str(uuid.uuid4()),
-          post.slug,
-          post.title,
-          post.date.isoformat(),
-          post.summary,
-          json.dumps(post.tags),
-          post.content,
-          post.image,
-          now,
-          topic.id,
-        ),
-      )
+    _insert_draft(post, topic_id=topic.id)
     generated += 1
   return generated
 
@@ -112,6 +90,30 @@ def trigger_daily_generation():
   """Manually trigger daily draft generation (also called by the scheduler)."""
   count = generate_daily_drafts()
   return {"generated": count}
+
+
+@router.patch("/{draft_id}", response_model=DraftOut)
+def patch_draft(draft_id: str, body: DraftPatch):
+  """Edit a draft's title, summary, content, or tags before approving."""
+  with get_conn() as conn:
+    row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
+    if row is None:
+      raise HTTPException(status_code=404, detail=f"Draft '{draft_id}' not found")
+    draft = draft_row_to_dict(row)
+
+    title = body.title if body.title is not None else draft["title"]
+    summary = body.summary if body.summary is not None else draft["summary"]
+    content = body.content if body.content is not None else draft["content"]
+    tags = body.tags if body.tags is not None else draft["tags"]
+
+    conn.execute(
+      "UPDATE drafts SET title=?, summary=?, content=?, tags=? WHERE id=?",
+      (title, summary, content, json.dumps(tags), draft_id),
+    )
+
+  with get_conn() as conn:
+    row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
+  return _draft_to_out(draft_row_to_dict(row))
 
 
 @router.post("/{draft_id}/approve", status_code=201)

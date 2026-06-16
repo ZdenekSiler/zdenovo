@@ -131,6 +131,39 @@ def test_approve_duplicate_slug_returns_409(client, monkeypatch):
   assert resp.status_code == 409
 
 
+# ─── Patch ────────────────────────────────────────────────────────────────────
+
+def test_patch_draft_title(client, monkeypatch):
+  draft_id = _insert_draft(client, monkeypatch)
+  resp = client.patch(f"/api/drafts/{draft_id}", json={"title": "Updated Title"})
+  assert resp.status_code == 200
+  assert resp.json()["title"] == "Updated Title"
+
+
+def test_patch_draft_content_updates_reading_time(client, monkeypatch):
+  draft_id = _insert_draft(client, monkeypatch)
+  long_content = "word " * 500
+  resp = client.patch(f"/api/drafts/{draft_id}", json={"content": long_content})
+  assert resp.status_code == 200
+  assert resp.json()["reading_time"] >= 2
+
+
+def test_patch_draft_partial_keeps_other_fields(client, monkeypatch):
+  draft_id = _insert_draft(client, monkeypatch)
+  original = client.get(f"/api/drafts/{draft_id}").json()
+  resp = client.patch(f"/api/drafts/{draft_id}", json={"title": "New Title"})
+  assert resp.status_code == 200
+  data = resp.json()
+  assert data["summary"] == original["summary"]
+  assert data["content"] == original["content"]
+  assert data["tags"] == original["tags"]
+
+
+def test_patch_draft_not_found(client):
+  resp = client.patch("/api/drafts/nonexistent-id", json={"title": "X"})
+  assert resp.status_code == 404
+
+
 # ─── Delete ───────────────────────────────────────────────────────────────────
 
 def test_delete_draft(client, monkeypatch):
