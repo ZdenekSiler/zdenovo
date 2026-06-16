@@ -47,27 +47,5 @@
 </section>
 
 
-<!-- Skills -->
-<section>
-  <p class="section-heading">Skills</p>
-  <div class="grid grid-cols-2 gap-3">
-    {% set skill_groups = [
-      ("Languages", ["Python", "TypeScript", "SQL", "Bash"]),
-      ("Backend", ["FastAPI", "PostgreSQL", "Redis", "SQLite"]),
-      ("Infrastructure", ["Docker", "GitHub Actions", "Linux", "Nginx"]),
-      ("Tooling", ["mypy", "pytest", "ruff", "Claude Code"]),
-    ] %}
-    {% for group, skills in skill_groups %}
-    <div class="skill-card">
-      <h3 class="text-[10px] font-semibold tracking-widest text-indigo-400 uppercase mb-2.5">{{ group }}</h3>
-      <div class="flex flex-wrap gap-1.5">
-        {% for skill in skills %}
-        <span class="tag">{{ skill }}</span>
-        {% endfor %}
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-</section>
 
 {% endblock %}
