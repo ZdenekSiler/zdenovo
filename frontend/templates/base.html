@@ -8,86 +8,88 @@
   <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
   <link rel="stylesheet" href="/static/css/style.css" />
 </head>
-<body class="h-full bg-zinc-950 text-zinc-100 font-sans antialiased">
+<body class="min-h-full bg-zinc-950 text-zinc-100 font-sans antialiased flex flex-col">
 
   <!-- HTMX loading bar at top of viewport -->
   <div id="htmx-indicator" class="htmx-indicator"></div>
 
-  <div class="flex h-full">
+  <!-- ── Top header ── -->
+  <header class="sticky top-0 z-10 border-b border-zinc-800/60 bg-zinc-900/80 backdrop-blur-sm">
+    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center gap-4">
 
-    <!-- ── Sidebar ── -->
-    <aside class="w-64 shrink-0 border-r border-zinc-800/60 bg-zinc-900/40 flex flex-col h-screen sticky top-0 overflow-y-auto">
+      <!-- Brand -->
+      <a href="/"
+         hx-get="/"
+         hx-target="#main-content"
+         hx-select="#main-content"
+         hx-push-url="true"
+         hx-swap="innerHTML"
+         hx-indicator="#htmx-indicator"
+         class="text-base font-black tracking-widest uppercase bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent select-none shrink-0">
+        Zdenovo
+      </a>
 
-      <!-- Profile -->
-      <div class="p-6 border-b border-zinc-800/60">
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-14 h-14 rounded-full border border-indigo-500/40 shrink-0 overflow-hidden bg-indigo-500/20">
-            <img src="/static/img/codinghard.png" alt="Zdenek" class="w-full h-full object-cover" onerror="this.style.display='none';this.parentElement.innerHTML='<span class=\'text-sm font-bold text-indigo-400 flex items-center justify-center w-full h-full\'>Z</span>'" />
-          </div>
-          <div class="min-w-0">
-            <p class="font-semibold text-zinc-100 text-sm leading-tight">Zdenek</p>
-            <p class="text-xs text-zinc-500 leading-tight">Software Engineer</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-1.5">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-          <span class="text-xs text-zinc-500">Open to opportunities</span>
-        </div>
-      </div>
+      <!-- Spacer -->
+      <div class="flex-1"></div>
 
       <!-- Navigation -->
-      <nav class="p-4 border-b border-zinc-800/60">
-        <p class="text-[10px] font-semibold tracking-widest uppercase text-zinc-600 mb-2 px-2">Menu</p>
-        <ul class="space-y-0.5">
-          <li>
-            <a href="/"
-               hx-get="/"
-               hx-target="#main-content"
-               hx-select="#main-content"
-               hx-push-url="true"
-               hx-swap="innerHTML"
-               hx-indicator="#htmx-indicator"
-               class="nav-link">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-              Home
-            </a>
-          </li>
-          <li>
-            <a href="/projects"
-               hx-get="/projects"
-               hx-target="#main-content"
-               hx-select="#main-content"
-               hx-push-url="true"
-               hx-swap="innerHTML"
-               hx-indicator="#htmx-indicator"
-               class="nav-link">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-              Projects
-            </a>
-          </li>
-          <li>
-            <a href="/blog"
-               hx-get="/blog"
-               hx-target="#main-content"
-               hx-select="#main-content"
-               hx-push-url="true"
-               hx-swap="innerHTML"
-               hx-indicator="#htmx-indicator"
-               class="nav-link">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-              Blog
-            </a>
-          </li>
-        </ul>
+      <nav class="flex items-center gap-0.5">
+        <a href="/"
+           hx-get="/"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-push-url="true"
+           hx-swap="innerHTML"
+           hx-indicator="#htmx-indicator"
+           class="nav-link">Home</a>
+        <a href="/projects"
+           hx-get="/projects"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-push-url="true"
+           hx-swap="innerHTML"
+           hx-indicator="#htmx-indicator"
+           class="nav-link">Projects</a>
+        <a href="/blog"
+           hx-get="/blog"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-push-url="true"
+           hx-swap="innerHTML"
+           hx-indicator="#htmx-indicator"
+           class="nav-link">Blog</a>
       </nav>
 
-      <!-- Dynamic sidebar content (tags, filters, etc.) -->
-      {% block sidebar_extra %}{% endblock %}
 
-      <!-- Footer links -->
-      <div class="mt-auto p-4">
-        <p class="text-[10px] font-semibold tracking-widest uppercase text-zinc-600 mb-3 px-2">Connect</p>
-        <div class="space-y-0.5">
+    </div>
+
+    <!-- Optional sub-bar (e.g. blog tag filters) -->
+    {% block sidebar_extra %}{% endblock %}
+  </header>
+
+  <!-- ── Body: content + right sidebar ── -->
+  <div class="flex-1 flex max-w-6xl mx-auto w-full px-6 py-10 gap-10">
+
+    <!-- Main content -->
+    <main class="flex-1 min-w-0">
+      <div id="main-content">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    <!-- ── Right sidebar ── -->
+    <aside class="w-56 shrink-0 hidden lg:block">
+      <div class="sticky top-24 border border-zinc-800/60 rounded-xl bg-zinc-900/40 p-5 text-center">
+        <div class="w-24 h-24 rounded-2xl border border-indigo-500/40 overflow-hidden bg-indigo-500/20 mx-auto mb-3">
+          <img src="/static/img/codinghard.png" alt="Zdenek" class="w-full h-full object-cover" onerror="this.style.display='none';this.parentElement.innerHTML='<span class=\'text-sm font-bold text-indigo-400 flex items-center justify-center w-full h-full\'>Z</span>'" />
+        </div>
+        <p class="font-semibold text-zinc-100 text-sm">Zdenek</p>
+        <p class="text-xs text-zinc-500 mt-0.5">Software Engineer</p>
+        <div class="flex items-center justify-center gap-1.5 mt-3 pt-3 border-t border-zinc-800/60">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+          <span class="text-[11px] text-zinc-500">Open to opportunities</span>
+        </div>
+        <div class="flex justify-center gap-2 mt-3 pt-3 border-t border-zinc-800/60">
           <a href="https://github.com/zdenek" target="_blank" rel="noopener noreferrer" class="nav-link text-xs">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" class="shrink-0"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
             GitHub
@@ -97,19 +99,15 @@
             LinkedIn
           </a>
         </div>
-        <p class="text-[10px] text-zinc-700 mt-4 px-2">&copy; 2026 Zdenek</p>
       </div>
-
     </aside>
 
-    <!-- ── Main content ── -->
-    <div class="flex-1 overflow-y-auto">
-      <div id="main-content" class="max-w-2xl mx-auto px-8 py-12">
-        {% block content %}{% endblock %}
-      </div>
-    </div>
-
   </div>
+
+  <!-- ── Footer ── -->
+  <footer class="border-t border-zinc-800/60 py-4">
+    <p class="text-center text-[11px] text-zinc-700">&copy; 2026 Zdenek</p>
+  </footer>
 
   <script src="/static/js/main.js"></script>
 </body>

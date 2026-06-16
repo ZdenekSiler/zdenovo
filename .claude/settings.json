@@ -5,13 +5,8 @@
       "Bash(git *)",
       "Bash(uv *)",
       "Read(**)",
-      "Edit(docs/**)",
-      "Edit(.claude/**)",
-      "Edit(backend/**)",
-      "Edit(frontend/**)",
-      "Write(docs/**)",
-      "Write(backend/**)",
-      "Write(frontend/**)"
+      "Edit(**)",
+      "Write(**)"
     ],
     "deny": [
       "Bash(rm -rf /)",
