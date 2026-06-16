@@ -121,5 +121,5 @@
     }, 200);
   }
 
-  setInterval(rotate, 10000);
+  setInterval(rotate, 300000);
 })();
