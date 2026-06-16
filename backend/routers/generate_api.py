@@ -127,14 +127,15 @@ def _call_claude(user_message: str) -> PostOut:
     raise HTTPException(status_code=422, detail=f"Claude omitted fields (max_tokens hit?): {missing}")
 
   content = data["content"]
+  slug = _slugify(data["title"])
   return PostOut(
-    slug=_slugify(data["title"]),
+    slug=slug,
     title=data["title"],
     summary=data["summary"],
     tags=data.get("tags", []),
     content=content,
     date=Date.today(),
-    image=None,
+    image=f"https://picsum.photos/seed/{slug}/800/400",
     reading_time=max(1, len(content.split()) // 200),
   )
 

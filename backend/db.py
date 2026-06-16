@@ -50,6 +50,9 @@ def init_db() -> None:
                 status       TEXT NOT NULL DEFAULT 'pending'
             )
         """)
+        conn.execute(
+            "UPDATE posts SET image = 'https://picsum.photos/seed/' || slug || '/800/400' WHERE image IS NULL"
+        )
         if conn.execute("SELECT COUNT(*) FROM posts").fetchone()[0] == 0:
             conn.executemany(
                 "INSERT INTO posts (slug, title, date, summary, tags, content, image) VALUES (?,?,?,?,?,?,?)",
