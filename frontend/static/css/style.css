@@ -488,6 +488,46 @@ pre[class*="language-"] {
   max-width: 100%;
 }
 
+/* ─── Hero heading gradient ─── */
+.hero-heading {
+  background: linear-gradient(135deg, #818cf8, #a78bfa, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Typing cursor ─── */
+.typed-cursor {
+  font-weight: 300;
+  color: #818cf8;
+  animation: blink 1s step-end infinite;
+  margin-left: 1px;
+}
+.typed-cursor.done { display: none; }
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* ─── Hero reveal (after typing finishes) ─── */
+.hero-reveal {
+  transform: translateY(12px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.hero-reveal.visible {
+  opacity: 1 !important;
+  transform: translateY(0);
+}
+
+/* ─── Scroll reveal ─── */
+.scroll-reveal {
+  transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.scroll-reveal.visible {
+  opacity: 1 !important;
+  transform: translateY(0);
+}
+
 /* ─── Fade-in on HTMX swap ─── */
 #main-content { animation: fade-in 180ms ease; }
 @keyframes fade-in {

@@ -5,17 +5,13 @@
 
 <!-- Hero -->
 <section class="mb-16">
-  <div class="inline-flex items-center gap-2 text-xs font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-full px-3 py-1 mb-6">
-    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-    Available for new projects
-  </div>
-  <h1 class="text-3xl font-bold tracking-tight text-zinc-100 mb-4 leading-snug">
-    Deploy. Fail. Fix.<br>Repeat.
+  <h1 class="text-3xl font-bold tracking-tight leading-snug mb-4 hero-heading">
+    <span id="typed-heading" aria-label="Deploy. Fail. Fix. Repeat."></span><span id="typed-cursor" class="typed-cursor">|</span>
   </h1>
-  <p class="text-zinc-400 leading-relaxed mb-8 text-sm max-w-lg">
+  <p class="text-zinc-400 leading-relaxed mb-8 text-sm max-w-lg hero-reveal" style="opacity:0">
     A digital sandbox where ideas become POCs, POCs become deploys, deploys become incidents, and incidents become wisdom. Powered entirely by caffeine.
   </p>
-  <div class="flex gap-3">
+  <div class="flex gap-3 hero-reveal" style="opacity:0">
     <a href="/projects"
        hx-get="/projects"
        hx-target="#main-content"
@@ -36,16 +32,59 @@
 </section>
 
 
-<!-- Stats row -->
-<section class="mb-16 grid grid-cols-3 gap-4">
-  {% for value, label in [("8+", "Years experience"), ("20+", "Projects shipped"), ("∞", "Coffee consumed")] %}
-  <div class="card text-center">
-    <p class="text-2xl font-bold text-zinc-100 mb-1">{{ value }}</p>
-    <p class="text-xs text-zinc-500">{{ label }}</p>
+<!-- Latest posts -->
+{% if recent_posts %}
+<section class="mb-16 scroll-reveal" style="opacity:0">
+  <p class="section-heading">Latest Posts</p>
+  <div class="space-y-5">
+    {% for post in recent_posts %}
+    <article class="group scroll-reveal" style="opacity:0">
+      <a href="/blog/{{ post.slug }}"
+         hx-get="/blog/{{ post.slug }}"
+         hx-target="#main-content"
+         hx-select="#main-content"
+         hx-push-url="true"
+         hx-swap="innerHTML"
+         hx-indicator="#htmx-indicator"
+         class="block">
+        <div class="flex gap-4 items-start">
+          {% if post.image %}
+          <img src="{{ post.image }}" alt="{{ post.title }}" class="post-thumb" loading="lazy">
+          {% endif %}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3 mb-1">
+              <time class="text-xs text-zinc-600">{{ post.date | dateformat }}</time>
+              <span class="text-zinc-800">&middot;</span>
+              <span class="text-xs text-zinc-600">{{ post.reading_time }} min read</span>
+            </div>
+            <h2 class="text-base font-semibold text-zinc-200 group-hover:text-indigo-400 transition-colors leading-snug mb-1">
+              {{ post.title }}
+            </h2>
+            <p class="text-xs text-zinc-500 leading-relaxed mb-2 line-clamp-2">{{ post.summary }}</p>
+            <div class="flex flex-wrap gap-1.5">
+              {% for t in post.tags %}
+              <span class="tag">{{ t }}</span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </a>
+      {% if not loop.last %}<hr class="border-zinc-800/60 mt-5" />{% endif %}
+    </article>
+    {% endfor %}
   </div>
-  {% endfor %}
+  <div class="mt-6">
+    <a href="/blog"
+       hx-get="/blog"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-push-url="true"
+       hx-swap="innerHTML"
+       hx-indicator="#htmx-indicator"
+       class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">View all posts &rarr;</a>
+  </div>
 </section>
-
+{% endif %}
 
 
 {% endblock %}

@@ -121,12 +121,24 @@ async def admin_logout(request: Request):
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse(request, "index.html")
+    posts = get_all_posts()[:3]
+    projects = [p for p in get_all_projects() if p["featured"]]
+    tags = get_all_tags()
+    return templates.TemplateResponse(request, "index.html", {
+        "recent_posts": posts,
+        "featured_projects": projects,
+        "all_tags": tags,
+    })
 
 
 @app.get("/about", response_class=HTMLResponse)
 async def about(request: Request):
-    return templates.TemplateResponse(request, "about.html")
+    projects = [p for p in get_all_projects() if p["featured"]]
+    tags = get_all_tags()
+    return templates.TemplateResponse(request, "about.html", {
+        "featured_projects": projects,
+        "all_tags": tags,
+    })
 
 
 @app.get("/projects", response_class=HTMLResponse)

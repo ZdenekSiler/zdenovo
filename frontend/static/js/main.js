@@ -123,3 +123,70 @@
 
   setInterval(rotate, 300000);
 })();
+
+// Typing effect for hero heading
+(function () {
+  function typeHeading() {
+    var el = document.getElementById("typed-heading");
+    var cursor = document.getElementById("typed-cursor");
+    if (!el || el.dataset.typed) return;
+    el.dataset.typed = "1";
+
+    var text = "Deploy. Fail. Fix.\nRepeat.";
+    var i = 0;
+
+    function tick() {
+      if (i >= text.length) {
+        if (cursor) cursor.classList.add("done");
+        revealHeroContent();
+        return;
+      }
+      var ch = text[i];
+      if (ch === "\n") {
+        el.appendChild(document.createElement("br"));
+      } else {
+        el.appendChild(document.createTextNode(ch));
+      }
+      i++;
+      setTimeout(tick, ch === "." ? 180 : 55);
+    }
+
+    setTimeout(tick, 300);
+  }
+
+  function revealHeroContent() {
+    document.querySelectorAll(".hero-reveal").forEach(function (el, i) {
+      setTimeout(function () { el.classList.add("visible"); }, i * 150);
+    });
+  }
+
+  typeHeading();
+  document.body.addEventListener("htmx:afterSwap", typeHeading);
+})();
+
+// Scroll-triggered reveal animations
+(function () {
+  var revealCount = 0;
+
+  function initReveal() {
+    revealCount = 0;
+    var elements = document.querySelectorAll(".scroll-reveal:not(.visible)");
+    if (!elements.length) return;
+
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          revealCount++;
+          var el = entry.target;
+          setTimeout(function () { el.classList.add("visible"); }, revealCount * 120);
+          observer.unobserve(el);
+        }
+      });
+    }, { threshold: 0.15 });
+
+    elements.forEach(function (el) { observer.observe(el); });
+  }
+
+  initReveal();
+  document.body.addEventListener("htmx:afterSwap", initReveal);
+})();

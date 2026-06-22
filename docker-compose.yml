@@ -4,11 +4,8 @@ services:
     ports:
       - "8080:8000"
     volumes:
-      - db_data:/data
+      - ./data:/data
       - ./.env:/app/backend/.env:ro
     environment:
       - DB_DIR=/data
     restart: unless-stopped
-
-volumes:
-  db_data:

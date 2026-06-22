@@ -33,7 +33,7 @@ SYSTEM_PROMPT = (
   "- Use horizontal rules (---) between major topic shifts.\n"
   "- Use callout blockquotes with emoji prefixes for tips, warnings, and key takeaways:\n"
   "  > 💡 Tip: ...\n  > ⚠️ Warning: ...\n  > ❌ Danger: ...\n  > ✅ Pro tip: ...\n"
-  "- Include at least one Mermaid diagram using a fenced code block with ```mermaid. "
+  "- Include exactly one Mermaid diagram (no more than one) using a fenced code block with ```mermaid. "
   "Use flowchart TD, sequence diagrams, or mindmaps to illustrate architecture, decision trees, or workflows.\n"
   "- Write at least 800 words. Mix paragraphs, lists, code, tables, and callouts — "
   "never have more than 3 paragraphs in a row without a visual break (code, table, callout, diagram, or hr).\n"
@@ -60,7 +60,7 @@ POST_TOOL = {
       },
       "content": {
         "type": "string",
-        "description": "Full post body in Markdown, at least 800 words. Must include: ## headings, fenced code blocks with language tags, at least one Markdown table, callout blockquotes (> 💡/⚠️/❌/✅ prefix), horizontal rules (---) between sections, and at least one Mermaid diagram (```mermaid fenced block). Mix visual elements so no more than 3 plain paragraphs appear in a row.",
+        "description": "Full post body in Markdown, at least 800 words. Must include: ## headings, fenced code blocks with language tags, at least one Markdown table, callout blockquotes (> 💡/⚠️/❌/✅ prefix), horizontal rules (---) between sections, and exactly one Mermaid diagram (```mermaid fenced block, no more than one). Mix visual elements so no more than 3 plain paragraphs appear in a row.",
       },
     },
     "required": ["title", "summary", "tags", "content"],

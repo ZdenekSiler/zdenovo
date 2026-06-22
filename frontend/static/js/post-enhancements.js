@@ -94,8 +94,21 @@
   }
 
   // ─── Init Mermaid ───
-  function initMermaid() {
-    if (typeof mermaid === "undefined") return;
+  function initMermaid(retries) {
+    if (typeof retries === "undefined") retries = 10;
+    if (typeof mermaid === "undefined") {
+      if (retries > 0) setTimeout(function () { initMermaid(retries - 1); }, 200);
+      return;
+    }
+    document.querySelectorAll("pre > code.language-mermaid").forEach(function (code) {
+      var pre = code.parentElement;
+      var div = document.createElement("div");
+      div.className = "mermaid";
+      div.textContent = code.textContent;
+      pre.parentElement.replaceChild(div, pre);
+    });
+    var targets = document.querySelectorAll(".mermaid:not([data-processed])");
+    if (!targets.length) return;
     mermaid.initialize({
       startOnLoad: false,
       theme: "dark",
@@ -114,7 +127,7 @@
         edgeLabelBackground: "#18181b"
       }
     });
-    mermaid.run({ querySelector: ".mermaid" });
+    mermaid.run({ querySelector: ".mermaid:not([data-processed])" });
   }
 
   // ─── Re-highlight with Prism after HTMX swap ───
