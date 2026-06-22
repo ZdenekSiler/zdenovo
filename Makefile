@@ -139,7 +139,7 @@ deploy-first: _require-env _require-secrets
 	@echo "→ First-time setup on $(SERVER_USER)@$(SERVER_HOST)..."
 	@echo "  This will: install Docker, clone repo, push secrets, obtain SSL cert, start app."
 	@read -p "  Continue? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
-	ssh-copy-id -i ~/.ssh/id_rsa.pub $(SERVER_USER)@$(SERVER_HOST) 2>/dev/null || true
+	ssh-copy-id $(SERVER_USER)@$(SERVER_HOST) 2>/dev/null || true
 	DEPLOY_DIR=$(DEPLOY_DIR) REPO_URL=$(REPO_URL) \
 		$(SSH_CMD) "bash -s" < scripts/server-setup.sh
 	@echo "→ Pushing secrets to server..."
