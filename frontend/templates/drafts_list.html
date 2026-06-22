@@ -33,6 +33,15 @@
         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-800 text-zinc-500 border border-zinc-700">rejected</span>
         {% endif %}
         <span class="text-[10px] text-zinc-600">{{ draft.topic_id }}</span>
+        {% if draft.quality_score is not none %}
+        {% if draft.quality_score >= 7 %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-900/40 text-green-400 border border-green-800/50">Q: {{ draft.quality_score }}/10</span>
+        {% elif draft.quality_score >= 5 %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-900/40 text-yellow-400 border border-yellow-800/50">Q: {{ draft.quality_score }}/10</span>
+        {% else %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-900/40 text-red-400 border border-red-800/50">Q: {{ draft.quality_score }}/10</span>
+        {% endif %}
+        {% endif %}
       </div>
       <a href="/admin/drafts/{{ draft.id }}" class="text-sm font-semibold text-zinc-200 hover:text-indigo-400 transition-colors leading-snug block mb-1">
         {{ draft.title }}

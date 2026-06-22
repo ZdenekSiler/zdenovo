@@ -5,9 +5,9 @@ services:
       - "8080:8000"
     volumes:
       - db_data:/data
+      - ./.env:/app/backend/.env:ro
     environment:
       - DB_DIR=/data
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     restart: unless-stopped
 
 volumes:

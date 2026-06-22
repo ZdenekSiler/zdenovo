@@ -66,8 +66,8 @@ def test_generate_with_tag_hints(client, monkeypatch):
     )
 
   assert resp.status_code == 201
-  call_kwargs = mock_client.messages.create.call_args
-  user_content = call_kwargs.kwargs["messages"][0]["content"]
+  generation_call = mock_client.messages.create.call_args_list[0]
+  user_content = generation_call.kwargs["messages"][0]["content"]
   assert "python" in user_content
   assert "mypy" in user_content
 
@@ -186,8 +186,8 @@ def test_generate_from_brief_builds_rich_prompt(client, monkeypatch):
   with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
     client.post("/api/posts/generate/claude-code-repo-best-practices")
 
-  call_kwargs = mock_client.messages.create.call_args
-  user_content = call_kwargs.kwargs["messages"][0]["content"]
+  generation_call = mock_client.messages.create.call_args_list[0]
+  user_content = generation_call.kwargs["messages"][0]["content"]
   assert "Title hint:" in user_content
   assert "Target audience:" in user_content
   assert "Tone:" in user_content

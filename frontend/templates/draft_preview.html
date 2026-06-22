@@ -50,6 +50,45 @@
     </div>
   </header>
 
+  {% if draft.quality_score is not none %}
+  <div class="mb-8 px-4 py-4 rounded-lg border
+    {% if draft.quality_score >= 7 %}bg-green-900/10 border-green-800/40{% elif draft.quality_score >= 5 %}bg-yellow-900/10 border-yellow-800/40{% else %}bg-red-900/10 border-red-800/40{% endif %}">
+    <div class="flex items-center gap-3 mb-3">
+      <span class="text-[10px] font-semibold tracking-widest uppercase
+        {% if draft.quality_score >= 7 %}text-green-400{% elif draft.quality_score >= 5 %}text-yellow-400{% else %}text-red-400{% endif %}">Quality Review</span>
+      <span class="text-sm font-bold
+        {% if draft.quality_score >= 7 %}text-green-400{% elif draft.quality_score >= 5 %}text-yellow-400{% else %}text-red-400{% endif %}">{{ draft.quality_score }}/10</span>
+      {% if draft.quality_score >= 7 %}
+      <span class="text-[10px] text-green-500">Passed</span>
+      {% elif draft.quality_score >= 5 %}
+      <span class="text-[10px] text-yellow-500">Borderline</span>
+      {% else %}
+      <span class="text-[10px] text-red-500">Failed — best attempt after retries</span>
+      {% endif %}
+    </div>
+    {% if draft.quality_issues %}
+    <div class="mb-2">
+      <span class="text-[10px] font-semibold tracking-widest uppercase text-zinc-500">Issues</span>
+      <ul class="mt-1 space-y-0.5">
+        {% for issue in draft.quality_issues %}
+        <li class="text-xs text-zinc-400 flex gap-1.5"><span class="text-red-500 shrink-0">-</span> {{ issue }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% if draft.quality_strengths %}
+    <div>
+      <span class="text-[10px] font-semibold tracking-widest uppercase text-zinc-500">Strengths</span>
+      <ul class="mt-1 space-y-0.5">
+        {% for strength in draft.quality_strengths %}
+        <li class="text-xs text-zinc-400 flex gap-1.5"><span class="text-green-500 shrink-0">+</span> {{ strength }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {% if draft.summary %}
   <p class="text-base text-zinc-400 leading-relaxed mb-8 pb-8 border-b border-zinc-800/60">
     {{ draft.summary }}
@@ -64,6 +103,28 @@
     {{ draft.content | markdown | safe }}
   </div>
 </article>
+
+<!-- Regenerate with feedback -->
+<section class="mt-16 pt-8 border-t border-zinc-800/60">
+  <p class="section-heading">Regenerate with feedback</p>
+  <form method="POST" action="/admin/drafts/{{ draft.id }}/regenerate"
+        onsubmit="return confirm('Regenerate this draft? Current content will be replaced.')"
+        class="space-y-4">
+    <div>
+      <label class="block text-[10px] font-semibold tracking-widest uppercase text-zinc-500 mb-1.5">
+        Remarks
+        <span class="text-zinc-700 normal-case font-normal">(what to change or improve)</span>
+      </label>
+      <textarea name="remarks" rows="4" required maxlength="2000"
+        placeholder="e.g. Make the intro more aggressive, add a Docker section, fewer bullet lists..."
+        class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500/60 resize-y">{{ draft.admin_remarks or '' }}</textarea>
+    </div>
+    <div class="flex items-center justify-between">
+      <p class="text-xs text-zinc-600">Keeps the same image. Runs quality review on the result.</p>
+      <button type="submit" class="btn-primary text-xs">Regenerate</button>
+    </div>
+  </form>
+</section>
 
 <!-- Edit form -->
 <section class="mt-16 pt-8 border-t border-zinc-800/60">

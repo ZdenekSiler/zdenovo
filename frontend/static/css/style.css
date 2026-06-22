@@ -227,11 +227,11 @@
 /* ─── Post hero image (post detail) ─── */
 .post-hero {
   width: 100%;
-  max-height: 340px;
+  max-height: 400px;
   object-fit: cover;
   border-radius: 0.75rem;
   border: 1px solid #27272a;
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
 }
 
 /* ─── Divider ─── */
@@ -247,6 +247,246 @@
 
 /* ─── Selection ─── */
 ::selection { background-color: #4f46e5; color: #fff; }
+
+/* ─── Reading progress bar ─── */
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #6366f1, #a78bfa, #818cf8);
+  z-index: 10000;
+  width: 0%;
+  transition: width 80ms ease-out;
+}
+
+/* ─── TL;DR card ─── */
+.tldr-card {
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  border: 1px solid #4338ca;
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+.tldr-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #6366f1, #a78bfa);
+}
+.tldr-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+  margin-bottom: 0.5rem;
+}
+
+/* ─── Table of contents ─── */
+.toc {
+  background-color: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 2.5rem;
+}
+.toc:empty { display: none; }
+.toc-title {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #52525b;
+  margin-bottom: 0.75rem;
+}
+.toc ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: toc-counter;
+}
+.toc li {
+  counter-increment: toc-counter;
+  margin-bottom: 0.375rem;
+}
+.toc li::before {
+  content: counter(toc-counter, decimal-leading-zero);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6366f1;
+  margin-right: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.toc a {
+  font-size: 0.8125rem;
+  color: #a1a1aa;
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+.toc a:hover { color: #a5b4fc; }
+
+/* ─── Callout boxes (blockquotes with emoji prefixes) ─── */
+.prose-custom blockquote.callout {
+  border-left: 3px solid #6366f1;
+  background-color: #1e1b4b20;
+  padding: 1rem 1.25rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+  font-style: normal;
+  color: #d4d4d8;
+}
+.prose-custom blockquote.callout-warning {
+  border-left-color: #f59e0b;
+  background-color: #78350f20;
+}
+.prose-custom blockquote.callout-danger {
+  border-left-color: #ef4444;
+  background-color: #7f1d1d20;
+}
+.prose-custom blockquote.callout-success {
+  border-left-color: #22c55e;
+  background-color: #14532d20;
+}
+
+/* ─── Pull quotes ─── */
+.pull-quote {
+  border: none;
+  border-left: none;
+  padding: 1.5rem 0;
+  margin: 2.5rem 0;
+  text-align: center;
+  position: relative;
+}
+.pull-quote::before,
+.pull-quote::after {
+  content: '';
+  display: block;
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #6366f1, transparent);
+  margin: 0 auto;
+}
+.pull-quote::before { margin-bottom: 1.25rem; }
+.pull-quote::after { margin-top: 1.25rem; }
+.pull-quote p {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: #e4e4e7;
+  font-style: italic;
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* ─── Styled tables ─── */
+.prose-custom table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.8125rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid #27272a;
+}
+.prose-custom thead {
+  background-color: #1e1b4b;
+}
+.prose-custom th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #a5b4fc;
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 2px solid #4338ca;
+}
+.prose-custom td {
+  padding: 0.625rem 1rem;
+  color: #a1a1aa;
+  border-bottom: 1px solid #27272a;
+}
+.prose-custom tbody tr:hover {
+  background-color: #27272a40;
+}
+
+/* ─── Section dividers (hr) ─── */
+.prose-custom hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #3f3f46, #6366f1, #3f3f46, transparent);
+  margin: 3rem 0;
+}
+
+/* ─── Code block wrapper with copy button ─── */
+.code-block-wrapper {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+.code-block-wrapper pre {
+  margin-bottom: 0;
+}
+.copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: #71717a;
+  background-color: #27272a;
+  border: 1px solid #3f3f46;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease;
+  font-family: inherit;
+  z-index: 2;
+}
+.copy-btn:hover {
+  color: #a5b4fc;
+  border-color: #6366f1;
+}
+.copy-btn.copied {
+  color: #22c55e;
+  border-color: #22c55e;
+}
+
+/* ─── Prism.js overrides ─── */
+.prose-custom pre[class*="language-"] {
+  background-color: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 0.625rem;
+  padding: 1.25rem;
+  font-size: 0.8125rem;
+  margin: 0;
+}
+.prose-custom code[class*="language-"] {
+  background: transparent;
+  padding: 0;
+  font-size: 0.8125rem;
+}
+code[class*="language-"],
+pre[class*="language-"] {
+  text-shadow: none;
+}
+
+/* ─── Mermaid diagram container ─── */
+.mermaid {
+  background-color: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  text-align: center;
+  overflow-x: auto;
+}
+.mermaid svg {
+  max-width: 100%;
+}
 
 /* ─── Fade-in on HTMX swap ─── */
 #main-content { animation: fade-in 180ms ease; }

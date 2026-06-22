@@ -37,19 +37,30 @@ def init_db() -> None:
             conn.execute("ALTER TABLE posts ADD COLUMN image TEXT")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS drafts (
-                id           TEXT PRIMARY KEY,
-                slug         TEXT NOT NULL,
-                title        TEXT NOT NULL,
-                date         TEXT NOT NULL,
-                summary      TEXT NOT NULL,
-                tags         TEXT NOT NULL,
-                content      TEXT NOT NULL,
-                image        TEXT,
-                generated_at TEXT NOT NULL,
-                topic_id     TEXT NOT NULL,
-                status       TEXT NOT NULL DEFAULT 'pending'
+                id                TEXT PRIMARY KEY,
+                slug              TEXT NOT NULL,
+                title             TEXT NOT NULL,
+                date              TEXT NOT NULL,
+                summary           TEXT NOT NULL,
+                tags              TEXT NOT NULL,
+                content           TEXT NOT NULL,
+                image             TEXT,
+                generated_at      TEXT NOT NULL,
+                topic_id          TEXT NOT NULL,
+                status            TEXT NOT NULL DEFAULT 'pending',
+                quality_score     INTEGER,
+                quality_issues    TEXT NOT NULL DEFAULT '[]',
+                quality_strengths TEXT NOT NULL DEFAULT '[]',
+                admin_remarks     TEXT
             )
         """)
+        draft_cols = {row[1] for row in conn.execute("PRAGMA table_info(drafts)")}
+        if "quality_score" not in draft_cols:
+            conn.execute("ALTER TABLE drafts ADD COLUMN quality_score INTEGER")
+            conn.execute("ALTER TABLE drafts ADD COLUMN quality_issues TEXT DEFAULT '[]'")
+            conn.execute("ALTER TABLE drafts ADD COLUMN quality_strengths TEXT DEFAULT '[]'")
+        if "admin_remarks" not in draft_cols:
+            conn.execute("ALTER TABLE drafts ADD COLUMN admin_remarks TEXT")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS comments (
                 id         TEXT PRIMARY KEY,
@@ -94,6 +105,8 @@ def draft_row_to_dict(row: sqlite3.Row) -> dict:
     d["date"] = date.fromisoformat(d["date"])
     d["generated_at"] = datetime.fromisoformat(d["generated_at"])
     d["reading_time"] = max(1, len(d["content"].split()) // 200)
+    d["quality_issues"] = json.loads(d.get("quality_issues") or "[]")
+    d["quality_strengths"] = json.loads(d.get("quality_strengths") or "[]")
     return d
 
 

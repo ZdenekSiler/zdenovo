@@ -6,10 +6,19 @@
   <title>{% block title %}Zdenek{% endblock %} — Software Engineer</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" />
   <link rel="stylesheet" href="/static/css/style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js" defer></script>
 </head>
 <body class="min-h-full bg-zinc-950 text-zinc-100 font-sans antialiased flex flex-col">
 
+  <!-- Reading progress bar -->
+  <div id="reading-progress" class="reading-progress"></div>
   <!-- HTMX loading bar at top of viewport -->
   <div id="htmx-indicator" class="htmx-indicator"></div>
 
@@ -142,5 +151,6 @@
   </footer>
 
   <script src="/static/js/main.js"></script>
+  <script src="/static/js/post-enhancements.js"></script>
 </body>
 </html>

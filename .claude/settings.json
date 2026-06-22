@@ -4,6 +4,19 @@
     "allow": [
       "Bash(git *)",
       "Bash(uv *)",
+      "Bash(docker *)",
+      "Bash(docker compose *)",
+      "Bash(curl *)",
+      "Bash(make *)",
+      "Bash(ls *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(cat *)",
+      "Bash(echo *)",
+      "Bash(sleep *)",
+      "Bash(ss *)",
+      "Bash(which *)",
+      "Bash(test *)",
       "Read(**)",
       "Edit(**)",
       "Write(**)"
@@ -28,5 +41,11 @@
   },
   "env": {
     "NODE_ENV": "development"
+  },
+  "sandbox": {
+    "network": {
+      "allowLocalBinding": true,
+      "allowedDomains": ["localhost", "127.0.0.1"]
+    }
   }
 }

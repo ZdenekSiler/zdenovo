@@ -45,14 +45,15 @@
     </div>
   </header>
 
-  {% if post.summary %}
-  <p class="text-base text-zinc-400 leading-relaxed mb-8 pb-8 border-b border-zinc-800/60">
-    {{ post.summary }}
-  </p>
-  {% endif %}
-
   {% if post.image %}
   <img src="{{ post.image }}" alt="{{ post.title }}" class="post-hero" loading="lazy">
+  {% endif %}
+
+  {% if post.summary %}
+  <div class="tldr-card">
+    <div class="tldr-label">TL;DR</div>
+    <p class="text-sm text-zinc-300 leading-relaxed m-0">{{ post.summary }}</p>
+  </div>
   {% endif %}
 
   <div class="prose-custom">

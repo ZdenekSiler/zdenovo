@@ -16,5 +16,23 @@
       "The full workflow end-to-end: branch → /design → review spec → /implement → /simplify → test → commit",
       "Common mistakes: putting too much in CLAUDE.md, skipping /design for non-trivial features, not isolating tests"
     ]
+  },
+  {
+    "id": "forbidden-frontier-model",
+    "title_hint": "The Forbidden Model: Building a Company When Your AI Can Be Unplugged",
+    "description": "A sarcastic, opinionated take on the US government restricting Anthropic's most powerful frontier model and what that means for everyone who built their entire stack on top of it. Explores the uncomfortable reality that modern software engineering — from code generation to architecture decisions — now depends on API keys that can be revoked by executive order. Contrasts the 'just use Claude/GPT' default with self-hosted alternatives like Ollama, llama.cpp, Mistral, and other models you can actually own. Offers concrete advice on building a modern tech company that doesn't collapse when a single provider goes dark, including local model deployment, model-agnostic abstractions, hybrid architectures, and the business case for AI sovereignty. The tone should be dripping with sarcasm — the kind of post someone writes after realising their entire CI pipeline depends on a model that a government official can ban over lunch.",
+    "audience": "CTOs, tech leads, and senior engineers who have gone all-in on cloud AI APIs and are now nervously reading geopolitics news. Also founders building AI-native companies who want to sleep at night.",
+    "tone": "sarcastic, dark-humored, opinionated — think 'I told you so' energy mixed with genuine practical advice. Deploy war story vibes. The sarcasm should make the serious points hit harder, not soften them.",
+    "tags": ["ai", "self-hosted", "risk-mitigation", "strategy"],
+    "outline": [
+      "The punchline: you built your company on someone else's brain and now the government is debating whether to lobotomize it — congratulations on your architecture choices",
+      "What actually happened: the US government restricting the most powerful Anthropic frontier model, why it matters beyond the headlines, and why 'it won't happen to my model' is copium",
+      "The dependency horror show: how modern software engineering quietly became addicted to frontier AI — code generation, PR reviews, architecture planning, testing, documentation — and what your bus factor looks like when the API returns 403",
+      "The Ollama manifesto: self-hosted models (Ollama, llama.cpp, vLLM, Mistral, Llama, Qwen, DeepSeek) you can run on your own hardware, what they can and can't do today, and why 'but it's not as good as Claude' is missing the point",
+      "Building a company without a single point of AI failure: model-agnostic abstraction layers, hybrid local+cloud architectures, fallback chains, keeping your prompts portable, and why your LLM should be a swappable dependency not a load-bearing wall",
+      "The procurement checklist nobody wants: evaluating AI providers like you'd evaluate any critical vendor — exit strategy, data residency, geopolitical risk, what happens when the ToS changes at 2am",
+      "Concrete mitigation strategies: run critical paths on local models, keep cloud AI for nice-to-haves, version your prompts like code, test against multiple backends, build kill switches, maintain a 'no-AI' degraded mode",
+      "The uncomfortable truth: the companies that survive the next AI regulation wave won't be the ones with the best models — they'll be the ones that treated AI as a tool, not a foundation"
+    ]
   }
 ]

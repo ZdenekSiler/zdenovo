@@ -21,7 +21,7 @@ from data.posts import get_all_posts, get_all_tags, get_post_by_slug, get_posts_
 from data.projects import get_all_projects
 from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
 from routers.comments_api import router as comments_router
-from routers.drafts_api import generate_daily_drafts, router as drafts_router
+from routers.drafts_api import _regenerate_draft, generate_daily_drafts, router as drafts_router
 from routers.generate_api import router as generate_router
 from routers.posts_api import router as posts_router
 
@@ -251,4 +251,15 @@ async def admin_draft_edit(
             "UPDATE drafts SET title=?, summary=?, content=?, tags=? WHERE id=?",
             (title, summary, content, json.dumps(tags_list), draft_id),
         )
+    return RedirectResponse(f"/admin/drafts/{draft_id}", status_code=303)
+
+
+@app.post("/admin/drafts/{draft_id}/regenerate", response_class=HTMLResponse)
+async def admin_draft_regenerate(
+    request: Request,
+    draft_id: str,
+    remarks: str = Form(...),
+    _: None = Depends(require_admin),
+):
+    _regenerate_draft(draft_id, remarks)
     return RedirectResponse(f"/admin/drafts/{draft_id}", status_code=303)
