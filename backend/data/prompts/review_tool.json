@@ -1,0 +1,29 @@
+{
+  "name": "review_post",
+  "description": "Output a structured quality review of a blog post.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "score": {
+        "type": "integer",
+        "description": "Quality score 1-10. 1-4 = reject (AI slop), 5-6 = borderline, 7-10 = publishable."
+      },
+      "verdict": {
+        "type": "string",
+        "enum": ["pass", "fail"],
+        "description": "'pass' if score >= 6, 'fail' otherwise."
+      },
+      "issues": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Specific issues found: clichés, filler sentences, generic advice, missing concrete examples, AI-isms like 'delve/landscape/crucial/it's important to note', corporate tone, etc."
+      },
+      "strengths": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "What the post does well — specific voice, concrete examples, genuine opinions, etc."
+      }
+    },
+    "required": ["score", "verdict", "issues", "strengths"]
+  }
+}

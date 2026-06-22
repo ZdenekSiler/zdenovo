@@ -19,91 +19,12 @@ from routers.posts_api import PostOut, _slugify
 router = APIRouter(prefix="/api/posts", tags=["generate"])
 
 BRIEFS_PATH = Path(__file__).parent.parent / "data" / "post_briefs.json"
+PROMPTS_DIR = Path(__file__).parent.parent / "data" / "prompts"
 
-SYSTEM_PROMPT = (
-  "You are writing for a personal technical blog run by Zdenek, a software engineer and consultant. "
-  "The tone is dry, sarcastic, and self-deprecating — think deploy war stories, things that went wrong, "
-  "and lessons earned the hard way. Avoid corporate language and buzzword-heavy intros. "
-  "If there's a way to make a point with a deploy-fail-fix analogy or a dark joke about production, take it. "
-  "Write like someone who has been paged at 3am and has opinions about it.\n\n"
-  "FORMATTING RULES for visually rich posts:\n"
-  "- Use ## for major sections and ### for subsections. Every section needs real content, not just bullets.\n"
-  "- Use fenced code blocks with language tags (```python, ```bash, ```yaml) for any code or config.\n"
-  "- Use Markdown tables when comparing options, tools, or tradeoffs.\n"
-  "- Use horizontal rules (---) between major topic shifts.\n"
-  "- Use callout blockquotes with emoji prefixes for tips, warnings, and key takeaways:\n"
-  "  > 💡 Tip: ...\n  > ⚠️ Warning: ...\n  > ❌ Danger: ...\n  > ✅ Pro tip: ...\n"
-  "- Include exactly one Mermaid diagram (no more than one) using a fenced code block with ```mermaid. "
-  "Use flowchart TD, sequence diagrams, or mindmaps to illustrate architecture, decision trees, or workflows.\n"
-  "- Write at least 800 words. Mix paragraphs, lists, code, tables, and callouts — "
-  "never have more than 3 paragraphs in a row without a visual break (code, table, callout, diagram, or hr).\n"
-  "- End with a punchy one-liner or dark joke, not a generic 'in conclusion' summary.\n"
-  "Use the write_post tool to output the generated post."
-)
-
-POST_TOOL = {
-  "name": "write_post",
-  "description": "Output a complete blog post.",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "title": {"type": "string", "description": "Concise, engaging post title"},
-      "summary": {"type": "string", "description": "One or two sentence description"},
-      "tags": {
-        "type": "array",
-        "items": {"type": "string"},
-        "description": "3-5 specific, descriptive lowercase tags. Include the core technology or topic (e.g. 'anthropic', 'ollama', 'kubernetes'), the domain (e.g. 'ai-regulation', 'devops', 'security'), and the angle (e.g. 'vendor-lock-in', 'self-hosting', 'incident-response'). Avoid vague tags like 'strategy' or 'tips'.",
-      },
-      "image_query": {
-        "type": "string",
-        "description": "A 2-4 word Unsplash search query for a hero photo that visually represents the post's core theme. Be concrete and visual — e.g. 'server room locked door' not 'ai risk'. Think about what photo would make someone click the article.",
-      },
-      "content": {
-        "type": "string",
-        "description": "Full post body in Markdown, at least 800 words. Must include: ## headings, fenced code blocks with language tags, at least one Markdown table, callout blockquotes (> 💡/⚠️/❌/✅ prefix), horizontal rules (---) between sections, and exactly one Mermaid diagram (```mermaid fenced block, no more than one). Mix visual elements so no more than 3 plain paragraphs appear in a row.",
-      },
-    },
-    "required": ["title", "summary", "tags", "content"],
-  },
-}
-
-REVIEW_SYSTEM_PROMPT = (
-  "You are a ruthless blog post editor. Your job is to detect AI slop — generic, "
-  "corporate, filler content that any LLM could have written. You are reviewing a post "
-  "for a sarcastic, opinionated personal tech blog written by a real engineer. "
-  "The bar is high: if it reads like a LinkedIn post, a press release, or a ChatGPT "
-  "default, it fails. Use the review_post tool to output your verdict."
-)
-
-REVIEW_TOOL = {
-  "name": "review_post",
-  "description": "Output a structured quality review of a blog post.",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "score": {
-        "type": "integer",
-        "description": "Quality score 1-10. 1-4 = reject (AI slop), 5-6 = borderline, 7-10 = publishable.",
-      },
-      "verdict": {
-        "type": "string",
-        "enum": ["pass", "fail"],
-        "description": "'pass' if score >= 6, 'fail' otherwise.",
-      },
-      "issues": {
-        "type": "array",
-        "items": {"type": "string"},
-        "description": "Specific issues found: clichés, filler sentences, generic advice, missing concrete examples, AI-isms like 'delve/landscape/crucial/it\\'s important to note', corporate tone, etc.",
-      },
-      "strengths": {
-        "type": "array",
-        "items": {"type": "string"},
-        "description": "What the post does well — specific voice, concrete examples, genuine opinions, etc.",
-      },
-    },
-    "required": ["score", "verdict", "issues", "strengths"],
-  },
-}
+SYSTEM_PROMPT = (PROMPTS_DIR / "blog_system.md").read_text(encoding="utf-8")
+POST_TOOL = json.loads((PROMPTS_DIR / "blog_tool.json").read_text(encoding="utf-8"))
+REVIEW_SYSTEM_PROMPT = (PROMPTS_DIR / "blog_review.md").read_text(encoding="utf-8")
+REVIEW_TOOL = json.loads((PROMPTS_DIR / "review_tool.json").read_text(encoding="utf-8"))
 
 MAX_GENERATION_ATTEMPTS = 3
 
@@ -262,18 +183,7 @@ def _review_post(post: PostOut) -> ReviewResult:
     f"Review this blog post for AI slop.\n\n"
     f"Title: {post.title}\n"
     f"Summary: {post.summary}\n\n"
-    f"Content:\n{post.content}\n\n"
-    f"Check for:\n"
-    f"- AI cliché words: delve, landscape, crucial, leverage, foster, comprehensive, robust, "
-    f"seamless, cutting-edge, game-changer, it's important to note, in today's world\n"
-    f"- Corporate/LinkedIn tone vs the expected sarcastic, opinionated engineer voice\n"
-    f"- Generic advice that could apply to anything vs specific, concrete examples\n"
-    f"- Filler paragraphs that say nothing\n"
-    f"- Excessive bullet lists used as padding\n"
-    f"- Missing personal voice, war stories, or genuine opinions\n"
-    f"- Over-hedging ('it depends', 'there's no one-size-fits-all') without taking a stance\n"
-    f"- Suspiciously balanced 'on one hand / on the other hand' structure\n"
-    f"Be harsh. The bar is: would a real engineer with opinions write this, or did an AI?"
+    f"Content:\n{post.content}"
   )
   try:
     client = anthropic.Anthropic(api_key=api_key)

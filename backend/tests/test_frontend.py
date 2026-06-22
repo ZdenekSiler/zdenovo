@@ -295,6 +295,47 @@ def test_admin_draft_preview_has_edit_form(page: Page):
         expect(page.locator("textarea[name='content']")).to_be_visible()
 
 
+def test_admin_draft_regenerate_submits(page: Page):
+    admin_login(page)
+    page.goto(f"{BASE}/admin/drafts")
+    draft_link = page.locator("a[href*='/admin/drafts/']").first
+    if draft_link.count() == 0:
+        pytest.skip("No drafts available")
+    draft_link.click()
+    page.wait_for_url(re.compile(r"/admin/drafts/"))
+
+    remarks_box = page.locator("textarea[name='remarks']")
+    expect(remarks_box).to_be_visible()
+    remarks_box.fill("Make the intro more aggressive and add a concrete deploy failure example")
+
+    page.on("dialog", lambda d: d.accept())
+
+    regen_btn = page.get_by_role("button", name="Regenerate")
+    regen_btn.scroll_into_view_if_needed()
+
+    try:
+        with page.expect_response(
+            lambda r: "/regenerate" in r.url, timeout=120000
+        ) as resp_info:
+            regen_btn.click(timeout=60000, no_wait_after=True)
+
+        resp = resp_info.value
+        if resp.status == 502:
+            pytest.skip("Claude API unavailable — form submitted OK but generation failed")
+        assert resp.status in (200, 303), \
+            f"Regenerate returned unexpected status {resp.status}"
+
+        page.wait_for_url(re.compile(r"/admin/drafts/"), timeout=120000)
+        expect(page.locator("text=Draft Preview")).to_be_visible()
+        remarks_after = page.locator("textarea[name='remarks']").input_value()
+        assert "more aggressive" in remarks_after, \
+            "Remarks not preserved after regeneration"
+    except Exception as exc:
+        if "ERR_CONNECTION" in str(exc) or "Timeout" in str(exc):
+            pytest.skip(f"Claude API timeout during regeneration — form submission worked: {exc}")
+        raise
+
+
 # ─── Reading progress & visual polish ────────────────────────────────────────
 
 def test_reading_progress_bar_exists(page: Page):

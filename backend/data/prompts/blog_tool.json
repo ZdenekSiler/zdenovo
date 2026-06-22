@@ -1,0 +1,31 @@
+{
+  "name": "write_post",
+  "description": "Output a complete blog post.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string",
+        "description": "Concise, engaging post title"
+      },
+      "summary": {
+        "type": "string",
+        "description": "One or two sentence description"
+      },
+      "tags": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "3-5 specific, descriptive lowercase tags. Include the core technology or topic (e.g. 'anthropic', 'ollama', 'kubernetes'), the domain (e.g. 'ai-regulation', 'devops', 'security'), and the angle (e.g. 'vendor-lock-in', 'self-hosting', 'incident-response'). Avoid vague tags like 'strategy' or 'tips'."
+      },
+      "image_query": {
+        "type": "string",
+        "description": "A 2-4 word Unsplash search query for a hero photo that visually represents the post's core theme. Be concrete and visual — e.g. 'server room locked door' not 'ai risk'. Think about what photo would make someone click the article."
+      },
+      "content": {
+        "type": "string",
+        "description": "Full post body in Markdown, at least 800 words. Must include: ## headings, fenced code blocks with language tags, at least one Markdown table, callout blockquotes (> with emoji prefix), horizontal rules (---) between sections, and exactly one Mermaid diagram (```mermaid fenced block, no more than one). Mix visual elements so no more than 3 plain paragraphs appear in a row."
+      }
+    },
+    "required": ["title", "summary", "tags", "content"]
+  }
+}
