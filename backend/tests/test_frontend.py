@@ -5,13 +5,14 @@ Run with: cd backend && npx playwright test tests/test_frontend.py
 
 Requires the app running on localhost:8080 (docker compose up).
 """
+import os
 import re
 
 import pytest
 from playwright.sync_api import Page, expect
 
 BASE = "http://localhost:8080"
-ADMIN_PW = "admin"
+ADMIN_PW = os.environ.get("ADMIN_PASSWORD", "admin")
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
