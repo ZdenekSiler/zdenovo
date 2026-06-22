@@ -1,52 +1,145 @@
 # Deployment Guide
 
-zdenovo deploys to a single Hetzner (or any Ubuntu 24.04) VPS via Docker Compose,
-automated end-to-end by the root `Makefile`. There is no PaaS, no Kubernetes — one
-server, three containers.
+Complete guide for deploying zdenovo to a Hetzner VPS behind Cloudflare.
 
-## Architecture
+---
+
+## Table of Contents
+
+- [Architecture Overview](#architecture-overview)
+- [Infrastructure Stack](#infrastructure-stack)
+- [Prerequisites](#prerequisites)
+- [SSH Configuration](#ssh-configuration)
+- [Secrets Strategy](#secrets-strategy)
+- [First-Time Server Setup](#first-time-server-setup)
+- [Day-to-Day Deploys](#day-to-day-deploys)
+- [Quick Deploy via Claude Code](#quick-deploy-via-claude-code)
+- [Cloudflare Configuration](#cloudflare-configuration)
+- [nginx Configuration](#nginx-configuration)
+- [SSL/TLS](#ssltls)
+- [Database Management](#database-management)
+- [Secret Rotation](#secret-rotation)
+- [Monitoring and Health Checks](#monitoring-and-health-checks)
+- [Troubleshooting](#troubleshooting)
+- [Make Targets Reference](#make-targets-reference)
+- [Environment Variables Reference](#environment-variables-reference)
+- [Production Hardening Checklist](#production-hardening-checklist)
+
+---
+
+## Architecture Overview
 
 ```
-Internet
-   │
-   ▼
-┌─────────────────────────────┐
-│ nginx (ports 80, 443)        │  ← TLS termination, serves /static directly
-│  - redirects 80 → 443        │
-│  - rate-limits /api/ + /admin│
-│  - proxies / to web:8000     │
-└──────────────┬────────────────┘
-               │
+ Browser
+    │
+    ▼
+┌──────────────────────────────────────┐
+│ Cloudflare (Flexible SSL)            │
+│  - DNS proxy (orange cloud)          │
+│  - HTTPS termination to client       │
+│  - DDoS protection, caching          │
+│  - Connects to origin over HTTP:80   │
+└──────────────┬───────────────────────┘
+               │ HTTP
                ▼
-        ┌─────────────┐      ┌──────────────────────┐
-        │ web          │      │ certbot               │
-        │ FastAPI app  │      │ renews TLS cert       │
-        │ (uvicorn)    │      │ every 12h             │
-        └──────┬───────┘      └───────────────────────┘
-               │
-               ▼
-        db_data volume (blog.db, SQLite)
-        /run/secrets/ (API keys, passwords — file-mounted)
+┌──────────────────────────────────────┐
+│ Hetzner VPS (Ubuntu 24.04)           │
+│                                      │
+│  ┌────────────────────────────────┐  │
+│  │ nginx (port 80)                │  │
+│  │  - rate limiting               │  │
+│  │  - serves /static/ directly    │  │
+│  │  - proxies everything else     │  │
+│  │    to web:8000                 │  │
+│  └──────────────┬─────────────────┘  │
+│                 │                     │
+│                 ▼                     │
+│  ┌────────────────────────────────┐  │
+│  │ web (FastAPI + uvicorn)        │  │
+│  │  - reads /run/secrets/*        │  │
+│  │  - writes to /data/blog.db    │  │
+│  └──────────────┬─────────────────┘  │
+│                 │                     │
+│                 ▼                     │
+│  db_data volume (SQLite)             │
+│  /opt/zdenovo/secrets/ (API keys)    │
+└──────────────────────────────────────┘
 ```
 
-Defined in `docker-compose.prod.yml`:
+Traffic flow: Browser → Cloudflare (HTTPS) → nginx (HTTP:80) → FastAPI (HTTP:8000)
 
-- **`web`** — built from the root `Dockerfile` (`uv sync --no-dev`, runs
-  `uvicorn main:app --port 8000`). `DB_DIR=/data` so SQLite persists on the
-  `db_data` volume. Has a healthcheck (`curl -f http://localhost:8000/`).
-  Secrets are mounted as files via Docker Compose secrets (not env vars).
-- **`nginx`** — `nginx:1.27-alpine`, config rendered from `nginx/app.conf.template`.
-  Terminates TLS, sets security headers, rate-limits sensitive endpoints, serves
-  `frontend/static/` directly, and proxies everything else to `web`. Waits for `web`'s
+---
+
+## Infrastructure Stack
+
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| Server | Hetzner CX22, Ubuntu 24.04 | VPS host |
+| Containers | Docker + Docker Compose | Application runtime |
+| Web framework | FastAPI + uvicorn | Python backend |
+| Database | SQLite (Docker volume) | Blog posts, drafts |
+| Reverse proxy | nginx 1.27-alpine | Rate limiting, static files, proxy |
+| CDN/DNS | Cloudflare (free tier) | DNS, SSL termination, DDoS protection |
+| Secrets | Docker Compose file secrets | `/run/secrets/*` inside container |
+| Deployment | Git pull + Docker rebuild via SSH | No CI/CD pipeline needed |
+
+Docker Compose runs two services in production (`docker-compose.prod.yml`):
+
+- **`web`** — built from `Dockerfile` (Python 3.12-slim + uv), runs uvicorn on port 8000.
+  SQLite DB persists on the `db_data` volume at `/data/blog.db`. Secrets mounted as
+  read-only files at `/run/secrets/<name>`.
+- **`nginx`** — nginx:1.27-alpine, listens on port 80. Serves `/static/` directly from a
+  bind-mounted volume. Proxies all other requests to `web:8000`. Waits for web's
   healthcheck before starting.
-- **`certbot`** — runs `certbot renew --quiet` every 12 hours against the
-  `certbot_conf`/`certbot_www` volumes shared with `nginx`.
+
+A `certbot` service is defined for Let's Encrypt but is unused in the current Cloudflare
+Flexible SSL setup (Cloudflare terminates HTTPS; origin is HTTP-only).
+
+---
 
 ## Prerequisites
 
-- A Hetzner CX22 (or similar) Ubuntu 24.04 server with SSH access
-- A domain with an A record pointing at the server's IP
-- Locally: `make`, `ssh`, `scp`, `ssh-copy-id`
+### Server
+
+- Hetzner CX22 (or any Ubuntu 24.04 VPS with 2+ GB RAM)
+- SSH access as root
+- Public IPv4 address
+
+### DNS
+
+- Domain with Cloudflare DNS (free tier is fine)
+- A record pointing to the server IP, **proxied** (orange cloud)
+- www CNAME to the apex domain, **proxied**
+
+### Local machine
+
+- `make`, `ssh`, `git`
+- Docker + Docker Compose (for local dev)
+- Claude Code CLI (for `/deploy` skill)
+
+---
+
+## SSH Configuration
+
+SSH access uses an alias defined in `~/.ssh/config` (local machine, not committed to git):
+
+```
+Host zdenovo
+    HostName <server-ip>
+    User root
+    IdentityFile ~/.ssh/<your-key>
+```
+
+All deployment commands use `ssh zdenovo` — no hardcoded IPs or key paths in the
+repository. Test with:
+
+```bash
+ssh zdenovo "echo OK"
+```
+
+The Makefile uses `SSH_CMD := ssh $(SERVER_USER)@$(SERVER_HOST)` from `.env` for the
+`make deploy*` targets. Both approaches work — the SSH config alias is used by the
+`/deploy` Claude Code skill, while the Makefile reads from `.env`.
 
 ---
 
@@ -54,18 +147,18 @@ Defined in `docker-compose.prod.yml`:
 
 ### The Problem
 
-A flat `.env` file on the server is risky:
+A flat `.env` file on the server is dangerous:
 
-- One misconfigured `docker compose` flag or shell expansion leaks everything
-- Any process in the container can read all env vars via `/proc/1/environ`
 - `docker inspect` shows env vars in plaintext to anyone with Docker access
-- A stray `printenv` or crash dump exposes keys
+- Any process inside the container reads all env vars via `/proc/1/environ`
+- Shell expansion or a stray `printenv` in a script can leak everything
+- A crash dump or debug log may capture the full environment
 
 ### The Solution: Docker Compose File Secrets
 
-Secrets are stored as **individual files** on the server under `$DEPLOY_DIR/secrets/`,
-mounted read-only into the container at `/run/secrets/<name>`. The app reads them from
-files, not environment variables.
+Secrets are stored as **individual files** on the server, mounted read-only into the
+container at `/run/secrets/<name>`. The app reads them from files, never from environment
+variables in production.
 
 ```
 /opt/zdenovo/secrets/           ← chmod 700, owned by root
@@ -75,24 +168,20 @@ files, not environment variables.
 └── secret_key
 ```
 
-**Why this approach over alternatives:**
+### How It Works
 
-| Approach | Verdict |
-|----------|---------|
-| `.env` file | Dangerous — leaked via `docker inspect`, `/proc`, shell expansion |
-| Docker Swarm secrets | Requires swarm mode — overkill for a single server |
-| HashiCorp Vault | Enterprise-grade, needs its own server — overkill |
-| Cloud KMS (AWS/GCP) | Wrong cloud, adds vendor lock-in |
-| SOPS/age encrypted files | Good for git, but still decrypts to env vars |
-| **Docker Compose file secrets** | **Right fit — simple, secure, no extra deps** |
-
-### How It Works in `docker-compose.prod.yml`
+In `docker-compose.prod.yml`:
 
 ```yaml
 secrets:
   anthropic_api_key:
     file: ./secrets/anthropic_api_key
-  # ...
+  unsplash_access_key:
+    file: ./secrets/unsplash_access_key
+  admin_password:
+    file: ./secrets/admin_password
+  secret_key:
+    file: ./secrets/secret_key
 
 services:
   web:
@@ -103,205 +192,640 @@ services:
       - secret_key
 ```
 
-Docker mounts each secret as a read-only file at `/run/secrets/<name>` inside the
-container. The Python app reads them with a helper:
+Docker mounts each file at `/run/secrets/<name>` inside the container. The Python app
+reads them with a dual-mode helper (`config.py`):
 
 ```python
-def _read_secret(name: str, env_fallback: str = "") -> str:
+def read_secret(name: str, env_fallback: str = "") -> str:
     secret_path = Path(f"/run/secrets/{name}")
     if secret_path.exists():
         return secret_path.read_text().strip()
-    return os.environ.get(env_fallback, "")
+    return os.environ.get(env_fallback or name.upper(), "")
 ```
 
-This gives **dual-mode support**: prod reads files, dev reads `.env` via `load_dotenv()`.
+- **Production**: reads `/run/secrets/<name>` (file exists in the container)
+- **Local dev**: falls back to env var from `.env` via `load_dotenv()`
 
-### Secret Categories
+No code changes needed between environments.
 
-| Secret | Runtime? | Stored as |
-|--------|----------|-----------|
-| `ANTHROPIC_API_KEY` | Yes — Claude API calls | `/run/secrets/anthropic_api_key` |
-| `UNSPLASH_ACCESS_KEY` | Yes — hero images | `/run/secrets/unsplash_access_key` |
-| `ADMIN_PASSWORD` | Yes — admin login | `/run/secrets/admin_password` |
-| `SECRET_KEY` | Yes — session cookies | `/run/secrets/secret_key` |
-| `DOMAIN` | Config, not secret | Server `.env` |
-| `CERTBOT_EMAIL` | Config, not secret | Server `.env` |
-| `SERVER_HOST` | Local only | Local `.env` (never on server) |
-| `SERVER_USER` | Local only | Local `.env` (never on server) |
-| `DEPLOY_DIR` | Local only | Local `.env` (never on server) |
-| `REPO_URL` | One-time setup | Local `.env` (never on server) |
+### Why File Secrets Over Alternatives
+
+| Approach | Verdict |
+|----------|---------|
+| `.env` file | Dangerous — leaked via `docker inspect`, `/proc`, shell expansion |
+| Docker Swarm secrets | Requires swarm mode — overkill for a single server |
+| HashiCorp Vault | Enterprise-grade, needs its own server |
+| Cloud KMS (AWS/GCP) | Wrong cloud, adds vendor lock-in |
+| SOPS/age encrypted files | Good for git, but still decrypts to env vars |
+| **Docker Compose file secrets** | **Right fit — simple, secure, no extra dependencies** |
 
 ---
 
-## One-Time Setup
+## First-Time Server Setup
 
-### 1. Local `.env`
+### 1. Prepare local `.env`
 
 ```bash
 cp .env.example .env
-# Fill in ALL values — secrets here are used for local dev
+# Fill in all values — secrets here are used for local dev
 # and pushed to server as files on first deploy
 ```
 
-### 2. First Deploy
+### 2. Set up SSH config
+
+Add the server to `~/.ssh/config`:
+
+```
+Host zdenovo
+    HostName <your-server-ip>
+    User root
+    IdentityFile ~/.ssh/<your-key>
+```
+
+Copy your SSH key to the server:
+
+```bash
+ssh-copy-id zdenovo
+```
+
+### 3. Run first deploy
 
 ```bash
 make deploy-first
 ```
 
-This command (run from your local machine):
+This single command:
 
-1. Copies your SSH key to the server (`ssh-copy-id`)
-2. Runs `scripts/server-setup.sh` on the server — updates packages, installs
-   Docker Engine + Compose plugin, configures UFW (allows SSH, 80, 443), and
-   clones `REPO_URL` into `DEPLOY_DIR`
-3. Creates `$DEPLOY_DIR/secrets/` on the server (chmod 700) and writes each
-   secret from your local `.env` into its own file (chmod 600)
+1. Copies your SSH key to the server
+2. Runs `scripts/server-setup.sh` on the server:
+   - Updates packages
+   - Installs Docker Engine + Compose plugin
+   - Configures UFW firewall (SSH, HTTP, HTTPS only)
+   - Clones the repository to `/opt/zdenovo`
+3. Creates `/opt/zdenovo/secrets/` (chmod 700) and writes each secret from your
+   local `.env` as an individual file (chmod 600)
 4. Copies a minimal `.env` with only `DOMAIN` + `CERTBOT_EMAIL` to the server
-5. Runs `make cert-init` on the server — bootstraps HTTP-only nginx, requests a
-   Let's Encrypt cert, then switches to HTTPS
-6. Runs `make prod` on the server — builds and starts the full stack
+5. Bootstraps SSL certificate (if using Let's Encrypt; skip for Cloudflare Flexible)
+6. Builds and starts the production stack
 
-### 3. Rotating a Secret
+### 4. Configure Cloudflare
+
+See [Cloudflare Configuration](#cloudflare-configuration) below.
+
+### 5. Write the nginx config on the server
+
+When using Cloudflare Flexible SSL, the server only listens on HTTP:80. The template
+(`nginx/app.conf.template`) is designed for direct Let's Encrypt HTTPS. For Cloudflare,
+write a simplified HTTP-only config directly on the server:
 
 ```bash
-# Update a single secret on the server and restart
-make secret-set NAME=anthropic_api_key VALUE=sk-ant-new-key-here
+ssh zdenovo
+cat > /opt/zdenovo/nginx/app.conf << 'NGINX'
+# Rate limiting zones
+limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=admin:10m rate=5r/s;
+limit_req_zone $binary_remote_addr zone=login:10m rate=3r/m;
+
+server {
+    listen 80;
+    server_name <your-domain> www.<your-domain>;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location /static/ {
+        alias /app/frontend/static/;
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location /admin/login {
+        limit_req zone=login burst=5 nodelay;
+        proxy_pass http://web:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 10s;
+        client_max_body_size 1m;
+    }
+
+    location /admin/ {
+        limit_req zone=admin burst=20 nodelay;
+        proxy_pass http://web:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 180s;
+        proxy_connect_timeout 10s;
+        client_max_body_size 5m;
+    }
+
+    location /api/ {
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass http://web:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 180s;
+        proxy_connect_timeout 10s;
+        client_max_body_size 5m;
+    }
+
+    location / {
+        proxy_pass http://web:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 30s;
+        proxy_connect_timeout 10s;
+        client_max_body_size 5m;
+    }
+}
+NGINX
 ```
 
-Or manually:
+Reload nginx: `docker compose -f docker-compose.prod.yml exec nginx nginx -s reload`
+
+### 6. Verify
 
 ```bash
-ssh root@YOUR_SERVER
+curl -s -o /dev/null -w "%{http_code}" https://<your-domain>/
+# Should return 200
+```
+
+---
+
+## Day-to-Day Deploys
+
+The standard deploy workflow:
+
+```bash
+# 1. Make changes locally
+# 2. Run tests
+make test
+
+# 3. Commit
+git add <files>
+git commit -m "feat: description"
+
+# 4. Push (pre-push hook runs full test suite including Playwright)
+git push origin main
+
+# 5. Deploy to server
+ssh zdenovo "cd /opt/zdenovo && git pull --ff-only && docker compose -f docker-compose.prod.yml up --build -d web nginx"
+```
+
+Or use the Makefile:
+
+```bash
+make deploy   # SSHes in, git pulls, rebuilds containers
+```
+
+The `--ff-only` flag on `git pull` ensures the server branch has not diverged. Never
+commit directly on the server.
+
+### What happens during deploy
+
+1. `git pull --ff-only` — fetches latest code from main
+2. `docker compose up --build -d web nginx` — rebuilds the web image (only layers that
+   changed), restarts both containers
+3. nginx waits for web's healthcheck (Python urllib probe on `http://localhost:8000/`)
+   before accepting traffic
+4. Typical deploy time: 10-30 seconds
+
+---
+
+## Quick Deploy via Claude Code
+
+The `/deploy` skill automates the full workflow:
+
+```
+/deploy                           # auto-generates commit message from diff
+/deploy fix: update project list  # uses the provided commit message
+```
+
+What it does:
+
+1. Checks for uncommitted changes and commits them
+2. Pushes to main (test suite runs via pre-push hook)
+3. SSHes to server, pulls, and rebuilds
+4. Verifies the site is live (checks API response)
+5. Reports: commit hash, build status, verification result
+
+---
+
+## Cloudflare Configuration
+
+### DNS Records
+
+| Type | Name | Content | Proxy |
+|------|------|---------|-------|
+| A | `@` (apex) | `<server-ip>` | Proxied (orange cloud) |
+| CNAME | `www` | `<your-domain>` | Proxied (orange cloud) |
+
+### SSL/TLS Settings
+
+- **Encryption mode**: Flexible
+  - Cloudflare handles HTTPS to the browser
+  - Cloudflare connects to your origin over HTTP (port 80)
+  - No SSL certificates needed on the server
+- **Always Use HTTPS**: ON (redirects http:// to https://)
+- **Minimum TLS Version**: 1.2
+
+### Performance Settings
+
+- **Rocket Loader**: OFF (or use `data-cfasync="false"` on critical scripts)
+  - Rocket Loader defers JavaScript execution, which breaks Tailwind CDN and htmx
+  - The site uses `data-cfasync="false"` on Tailwind and htmx script tags as a safeguard
+
+### Why Flexible SSL (not Full)
+
+With Cloudflare Flexible SSL:
+
+- No Let's Encrypt certificate management needed on the server
+- No certbot container, no renewal cron, no certificate expiry risk
+- Simpler nginx config (HTTP-only, no TLS termination)
+- The Cloudflare-to-origin hop is on Hetzner's internal network — acceptable risk for a
+  personal blog
+
+For sensitive applications, use **Full (Strict)** with a Cloudflare Origin Certificate
+instead.
+
+---
+
+## nginx Configuration
+
+Two nginx configs exist in the repo:
+
+### `nginx/app.conf.template` (for Let's Encrypt / Full SSL)
+
+- HTTP:80 redirects to HTTPS, serves ACME challenges
+- HTTPS:443 with TLS termination, HSTS, ssl_stapling
+- Used with `make cert-init` + certbot
+
+### `nginx/app.conf` on the server (for Cloudflare Flexible)
+
+- HTTP:80 only — Cloudflare handles HTTPS
+- Written directly on the server (not generated from template)
+- Survives `git pull` because `nginx/app.conf` is in `.gitignore`
+
+### `nginx/no-default.conf`
+
+An empty file mounted over `/etc/nginx/conf.d/default.conf` in the container. Without
+this, nginx's built-in default server block intercepts requests before `app.conf` can
+handle them.
+
+### Rate Limiting
+
+| Zone | Rate | Applied to | Purpose |
+|------|------|-----------|---------|
+| `login` | 3 req/min | `/admin/login` | Brute force protection |
+| `admin` | 5 req/sec | `/admin/*` | Admin abuse protection |
+| `api` | 10 req/sec | `/api/*` | API abuse protection |
+
+### Timeouts
+
+| Location | `proxy_read_timeout` | Why |
+|----------|---------------------|-----|
+| `/admin/login` | 10s | Simple form POST |
+| `/admin/*` | 180s | Claude API generation can take 1-2 minutes |
+| `/api/*` | 180s | Same — generation endpoints |
+| `/` | 30s | Standard page loads |
+
+---
+
+## SSL/TLS
+
+### Current Setup: Cloudflare Flexible
+
+No certificates on the server. Cloudflare provides HTTPS to visitors. The origin
+connection is HTTP-only.
+
+### Alternative: Let's Encrypt (Full SSL)
+
+If you switch to Cloudflare Full (Strict) or remove Cloudflare:
+
+```bash
+# On the server
+cd /opt/zdenovo
+make cert-init   # Bootstraps HTTP-only nginx, requests cert, switches to HTTPS
+
+# The certbot container auto-renews every 12 hours
+# Force renewal:
+make cert-renew
+```
+
+The `nginx/app.conf.template` is already configured for this mode.
+
+---
+
+## Database Management
+
+### Location
+
+SQLite database lives in the `db_data` Docker volume, mounted at `/data/blog.db` inside
+the web container.
+
+### Backup
+
+```bash
+# From local machine
+make backup   # Downloads blog.db to ./blog.db.bak
+
+# Or manually
+ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml exec -T web cat /data/blog.db" > blog.db.bak
+```
+
+### Restore
+
+```bash
+# Copy local database to server
+scp blog.db zdenovo:/tmp/blog.db
+
+# Replace the database in the Docker volume
+ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml cp /tmp/blog.db web:/data/blog.db"
+ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml restart web"
+```
+
+### Reset to Seed Data
+
+```bash
+# On the server — removes the db_data volume entirely
+ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml down -v && docker compose -f docker-compose.prod.yml up --build -d web nginx"
+```
+
+The app inserts seed posts from `seed_posts.json` when the `posts` table is empty.
+
+### Volume Safety
+
+- `docker compose down` preserves volumes (data safe)
+- `docker compose down -v` **deletes volumes** (data lost — only use intentionally)
+- `docker compose stop` / `restart` never touch volumes
+
+---
+
+## Secret Rotation
+
+### Rotate a single secret
+
+```bash
+# Via Makefile (from local machine)
+make secret-set NAME=anthropic_api_key VALUE=sk-ant-new-key-here
+
+# Or manually
+ssh zdenovo
 echo 'new-key-value' > /opt/zdenovo/secrets/anthropic_api_key
 chmod 600 /opt/zdenovo/secrets/anthropic_api_key
 cd /opt/zdenovo && docker compose -f docker-compose.prod.yml restart web
 ```
 
+Secrets are read at request time (not cached at startup), so a container restart picks
+up the new value immediately.
+
+### When to rotate
+
+- **Anthropic API key**: if leaked or compromised
+- **Unsplash access key**: if leaked or compromised
+- **Admin password**: periodically, or after sharing access
+- **Secret key**: rotating invalidates all active sessions (users get logged out)
+
 ---
 
-## Ongoing Deploys
+## Monitoring and Health Checks
+
+### Container health
 
 ```bash
-make deploy
+# From local machine
+ssh zdenovo "docker compose -f /opt/zdenovo/docker-compose.prod.yml ps"
 ```
 
-SSHes in and runs `cd $DEPLOY_DIR && git pull --ff-only && make prod`. The
-`--ff-only` pull means the server's `main` must not have diverged — never commit
-directly on the server. **Secrets are not touched during code deploys.**
+The web container has a built-in healthcheck:
 
----
+```yaml
+healthcheck:
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 10s
+```
 
-## SSL Certificates
+Uses Python's urllib instead of curl because `python:3.12-slim` doesn't include curl.
 
-- **`make cert-init`** — first-time bootstrap (see above); also re-run if you
-  change `DOMAIN`.
-- **`make cert-renew`** — force an immediate renewal and reload nginx. Normally
-  unnecessary: the `certbot` container renews automatically every 12 hours.
-
----
-
-## Local Development
+### Site health check
 
 ```bash
-make dev        # docker compose up --build -d → http://localhost:8080
-make dev-logs   # tail logs
-make dev-down   # stop and remove dev containers
+make check   # Verifies HTTPS, HTTP→HTTPS redirect, and API endpoint
 ```
 
-Uses the root `docker-compose.yml` (single `web` service, no nginx/TLS), maps
-container port 8000 → host port 8080. The local `.env` is bind-mounted into the
-container so `load_dotenv()` picks up secrets. Data lives in `./data/` (bind mount).
+### View logs
 
-**Dev uses `.env` for convenience. Prod uses file secrets. The app supports both.**
+```bash
+# All containers
+ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml logs --tail 50"
+
+# Web container only
+ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml logs web --tail 30"
+
+# Follow logs in real time
+ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml logs -f web"
+```
+
+### Container restart
+
+```bash
+# Restart web only (picks up secret changes)
+make deploy-restart
+
+# Restart both containers
+ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml restart"
+```
+
+---
+
+## Troubleshooting
+
+### Site returns Cloudflare error page
+
+1. Check containers are running: `ssh zdenovo "docker ps"`
+2. Check web container health: look for `(healthy)` in status
+3. Check nginx can reach web: `ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml logs nginx --tail 20"`
+4. Check if port 80 is open: `ssh zdenovo "ufw status"`
+
+### Static files return 404
+
+nginx needs the static files mounted as a volume. Check `docker-compose.prod.yml` has:
+
+```yaml
+nginx:
+  volumes:
+    - ./frontend/static:/app/frontend/static:ro
+```
+
+### nginx default page instead of app
+
+The nginx default.conf intercepts requests. Ensure the empty override is mounted:
+
+```yaml
+nginx:
+  volumes:
+    - ./nginx/no-default.conf:/etc/nginx/conf.d/default.conf:ro
+```
+
+### Fonts look wrong / FOUC in production
+
+Cloudflare Rocket Loader defers script execution, breaking Tailwind CDN. Ensure:
+
+1. Critical scripts have `data-cfasync="false"`:
+   ```html
+   <script data-cfasync="false" src="https://cdn.tailwindcss.com"></script>
+   <script data-cfasync="false" src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+   ```
+2. Google Fonts are loaded explicitly (not relying on system fonts)
+3. Consider disabling Rocket Loader entirely in Cloudflare > Speed > Optimization
+
+### Web container unhealthy
+
+Check the app logs:
+
+```bash
+ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml logs web --tail 30"
+```
+
+Common causes:
+- Missing secret file (check `/opt/zdenovo/secrets/` has all 4 files)
+- Python import error (dependency issue — rebuild with `--no-cache`)
+- Port conflict (another process on 8000)
+
+### `git pull --ff-only` fails on server
+
+The server branch has diverged. Never commit directly on the server. Fix:
+
+```bash
+ssh zdenovo "cd /opt/zdenovo && git reset --hard origin/main"
+```
+
+### Claude generation times out
+
+The `/admin/*` and `/api/*` locations have `proxy_read_timeout 180s`. If Claude API takes
+longer than 3 minutes:
+
+1. Check the Anthropic API status
+2. Increase timeout in nginx config on the server
+3. Reload nginx: `docker compose -f docker-compose.prod.yml exec nginx nginx -s reload`
+
+### System nginx conflicts with Docker nginx
+
+Hetzner Ubuntu images ship with system nginx. If port 80 is already in use:
+
+```bash
+ssh zdenovo "systemctl stop nginx && systemctl disable nginx"
+```
+
+### SSH connection refused
+
+1. Check the server IP in `~/.ssh/config` is correct
+2. Verify SSH key permissions: `chmod 600 ~/.ssh/<key>` and `chmod 700 ~/.ssh`
+3. Check UFW allows SSH: `ssh zdenovo "ufw status"` (if you can connect another way)
+4. Use Hetzner console (web UI) as a fallback
 
 ---
 
 ## Make Targets Reference
 
-| Target | Where | Purpose |
-|--------|-------|---------|
-| `make dev` / `dev-logs` / `dev-down` | local | Dev stack on `:8080` |
-| `make test` | local | `cd backend && uv run pytest --cov` |
-| `make prod` | server (or via `make deploy`) | Build + start the production stack |
-| `make prod-logs` | server | Tail production logs |
-| `make prod-stop` / `prod-down` | server | Stop/remove prod containers (data preserved) |
-| `make cert-init` | server | Bootstrap SSL certificate (first time only) |
-| `make cert-renew` | server | Force certificate renewal |
-| `make check` | local | Health check: HTTPS, HTTP→HTTPS redirect, `/api/posts` |
-| `make deploy-first` | local | One-time server setup + first deploy |
-| `make deploy` | local | `git pull --ff-only && make prod` on the server |
-| `make deploy-restart` | local | Restart prod containers (picks up secret changes) |
-| `make secret-set` | local | Update a single secret on the server |
-| `make backup` | local | Download `blog.db` backup from server |
+### Local development
+
+| Target | Purpose |
+|--------|---------|
+| `make dev` | Start dev stack on http://localhost:8080 |
+| `make dev-logs` | Tail dev container logs |
+| `make dev-down` | Stop and remove dev containers |
+| `make test` | Run pytest with coverage |
+
+### Production (run on server)
+
+| Target | Purpose |
+|--------|---------|
+| `make prod` | Build and start production stack |
+| `make prod-logs` | Tail production logs |
+| `make prod-stop` | Stop containers (data preserved) |
+| `make prod-down` | Remove containers (data preserved, volumes kept) |
+| `make check` | Health check: HTTPS + redirect + API |
+| `make cert-init` | Bootstrap Let's Encrypt certificate (first time) |
+| `make cert-renew` | Force certificate renewal |
+
+### Remote deployment (run locally, SSHes to server)
+
+| Target | Purpose |
+|--------|---------|
+| `make deploy-first` | One-time server setup + first deploy |
+| `make deploy` | Pull latest code + rebuild on server |
+| `make deploy-restart` | Restart web container (picks up secret changes) |
+| `make secret-set NAME=x VALUE=y` | Update a single secret and restart |
+| `make backup` | Download blog.db from server |
 
 ---
 
-## Environment Variables
+## Environment Variables Reference
 
 ### Server `.env` (non-secret config only)
 
+Only two variables live in the server's `.env`. Everything else is a secret file.
+
 | Variable | Example | Used by |
 |----------|---------|---------|
-| `DOMAIN` | `yourdomain.com` | `nginx/app.conf.template`, certbot |
-| `CERTBOT_EMAIL` | `you@yourdomain.com` | `make cert-init` (Let's Encrypt) |
+| `DOMAIN` | `zdenovo.com` | nginx config, health checks |
+| `CERTBOT_EMAIL` | `you@example.com` | Let's Encrypt (if used) |
 
 ### Local `.env` (everything for dev convenience)
 
-| Variable | Example | Used by |
+| Variable | Example | Purpose |
 |----------|---------|---------|
-| `DOMAIN` | `yourdomain.com` | Makefile targets |
-| `CERTBOT_EMAIL` | `you@yourdomain.com` | Makefile targets |
+| `DOMAIN` | `zdenovo.com` | Makefile targets |
+| `CERTBOT_EMAIL` | `you@example.com` | Makefile targets |
 | `SERVER_HOST` | `1.2.3.4` | `make deploy*` (SSH target) |
 | `SERVER_USER` | `root` | `make deploy*` (SSH user) |
-| `DEPLOY_DIR` | `/opt/zdenovo` | `make deploy*` (clone dir) |
-| `REPO_URL` | `https://github.com/youruser/zdenovo.git` | `server-setup.sh` |
+| `DEPLOY_DIR` | `/opt/zdenovo` | `make deploy*` (remote path) |
+| `REPO_URL` | `https://github.com/user/repo.git` | `server-setup.sh` (first deploy only) |
 | `ANTHROPIC_API_KEY` | `sk-ant-...` | Dev: env var. Prod: file secret |
 | `UNSPLASH_ACCESS_KEY` | `your-key` | Dev: env var. Prod: file secret |
-| `ADMIN_PASSWORD` | `change-me` | Dev: env var. Prod: file secret |
-| `SECRET_KEY` | `random-hex` | Dev: env var. Prod: file secret |
+| `ADMIN_PASSWORD` | `strong-password` | Dev: env var. Prod: file secret |
+| `SECRET_KEY` | `random-64-char-hex` | Dev: env var. Prod: file secret |
+
+### Secret categories
+
+| Secret | Runtime? | Dev source | Prod source |
+|--------|----------|-----------|-------------|
+| `anthropic_api_key` | Yes — Claude API calls | `.env` env var | `/run/secrets/anthropic_api_key` |
+| `unsplash_access_key` | Yes — hero images | `.env` env var | `/run/secrets/unsplash_access_key` |
+| `admin_password` | Yes — admin login | `.env` env var | `/run/secrets/admin_password` |
+| `secret_key` | Yes — session cookies | `.env` env var | `/run/secrets/secret_key` |
 
 ---
 
 ## Production Hardening Checklist
 
+- [ ] SSH config alias set up in `~/.ssh/config` (no hardcoded IPs in repo)
 - [ ] No `.env` with secrets on the server — only `DOMAIN` + `CERTBOT_EMAIL`
-- [ ] All API keys in `$DEPLOY_DIR/secrets/` with chmod 600
+- [ ] All API keys in `/opt/zdenovo/secrets/` with chmod 600
 - [ ] `secrets/` directory is chmod 700, owned by root
-- [ ] `ADMIN_PASSWORD` is strong (not "admin")
-- [ ] `SECRET_KEY` is random 64-char hex
-- [ ] TLS 1.2+ only, HSTS enabled (nginx template)
-- [ ] Rate limiting on `/api/` and `/admin/` (nginx template)
-- [ ] `proxy_read_timeout 180s` (Claude generation takes 1-2 min)
+- [ ] `ADMIN_PASSWORD` is strong (64+ character hex)
+- [ ] `SECRET_KEY` is random 64-char hex (`python3 -c "import secrets; print(secrets.token_hex(32))"`)
+- [ ] Cloudflare SSL set to Flexible, Always Use HTTPS enabled
+- [ ] Cloudflare Rocket Loader disabled (or `data-cfasync="false"` on critical scripts)
+- [ ] Rate limiting active on `/admin/login`, `/admin/*`, `/api/*`
+- [ ] `proxy_read_timeout 180s` for admin and API (Claude generation takes 1-2 min)
 - [ ] UFW active: only SSH (22), HTTP (80), HTTPS (443) open
-- [ ] SSH key-only auth (disable password login after first deploy)
-- [ ] Automated daily backup of `blog.db`
+- [ ] SSH key-only auth (consider disabling password login)
+- [ ] System nginx stopped and disabled (`systemctl disable nginx`)
+- [ ] `nginx/no-default.conf` mounted to prevent default server block
 - [ ] `restart: unless-stopped` on all containers
-
----
-
-## Health Check
-
-```bash
-make check
-```
-
-Verifies `https://$DOMAIN/` returns 200, `http://$DOMAIN/` redirects (301/302),
-and `https://$DOMAIN/api/posts` returns valid JSON.
-
----
-
-## Data Persistence & Backup
-
-`blog.db` lives in the `db_data` Docker volume at `/data/blog.db`. To back it up:
-
-```bash
-# From local machine
-make backup
-
-# Or manually on the server
-docker compose -f docker-compose.prod.yml exec web cat /data/blog.db > blog.db.bak
-```
-
-`make prod-down` / `prod-stop` preserve volumes. Only `docker compose down -v`
-removes `db_data` (resetting to `seed_posts.json` on next startup).
+- [ ] `secrets/` in `.gitignore`
+- [ ] No PII (server IPs, SSH key names) in committed files
+- [ ] Regular database backups (`make backup`)

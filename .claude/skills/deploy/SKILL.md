@@ -21,7 +21,7 @@ Deploy the current state to https://zdenovo.com on the Hetzner VPS.
 2. **If there are changes to commit:**
    - Stage the relevant files (never stage `.env` or `secrets/`)
    - Commit with a message. If `$ARGUMENTS` is provided, use it as the commit message. Otherwise, draft one from the diff.
-   - The commit message must end with `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`
+
 
 3. **Push to main.** Run `git push origin main`. The pre-push hook will automatically run 126+ unit tests and 37 Playwright frontend tests. If tests fail, fix the issue and retry — do NOT use `--no-verify`.
 
