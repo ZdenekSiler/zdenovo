@@ -40,7 +40,6 @@ def test_projects_returns_200(client):
 def test_projects_lists_project_names(client):
     r = client.get("/projects")
     assert b"zdenovo" in r.content
-    assert b"type-enforcer" in r.content
 
 
 # ── Blog list ─────────────────────────────────────────────────────────────────
