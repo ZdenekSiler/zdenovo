@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 log = logging.getLogger(__name__)
 
+from config import read_secret
 from db import get_conn
 from routers.posts_api import PostOut, _slugify
 
@@ -96,7 +97,7 @@ def _build_brief_message(brief: PostBrief) -> str:
 
 def _fetch_unsplash_image(query: str) -> str | None:
   """Search Unsplash for a topic-relevant hero image. Returns URL or None."""
-  access_key = os.environ.get("UNSPLASH_ACCESS_KEY")
+  access_key = read_secret("unsplash_access_key", "UNSPLASH_ACCESS_KEY")
   if not access_key:
     return None
   try:
@@ -135,7 +136,7 @@ def _get_hero_image(image_query: str, title: str, tags: list[str], slug: str) ->
 
 
 def _call_claude(user_message: str) -> PostOut:
-  api_key = os.environ.get("ANTHROPIC_API_KEY")
+  api_key = read_secret("anthropic_api_key", "ANTHROPIC_API_KEY")
   if not api_key:
     raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
   try:
@@ -176,7 +177,7 @@ def _call_claude(user_message: str) -> PostOut:
 
 
 def _review_post(post: PostOut) -> ReviewResult:
-  api_key = os.environ.get("ANTHROPIC_API_KEY")
+  api_key = read_secret("anthropic_api_key", "ANTHROPIC_API_KEY")
   if not api_key:
     return ReviewResult(score=0, verdict="fail", issues=["No API key — review skipped"], strengths=[])
   review_prompt = (

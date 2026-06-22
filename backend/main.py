@@ -15,8 +15,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-load_dotenv()  # no-op if .env absent; prod uses system env vars
+load_dotenv()  # no-op if .env absent; prod uses file secrets
 
+from config import read_secret
 from data.posts import get_all_posts, get_all_tags, get_post_by_slug, get_posts_page, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
@@ -42,7 +43,7 @@ app = FastAPI(title="zdenovo", lifespan=lifespan)
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.environ.get("SECRET_KEY", "dev-insecure-key-change-in-prod"),
+    secret_key=read_secret("secret_key", "SECRET_KEY") or "dev-insecure-key-change-in-prod",
     session_cookie="zdenovo_session",
     max_age=60 * 60 * 24 * 7,  # 7 days
     https_only=False,           # set True in prod behind HTTPS
@@ -101,7 +102,7 @@ async def admin_login(
     password: str = Form(...),
     next: str = Form("/admin/posts"),
 ):
-    admin_password = os.environ.get("ADMIN_PASSWORD", "")
+    admin_password = read_secret("admin_password", "ADMIN_PASSWORD")
     if admin_password and secrets.compare_digest(password.encode(), admin_password.encode()):
         request.session["admin"] = True
         return RedirectResponse(next if next.startswith("/admin") else "/admin/posts", status_code=303)

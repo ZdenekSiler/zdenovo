@@ -113,14 +113,14 @@
     <div>
       <label class="block text-[10px] font-semibold tracking-widest uppercase text-zinc-500 mb-1.5">
         Remarks
-        <span class="text-zinc-700 normal-case font-normal">(what to change or improve)</span>
+        <span class="text-zinc-700 normal-case font-normal">(specify which section to change — only that part gets rewritten)</span>
       </label>
       <textarea name="remarks" rows="4" required maxlength="2000"
-        placeholder="e.g. Make the intro more aggressive, add a Docker section, fewer bullet lists..."
+        placeholder="e.g. Rewrite the intro to be more aggressive. / Add a Docker section after 'Deployment'. / Replace the table in 'Comparison' with a mermaid diagram."
         class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500/60 resize-y">{{ draft.admin_remarks or '' }}</textarea>
     </div>
     <div class="flex items-center justify-between">
-      <p class="text-xs text-zinc-600">Keeps the same image. Runs quality review on the result.</p>
+      <p class="text-xs text-zinc-600">Only the targeted section is rewritten. Keeps the same image.</p>
       <button type="submit" class="btn-primary text-xs">Regenerate</button>
     </div>
   </form>

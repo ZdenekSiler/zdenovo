@@ -92,9 +92,12 @@ def _build_regenerate_message(draft: dict, remarks: str, brief: PostBrief | None
   parts.append(remarks)
   parts.append("\n---")
   parts.append(
-    "Rewrite the post addressing the editorial feedback above. "
-    "Keep the same general topic and structure unless the feedback explicitly asks for changes. "
-    "The feedback takes priority over the original brief where they conflict."
+    "IMPORTANT: Do NOT rewrite the entire post. Only modify the specific section(s) "
+    "mentioned in the editorial feedback. Copy every other section, heading, code block, "
+    "table, and diagram EXACTLY as-is — character for character. "
+    "If the feedback says 'fix the intro', only rewrite the intro. "
+    "If it says 'add a Docker section', insert it and leave everything else untouched. "
+    "The output must be the full post with surgical edits, not a rewrite."
   )
   return "\n".join(parts)
 

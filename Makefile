@@ -9,6 +9,7 @@
 export
 
 COMPOSE_PROD := docker compose -f docker-compose.prod.yml
+SSH_CMD := ssh $(SERVER_USER)@$(SERVER_HOST)
 
 .DEFAULT_GOAL := help
 
@@ -39,6 +40,9 @@ help:
 	@echo "  REMOTE DEPLOYMENT (run locally — SSHes into Hetzner)"
 	@echo "    make deploy-first  One-time server setup + first deploy"
 	@echo "    make deploy        Push updates to production server"
+	@echo "    make deploy-restart  Restart prod (picks up secret changes)"
+	@echo "    make secret-set    Update a secret: make secret-set NAME=x VALUE=y"
+	@echo "    make backup        Download blog.db from server"
 	@echo ""
 	@echo "  Prerequisites: copy .env.example → .env and fill in values"
 	@echo ""
@@ -129,30 +133,56 @@ check: _require-env
 
 # ─── Remote deployment (run locally) ──────────────────────────────────────────
 
-.PHONY: deploy-first deploy
+.PHONY: deploy-first deploy deploy-restart secret-set backup
 
-deploy-first: _require-env
+deploy-first: _require-env _require-secrets
 	@echo "→ First-time setup on $(SERVER_USER)@$(SERVER_HOST)..."
-	@echo "  This will: install Docker, clone repo, obtain SSL cert, start app."
+	@echo "  This will: install Docker, clone repo, push secrets, obtain SSL cert, start app."
 	@read -p "  Continue? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
 	ssh-copy-id -i ~/.ssh/id_rsa.pub $(SERVER_USER)@$(SERVER_HOST) 2>/dev/null || true
 	DEPLOY_DIR=$(DEPLOY_DIR) REPO_URL=$(REPO_URL) \
-		ssh $(SERVER_USER)@$(SERVER_HOST) "bash -s" < scripts/server-setup.sh
-	scp .env $(SERVER_USER)@$(SERVER_HOST):$(DEPLOY_DIR)/.env
-	ssh $(SERVER_USER)@$(SERVER_HOST) \
+		$(SSH_CMD) "bash -s" < scripts/server-setup.sh
+	@echo "→ Pushing secrets to server..."
+	$(SSH_CMD) "mkdir -p $(DEPLOY_DIR)/secrets && chmod 700 $(DEPLOY_DIR)/secrets"
+	@echo "$(ANTHROPIC_API_KEY)" | $(SSH_CMD) "cat > $(DEPLOY_DIR)/secrets/anthropic_api_key && chmod 600 $(DEPLOY_DIR)/secrets/anthropic_api_key"
+	@echo "$(UNSPLASH_ACCESS_KEY)" | $(SSH_CMD) "cat > $(DEPLOY_DIR)/secrets/unsplash_access_key && chmod 600 $(DEPLOY_DIR)/secrets/unsplash_access_key"
+	@echo "$(ADMIN_PASSWORD)" | $(SSH_CMD) "cat > $(DEPLOY_DIR)/secrets/admin_password && chmod 600 $(DEPLOY_DIR)/secrets/admin_password"
+	@echo "$(SECRET_KEY)" | $(SSH_CMD) "cat > $(DEPLOY_DIR)/secrets/secret_key && chmod 600 $(DEPLOY_DIR)/secrets/secret_key"
+	@echo "→ Pushing non-secret config (.env with DOMAIN + CERTBOT_EMAIL only)..."
+	@printf "DOMAIN=$(DOMAIN)\nCERTBOT_EMAIL=$(CERTBOT_EMAIL)\n" | $(SSH_CMD) "cat > $(DEPLOY_DIR)/.env"
+	$(SSH_CMD) \
 		"cd $(DEPLOY_DIR) && make cert-init && make prod"
 	@echo ""
 	@echo "✓ Deployment complete. Site live at https://$(DOMAIN)"
 
 deploy: _require-env
 	@echo "→ Deploying to $(SERVER_USER)@$(SERVER_HOST):$(DEPLOY_DIR)..."
-	ssh $(SERVER_USER)@$(SERVER_HOST) \
+	$(SSH_CMD) \
 		"cd $(DEPLOY_DIR) && git pull --ff-only && make prod"
 	@echo "✓ Deploy complete: https://$(DOMAIN)"
 
+deploy-restart: _require-env
+	@echo "→ Restarting production on $(SERVER_USER)@$(SERVER_HOST)..."
+	$(SSH_CMD) \
+		"cd $(DEPLOY_DIR) && $(COMPOSE_PROD) restart web"
+	@echo "✓ Restarted."
+
+secret-set: _require-env
+	@test -n "$(NAME)" || (echo "ERROR: NAME is required. Usage: make secret-set NAME=anthropic_api_key VALUE=sk-ant-..." && exit 1)
+	@test -n "$(VALUE)" || (echo "ERROR: VALUE is required." && exit 1)
+	@echo "→ Updating secret '$(NAME)' on server..."
+	@echo "$(VALUE)" | $(SSH_CMD) "cat > $(DEPLOY_DIR)/secrets/$(NAME) && chmod 600 $(DEPLOY_DIR)/secrets/$(NAME)"
+	$(SSH_CMD) "cd $(DEPLOY_DIR) && $(COMPOSE_PROD) restart web"
+	@echo "✓ Secret '$(NAME)' updated and app restarted."
+
+backup: _require-env
+	@echo "→ Downloading blog.db from $(SERVER_HOST)..."
+	$(SSH_CMD) "cd $(DEPLOY_DIR) && docker compose -f docker-compose.prod.yml exec -T web cat /data/blog.db" > blog.db.bak
+	@echo "✓ Saved to blog.db.bak ($(shell wc -c < blog.db.bak 2>/dev/null || echo '?') bytes)"
+
 # ─── Internal helpers ─────────────────────────────────────────────────────────
 
-.PHONY: _require-env _gen-nginx-conf
+.PHONY: _require-env _require-secrets _gen-nginx-conf
 
 _require-env:
 	@test -f .env \
@@ -161,6 +191,14 @@ _require-env:
 		|| (echo "ERROR: DOMAIN is not set in .env" && exit 1)
 	@test -n "$(CERTBOT_EMAIL)" \
 		|| (echo "ERROR: CERTBOT_EMAIL is not set in .env" && exit 1)
+
+_require-secrets:
+	@test -n "$(ANTHROPIC_API_KEY)" \
+		|| (echo "ERROR: ANTHROPIC_API_KEY is not set in .env" && exit 1)
+	@test -n "$(ADMIN_PASSWORD)" \
+		|| (echo "ERROR: ADMIN_PASSWORD is not set in .env" && exit 1)
+	@test -n "$(SECRET_KEY)" \
+		|| (echo "ERROR: SECRET_KEY is not set in .env" && exit 1)
 
 _gen-nginx-conf:
 	@DOMAIN=$(DOMAIN) envsubst '$$DOMAIN' < nginx/app.conf.template > nginx/app.conf

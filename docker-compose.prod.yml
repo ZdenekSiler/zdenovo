@@ -6,7 +6,11 @@ services:
       - db_data:/data
     environment:
       - DB_DIR=/data
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    secrets:
+      - anthropic_api_key
+      - unsplash_access_key
+      - admin_password
+      - secret_key
     networks:
       - internal
     healthcheck:
@@ -39,6 +43,16 @@ services:
       - certbot_conf:/etc/letsencrypt
     # Renews certificates every 12 hours if due
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done;'"
+
+secrets:
+  anthropic_api_key:
+    file: ./secrets/anthropic_api_key
+  unsplash_access_key:
+    file: ./secrets/unsplash_access_key
+  admin_password:
+    file: ./secrets/admin_password
+  secret_key:
+    file: ./secrets/secret_key
 
 networks:
   internal:

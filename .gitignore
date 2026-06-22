@@ -19,6 +19,9 @@ out/
 .env.local
 .env.*.local
 
+# Production secrets (file-based, never committed)
+secrets/
+
 # OS
 .DS_Store
 Thumbs.db
