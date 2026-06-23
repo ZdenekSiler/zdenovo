@@ -34,23 +34,26 @@ Complete guide for deploying zdenovo to a Hetzner VPS behind Cloudflare.
     │
     ▼
 ┌──────────────────────────────────────┐
-│ Cloudflare (Flexible SSL)            │
+│ Cloudflare (Full Strict SSL)         │
 │  - DNS proxy (orange cloud)          │
 │  - HTTPS termination to client       │
 │  - DDoS protection, caching          │
-│  - Connects to origin over HTTP:80   │
+│  - Connects to origin over HTTPS:443 │
 └──────────────┬───────────────────────┘
-               │ HTTP
+               │ HTTPS
                ▼
 ┌──────────────────────────────────────┐
-│ Hetzner VPS (Ubuntu 24.04)           │
+│ Hetzner VPS (Ubuntu 26.04)           │
 │                                      │
 │  ┌────────────────────────────────┐  │
-│  │ nginx (port 80)                │  │
-│  │  - rate limiting               │  │
-│  │  - serves /static/ directly    │  │
-│  │  - proxies everything else     │  │
-│  │    to web:8000                 │  │
+│  │ nginx (port 80 + 443)         │  │
+│  │  - Let's Encrypt TLS (certbot)│  │
+│  │  - HTTP→HTTPS redirect        │  │
+│  │  - gzip compression           │  │
+│  │  - rate limiting              │  │
+│  │  - serves /static/ directly   │  │
+│  │  - proxies everything else    │  │
+│  │    to web:8000                │  │
 │  └──────────────┬─────────────────┘  │
 │                 │                     │
 │                 ▼                     │
@@ -62,11 +65,12 @@ Complete guide for deploying zdenovo to a Hetzner VPS behind Cloudflare.
 │                 │                     │
 │                 ▼                     │
 │  db_data volume (SQLite)             │
+│  certbot_conf volume (SSL certs)     │
 │  /opt/zdenovo/secrets/ (API keys)    │
 └──────────────────────────────────────┘
 ```
 
-Traffic flow: Browser → Cloudflare (HTTPS) → nginx (HTTP:80) → FastAPI (HTTP:8000)
+Traffic flow: Browser → Cloudflare (HTTPS) → nginx (HTTPS:443) → FastAPI (HTTP:8000)
 
 ---
 
@@ -83,17 +87,17 @@ Traffic flow: Browser → Cloudflare (HTTPS) → nginx (HTTP:80) → FastAPI (HT
 | Secrets | Docker Compose file secrets | `/run/secrets/*` inside container |
 | Deployment | Git pull + Docker rebuild via SSH | No CI/CD pipeline needed |
 
-Docker Compose runs two services in production (`docker-compose.prod.yml`):
+Docker Compose runs three services in production (`docker-compose.prod.yml`):
 
 - **`web`** — built from `Dockerfile` (Python 3.12-slim + uv), runs uvicorn on port 8000.
   SQLite DB persists on the `db_data` volume at `/data/blog.db`. Secrets mounted as
-  read-only files at `/run/secrets/<name>`.
-- **`nginx`** — nginx:1.27-alpine, listens on port 80. Serves `/static/` directly from a
-  bind-mounted volume. Proxies all other requests to `web:8000`. Waits for web's
-  healthcheck before starting.
-
-A `certbot` service is defined for Let's Encrypt but is unused in the current Cloudflare
-Flexible SSL setup (Cloudflare terminates HTTPS; origin is HTTP-only).
+  read-only files at `/run/secrets/<name>`. Has a healthcheck that nginx depends on.
+- **`nginx`** — nginx:1.27-alpine, listens on port 80 (redirect) + 443 (TLS). Serves
+  `/static/` directly from a bind-mounted volume. Proxies all other requests to
+  `web:8000`. Uses Let's Encrypt certs from the `certbot_conf` volume. Waits for web's
+  healthcheck before starting. Has its own healthcheck.
+- **`certbot`** — certbot/certbot, auto-renews certificates every 12 hours. Shares the
+  `certbot_conf` and `certbot_www` volumes with nginx.
 
 ---
 
@@ -272,86 +276,7 @@ This single command:
 
 See [Cloudflare Configuration](#cloudflare-configuration) below.
 
-### 5. Write the nginx config on the server
-
-When using Cloudflare Flexible SSL, the server only listens on HTTP:80. The template
-(`nginx/app.conf.template`) is designed for direct Let's Encrypt HTTPS. For Cloudflare,
-write a simplified HTTP-only config directly on the server:
-
-```bash
-ssh zdenovo
-cat > /opt/zdenovo/nginx/app.conf << 'NGINX'
-# Rate limiting zones
-limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
-limit_req_zone $binary_remote_addr zone=admin:10m rate=5r/s;
-limit_req_zone $binary_remote_addr zone=login:10m rate=3r/m;
-
-server {
-    listen 80;
-    server_name <your-domain> www.<your-domain>;
-
-    add_header X-Content-Type-Options nosniff always;
-    add_header X-Frame-Options DENY always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location /static/ {
-        alias /app/frontend/static/;
-        expires 7d;
-        add_header Cache-Control "public, immutable";
-    }
-
-    location /admin/login {
-        limit_req zone=login burst=5 nodelay;
-        proxy_pass http://web:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 10s;
-        client_max_body_size 1m;
-    }
-
-    location /admin/ {
-        limit_req zone=admin burst=20 nodelay;
-        proxy_pass http://web:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 180s;
-        proxy_connect_timeout 10s;
-        client_max_body_size 5m;
-    }
-
-    location /api/ {
-        limit_req zone=api burst=20 nodelay;
-        proxy_pass http://web:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 180s;
-        proxy_connect_timeout 10s;
-        client_max_body_size 5m;
-    }
-
-    location / {
-        proxy_pass http://web:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 30s;
-        proxy_connect_timeout 10s;
-        client_max_body_size 5m;
-    }
-}
-NGINX
-```
-
-Reload nginx: `docker compose -f docker-compose.prod.yml exec nginx nginx -s reload`
-
-### 6. Verify
+### 5. Verify
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}" https://<your-domain>/
@@ -430,10 +355,11 @@ What it does:
 
 ### SSL/TLS Settings
 
-- **Encryption mode**: Flexible
+- **Encryption mode**: Full (strict)
   - Cloudflare handles HTTPS to the browser
-  - Cloudflare connects to your origin over HTTP (port 80)
-  - No SSL certificates needed on the server
+  - Cloudflare connects to origin over HTTPS (port 443)
+  - Origin must have a valid SSL certificate (Let's Encrypt)
+  - **NEVER set to Flexible** — causes redirect loops (see Incident Log below)
 - **Always Use HTTPS**: ON (redirects http:// to https://)
 - **Minimum TLS Version**: 1.2
 
@@ -443,36 +369,28 @@ What it does:
   - Rocket Loader defers JavaScript execution, which breaks Tailwind CDN and htmx
   - The site uses `data-cfasync="false"` on Tailwind and htmx script tags as a safeguard
 
-### Why Flexible SSL (not Full)
+### Why Full (Strict) SSL
 
-With Cloudflare Flexible SSL:
+- End-to-end encryption: Cloudflare → origin is HTTPS, not plaintext HTTP
+- Certificate validation: Cloudflare verifies the origin cert is valid and not expired
+- No redirect loops: nginx redirects HTTP→HTTPS, Cloudflare connects over HTTPS
+- Let's Encrypt is free and auto-renews via the certbot container
 
-- No Let's Encrypt certificate management needed on the server
-- No certbot container, no renewal cron, no certificate expiry risk
-- Simpler nginx config (HTTP-only, no TLS termination)
-- The Cloudflare-to-origin hop is on Hetzner's internal network — acceptable risk for a
-  personal blog
-
-For sensitive applications, use **Full (Strict)** with a Cloudflare Origin Certificate
-instead.
+**CRITICAL: Do not change Cloudflare SSL mode to Flexible.** Nginx is configured to
+redirect HTTP:80 → HTTPS:443. If Cloudflare connects over HTTP (Flexible mode), it gets a
+301 redirect to HTTPS, which Cloudflare re-sends over HTTP, creating an infinite redirect
+loop that takes down the site.
 
 ---
 
 ## nginx Configuration
 
-Two nginx configs exist in the repo:
-
-### `nginx/app.conf.template` (for Let's Encrypt / Full SSL)
+### `nginx/app.conf.template` (source of truth)
 
 - HTTP:80 redirects to HTTPS, serves ACME challenges
-- HTTPS:443 with TLS termination, HSTS, ssl_stapling
-- Used with `make cert-init` + certbot
-
-### `nginx/app.conf` on the server (for Cloudflare Flexible)
-
-- HTTP:80 only — Cloudflare handles HTTPS
-- Written directly on the server (not generated from template)
-- Survives `git pull` because `nginx/app.conf` is in `.gitignore`
+- HTTPS:443 with TLS termination, HSTS, ssl_stapling, gzip compression
+- `${DOMAIN}` placeholder — substituted by `make prod` via `envsubst`
+- Generates `nginx/app.conf` (gitignored) which nginx reads
 
 ### `nginx/no-default.conf`
 
@@ -501,26 +419,57 @@ handle them.
 
 ## SSL/TLS
 
-### Current Setup: Cloudflare Flexible
+### Current Setup: Let's Encrypt + Cloudflare Full (Strict)
 
-No certificates on the server. Cloudflare provides HTTPS to visitors. The origin
-connection is HTTP-only.
+The origin server has a valid Let's Encrypt certificate. Cloudflare connects to the
+origin over HTTPS and verifies the certificate. The certbot container auto-renews
+certificates every 12 hours.
 
-### Alternative: Let's Encrypt (Full SSL)
+### Certificate Storage
 
-If you switch to Cloudflare Full (Strict) or remove Cloudflare:
+Certificates are stored in the `certbot_conf` Docker volume, mounted at
+`/etc/letsencrypt` inside both the nginx and certbot containers.
+
+**CRITICAL: This volume must contain valid certificates for nginx to start.** If the
+volume is empty (e.g. after recreation), nginx will crash-loop with:
+```
+cannot load certificate "/etc/letsencrypt/live/zdenovo.com/fullchain.pem": No such file
+```
+
+### Certificate Recovery
+
+If the certbot_conf volume is empty but certs exist on the host:
 
 ```bash
-# On the server
+# Copy host certs into the Docker volume
+docker run --rm \
+  -v zdenovo_certbot_conf:/dest \
+  -v /etc/letsencrypt:/src:ro \
+  alpine sh -c 'cp -a /src/. /dest/'
+
+# Restart nginx
+cd /opt/zdenovo && docker compose -f docker-compose.prod.yml restart nginx
+```
+
+If no certs exist anywhere, re-issue:
+
+```bash
 cd /opt/zdenovo
 make cert-init   # Bootstraps HTTP-only nginx, requests cert, switches to HTTPS
+```
 
-# The certbot container auto-renews every 12 hours
-# Force renewal:
+### Certificate Renewal
+
+The certbot container auto-renews every 12 hours. Force renewal:
+
+```bash
 make cert-renew
 ```
 
-The `nginx/app.conf.template` is already configured for this mode.
+### Pre-Deploy Cert Check
+
+`make prod` automatically checks that certificates exist in the Docker volume before
+starting nginx. If certs are missing, the deploy aborts with recovery instructions.
 
 ---
 
@@ -651,12 +600,60 @@ ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml restar
 
 ## Troubleshooting
 
-### Site returns Cloudflare error page
+### Site returns Cloudflare 521 (Origin Down)
+
+**This is the most common outage.** It means Cloudflare cannot connect to the origin.
+
+Diagnosis steps in order:
+
+```bash
+# 1. Are containers running?
+ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml ps"
+# Look for: web (healthy), nginx (healthy)
+
+# 2. Is nginx crash-looping? (most likely cause)
+ssh zdenovo "docker logs zdenovo-nginx-1 --tail 10"
+# If "cannot load certificate" → SSL cert volume is empty. See "Certificate Recovery" above.
+# If "host not found in upstream web" → nginx started before web. Restart: docker compose -f docker-compose.prod.yml restart nginx
+
+# 3. Is the app itself working?
+ssh zdenovo "docker exec zdenovo-web-1 python -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:8000/').status)\""
+# Should print: 200
+
+# 4. Is the firewall blocking?
+ssh zdenovo "ufw status"
+# Must allow 80/tcp and 443/tcp
+```
+
+### Site returns Cloudflare 301 redirect loop
+
+**Cause**: Cloudflare SSL mode is set to "Flexible" but nginx redirects HTTP→HTTPS.
+Cloudflare sends HTTP, nginx responds with 301 to HTTPS, Cloudflare re-sends HTTP → loop.
+
+**Fix**: Set Cloudflare SSL/TLS encryption mode to **Full (strict)**. Never use Flexible.
+
+### nginx crash-loops with "cannot load certificate"
+
+The `certbot_conf` Docker volume is empty — nginx can't find the SSL cert.
+
+```bash
+# Check if certs exist on the host
+ssh zdenovo "ls /etc/letsencrypt/live/zdenovo.com/"
+
+# If they exist, copy into volume:
+docker run --rm -v zdenovo_certbot_conf:/dest -v /etc/letsencrypt:/src:ro alpine sh -c 'cp -a /src/. /dest/'
+cd /opt/zdenovo && docker compose -f docker-compose.prod.yml restart nginx
+
+# If they don't exist, re-issue:
+cd /opt/zdenovo && make cert-init
+```
+
+### Site returns Cloudflare error page (generic)
 
 1. Check containers are running: `ssh zdenovo "docker ps"`
 2. Check web container health: look for `(healthy)` in status
 3. Check nginx can reach web: `ssh zdenovo "cd /opt/zdenovo && docker compose -f docker-compose.prod.yml logs nginx --tail 20"`
-4. Check if port 80 is open: `ssh zdenovo "ufw status"`
+4. Check if port 80/443 is open: `ssh zdenovo "ufw status"`
 
 ### Static files return 404
 
@@ -817,15 +814,78 @@ Only two variables live in the server's `.env`. Everything else is a secret file
 - [ ] `secrets/` directory is chmod 700, owned by root
 - [ ] `ADMIN_PASSWORD` is strong (64+ character hex)
 - [ ] `SECRET_KEY` is random 64-char hex (`python3 -c "import secrets; print(secrets.token_hex(32))"`)
-- [ ] Cloudflare SSL set to Flexible, Always Use HTTPS enabled
+- [ ] Cloudflare SSL set to **Full (strict)**, Always Use HTTPS enabled
 - [ ] Cloudflare Rocket Loader disabled (or `data-cfasync="false"` on critical scripts)
+- [ ] Let's Encrypt certs present in `certbot_conf` Docker volume
+- [ ] certbot container running (auto-renews every 12h)
 - [ ] Rate limiting active on `/admin/login`, `/admin/*`, `/api/*`
 - [ ] `proxy_read_timeout 180s` for admin and API (Claude generation takes 1-2 min)
+- [ ] gzip compression enabled in nginx for text assets
 - [ ] UFW active: only SSH (22), HTTP (80), HTTPS (443) open
 - [ ] SSH key-only auth (consider disabling password login)
 - [ ] System nginx stopped and disabled (`systemctl disable nginx`)
 - [ ] `nginx/no-default.conf` mounted to prevent default server block
 - [ ] `restart: unless-stopped` on all containers
+- [ ] Both web and nginx have healthchecks in docker-compose.prod.yml
+- [ ] `make prod` runs pre-deploy cert check + post-deploy health check
+- [ ] `make deploy` verifies site is reachable after deploy
 - [ ] `secrets/` in `.gitignore`
 - [ ] No PII (server IPs, SSH key names) in committed files
 - [ ] Regular database backups (`make backup`)
+
+---
+
+## Deployment Safety Rules
+
+1. **Always use `docker-compose.prod.yml`** on the server. Never run bare
+   `docker compose up` — that uses the dev compose file which has no nginx, no secrets,
+   and no healthchecks.
+
+2. **Never use `--remove-orphans`** unless you understand what it will delete. It removes
+   containers not defined in the compose file you're using — if you accidentally ran the
+   dev compose, it will delete the prod nginx container.
+
+3. **Never change Cloudflare SSL to Flexible.** The nginx config redirects HTTP→HTTPS.
+   Flexible mode sends HTTP to origin, causing an infinite redirect loop.
+
+4. **Always verify after deploy.** `make prod` and `make deploy` now run automatic health
+   checks. If deploying manually, always run `make check` afterward.
+
+5. **The `certbot_conf` volume is critical infrastructure.** If it gets deleted or emptied,
+   nginx cannot start and the site goes down. `make prod` checks for certs before starting.
+
+---
+
+## Incident Log
+
+### 2026-06-23: Site down — nginx crash-loop + Cloudflare redirect loop
+
+**Duration**: ~30 minutes
+
+**Root cause**: Two separate issues compounded:
+
+1. **Empty SSL certificate volume.** During deployment, `docker compose up -d --build
+   --remove-orphans` was run using the **dev** compose file (which only defines `web`).
+   The `--remove-orphans` flag removed the prod nginx container since it wasn't in the dev
+   compose. When `make prod` later recreated it, the `certbot_conf` Docker volume was empty
+   (certs existed on the host at `/etc/letsencrypt/` but had never been copied into the
+   named volume). Nginx could not load the SSL cert and crash-looped.
+
+2. **Cloudflare SSL mode was Flexible.** Even after fixing nginx, the site still returned
+   301 redirect loops. Cloudflare Flexible connects to origin over HTTP:80, but nginx is
+   configured to redirect HTTP→HTTPS. This creates: Cloudflare→HTTP:80→301→HTTPS→
+   Cloudflare→HTTP:80→301 forever.
+
+**Resolution**:
+- Copied host certs into Docker volume: `docker run --rm -v zdenovo_certbot_conf:/dest -v /etc/letsencrypt:/src:ro alpine sh -c 'cp -a /src/. /dest/'`
+- Restarted nginx: `docker compose -f docker-compose.prod.yml restart nginx`
+- Changed Cloudflare SSL from Flexible to **Full (strict)**
+
+**Preventive measures added**:
+- `make prod` now runs `_check-certs` before starting — aborts if cert volume is empty
+- `make prod` now runs `_post-deploy-check` after starting — verifies all containers are
+  healthy and FastAPI is responding
+- `make deploy` now verifies site is reachable via curl after remote deploy
+- nginx container now has a healthcheck in `docker-compose.prod.yml`
+- Deployment docs updated with warnings about Flexible SSL and `--remove-orphans`
+- This incident log added for future reference

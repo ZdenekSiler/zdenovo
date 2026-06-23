@@ -72,9 +72,11 @@ test:
 
 .PHONY: prod prod-logs prod-stop prod-down
 
-prod: _require-env _gen-nginx-conf
+prod: _require-env _gen-nginx-conf _check-certs
 	$(COMPOSE_PROD) up --build -d
-	@echo "→ Production: https://$(DOMAIN)"
+	@echo "→ Waiting for containers to stabilize..."
+	@sleep 5
+	@$(MAKE) --no-print-directory _post-deploy-check
 
 prod-logs:
 	$(COMPOSE_PROD) logs -f
@@ -159,7 +161,11 @@ deploy: _require-env
 	@echo "→ Deploying to $(SERVER_USER)@$(SERVER_HOST):$(DEPLOY_DIR)..."
 	$(SSH_CMD) \
 		"cd $(DEPLOY_DIR) && git pull --ff-only && make prod"
-	@echo "✓ Deploy complete: https://$(DOMAIN)"
+	@echo "→ Verifying from local machine..."
+	@sleep 3
+	@curl -sf -o /dev/null --max-time 10 https://$(DOMAIN)/ \
+		&& echo "  ✓ Site is live: https://$(DOMAIN)" \
+		|| (echo "  ✗ SITE IS DOWN — check: ssh zdenovo 'cd /opt/zdenovo && docker compose -f docker-compose.prod.yml logs --tail 20'" && exit 1)
 
 deploy-restart: _require-env
 	@echo "→ Restarting production on $(SERVER_USER)@$(SERVER_HOST)..."
@@ -182,7 +188,7 @@ backup: _require-env
 
 # ─── Internal helpers ─────────────────────────────────────────────────────────
 
-.PHONY: _require-env _require-secrets _gen-nginx-conf
+.PHONY: _require-env _require-secrets _gen-nginx-conf _check-certs _post-deploy-check
 
 _require-env:
 	@test -f .env \
@@ -203,3 +209,29 @@ _require-secrets:
 _gen-nginx-conf:
 	@DOMAIN=$(DOMAIN) envsubst '$$DOMAIN' < nginx/app.conf.template > nginx/app.conf
 	@echo "→ nginx/app.conf generated for $(DOMAIN)"
+
+_check-certs:
+	@echo "→ Checking SSL certificates..."
+	@docker run --rm -v zdenovo_certbot_conf:/certs alpine \
+		test -f /certs/live/$(DOMAIN)/fullchain.pem 2>/dev/null \
+		&& echo "  ✓ SSL cert found for $(DOMAIN)" \
+		|| (echo "  ✗ SSL cert MISSING in certbot_conf volume!" && \
+			echo "    Fix: docker run --rm -v zdenovo_certbot_conf:/dest -v /etc/letsencrypt:/src:ro alpine sh -c 'cp -a /src/. /dest/'" && \
+			echo "    Or:  make cert-init" && exit 1)
+
+_post-deploy-check:
+	@echo "→ Post-deploy health check..."
+	@$(COMPOSE_PROD) ps --format '{{.Name}} {{.Status}}' | while read name status; do \
+		case "$$status" in \
+			*healthy*|*Up*) echo "  ✓ $$name: $$status" ;; \
+			*) echo "  ✗ $$name: $$status" ;; \
+		esac; \
+	done
+	@$(COMPOSE_PROD) exec -T web python -c \
+		"import urllib.request; r=urllib.request.urlopen('http://localhost:8000/'); assert r.status==200" 2>/dev/null \
+		&& echo "  ✓ FastAPI responding on :8000" \
+		|| (echo "  ✗ FastAPI NOT responding — check: docker compose -f docker-compose.prod.yml logs web --tail 20" && exit 1)
+	@$(COMPOSE_PROD) exec -T nginx wget -qO /dev/null http://web:8000/ 2>/dev/null \
+		&& echo "  ✓ nginx can reach web container" \
+		|| echo "  ⚠ nginx→web connectivity check skipped (wget not available)"
+	@echo "→ Production: https://$(DOMAIN)"
