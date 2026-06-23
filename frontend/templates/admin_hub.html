@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+
+{% block content %}
+<div class="mb-10">
+  <p class="section-heading">Admin</p>
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">Dashboard</h1>
+  <p class="text-sm text-zinc-500">Manage your site.</p>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <a href="/admin/posts" class="card group hover:border-zinc-700 transition-colors">
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm font-semibold text-zinc-200 group-hover:text-indigo-400 transition-colors">Posts</p>
+      <span class="text-2xl font-bold text-indigo-400">{{ post_count }}</span>
+    </div>
+    <p class="text-xs text-zinc-500">Manage published blog posts.</p>
+  </a>
+
+  <a href="/admin/drafts" class="card group hover:border-zinc-700 transition-colors">
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm font-semibold text-zinc-200 group-hover:text-yellow-400 transition-colors">Drafts</p>
+      <span class="text-2xl font-bold text-yellow-400">{{ pending_count }}</span>
+    </div>
+    <p class="text-xs text-zinc-500">Review and approve pending drafts.</p>
+  </a>
+
+  <a href="/admin/comments" class="card group hover:border-zinc-700 transition-colors">
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400 transition-colors">Comments</p>
+      <span class="text-2xl font-bold text-emerald-400">{{ comment_count }}</span>
+    </div>
+    <p class="text-xs text-zinc-500">Moderate reader comments.</p>
+  </a>
+
+  <a href="/admin/stats" class="card group hover:border-zinc-700 transition-colors">
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm font-semibold text-zinc-200 group-hover:text-violet-400 transition-colors">Analytics</p>
+      <span class="text-lg text-violet-400"><svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13h2v8H3zM9 9h2v12H9zM15 5h2v16h-2zM21 1h2v20h-2z"/></svg></span>
+    </div>
+    <p class="text-xs text-zinc-500">Cloudflare Web Analytics — traffic, pages, visitors.</p>
+  </a>
+</div>
+{% endblock %}

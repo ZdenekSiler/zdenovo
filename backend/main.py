@@ -201,7 +201,17 @@ async def submit_comment(request: Request, slug: str, author: str = Form(...), b
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_root(request: Request, _: None = Depends(require_admin)):
-    return RedirectResponse("/admin/posts")
+    posts = get_all_posts()
+    with get_conn() as conn:
+        pending_count = conn.execute(
+            "SELECT COUNT(*) FROM drafts WHERE status = 'pending'"
+        ).fetchone()[0]
+        comment_count = conn.execute("SELECT COUNT(*) FROM comments").fetchone()[0]
+    return templates.TemplateResponse(request, "admin_hub.html", {
+        "post_count": len(posts),
+        "pending_count": pending_count,
+        "comment_count": comment_count,
+    })
 
 
 @app.get("/admin/posts", response_class=HTMLResponse)

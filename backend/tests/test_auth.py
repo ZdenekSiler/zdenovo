@@ -110,6 +110,14 @@ def test_unauthenticated_redirect_preserves_next(client):
 
 # ─── Authenticated access ─────────────────────────────────────────────────────
 
+def test_authenticated_admin_hub_returns_200(admin_client):
+    r = admin_client.get("/admin")
+    assert r.status_code == 200
+    assert b"Dashboard" in r.content
+    assert b"/admin/posts" in r.content
+    assert b"/admin/stats" in r.content
+
+
 def test_authenticated_admin_posts_returns_200(admin_client):
     r = admin_client.get("/admin/posts")
     assert r.status_code == 200
