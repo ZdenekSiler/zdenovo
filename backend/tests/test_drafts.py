@@ -42,7 +42,7 @@ def test_manual_trigger_generates_drafts(client, monkeypatch):
   with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
     resp = client.post("/api/drafts/generate")
   assert resp.status_code == 201
-  assert resp.json()["generated"] == 3
+  assert resp.json()["generated"] == 1
 
 
 def test_generated_drafts_have_pending_status(client, monkeypatch):
@@ -76,7 +76,7 @@ def test_list_drafts_returns_all(client, monkeypatch):
   draft_id = _insert_draft(client, monkeypatch)
   resp = client.get("/api/drafts")
   assert resp.status_code == 200
-  assert len(resp.json()) == 3
+  assert len(resp.json()) == 1
 
 
 def test_get_draft_by_id(client, monkeypatch):

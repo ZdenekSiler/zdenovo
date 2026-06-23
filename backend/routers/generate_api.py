@@ -192,7 +192,7 @@ def _review_post(post: PostOut) -> ReviewResult:
   try:
     client = anthropic.Anthropic(api_key=api_key)
     message = client.messages.create(
-      model="claude-sonnet-4-6",
+      model="claude-haiku-4-5-20251001",
       max_tokens=2048,
       system=REVIEW_SYSTEM_PROMPT,
       tools=[REVIEW_TOOL],
@@ -227,7 +227,7 @@ def _find_sources(post: PostOut) -> list[Source]:
   try:
     client = anthropic.Anthropic(api_key=api_key)
     message = client.messages.create(
-      model="claude-sonnet-4-6",
+      model="claude-haiku-4-5-20251001",
       max_tokens=2048,
       system=SOURCES_SYSTEM_PROMPT,
       tools=[

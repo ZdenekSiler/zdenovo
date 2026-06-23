@@ -22,7 +22,7 @@ from routers.generate_api import (
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
 DAILY_TOPICS_PATH = Path(__file__).parent.parent / "data" / "daily_topics.json"
-DAILY_COUNT = 3
+DAILY_COUNT = 1
 
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
