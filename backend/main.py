@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import secrets
 import urllib.request
 import uuid
@@ -208,10 +209,12 @@ async def admin_root(request: Request, _: None = Depends(require_admin)):
             "SELECT COUNT(*) FROM drafts WHERE status = 'pending'"
         ).fetchone()[0]
         comment_count = conn.execute("SELECT COUNT(*) FROM comments").fetchone()[0]
+    topic_count = len(_load_topics())
     return templates.TemplateResponse(request, "admin_hub.html", {
         "post_count": len(posts),
         "pending_count": pending_count,
         "comment_count": comment_count,
+        "topic_count": topic_count,
     })
 
 
@@ -399,3 +402,103 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
         "top_countries": top_countries,
         "top_browsers": top_browsers,
     })
+
+
+# ─── Topics management ──────────────────────────────────────────────────────
+
+DAILY_TOPICS_PATH = Path(__file__).parent / "data" / "daily_topics.json"
+
+
+def _load_topics() -> list[dict]:
+    return json.loads(DAILY_TOPICS_PATH.read_text())
+
+
+def _save_topics(topics: list[dict]) -> None:
+    DAILY_TOPICS_PATH.write_text(json.dumps(topics, indent=2) + "\n")
+
+
+def _slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+@app.get("/admin/topics", response_class=HTMLResponse)
+async def admin_topics(request: Request, _: None = Depends(require_admin)):
+    topics = _load_topics()
+    return templates.TemplateResponse(request, "admin_topics.html", {"topics": topics})
+
+
+@app.get("/admin/topics/new", response_class=HTMLResponse)
+async def admin_topic_new(request: Request, _: None = Depends(require_admin)):
+    return templates.TemplateResponse(request, "admin_topic_edit.html", {"topic": None})
+
+
+@app.get("/admin/topics/{topic_id}/edit", response_class=HTMLResponse)
+async def admin_topic_edit(request: Request, topic_id: str, _: None = Depends(require_admin)):
+    topics = _load_topics()
+    topic = next((t for t in topics if t["id"] == topic_id), None)
+    if topic is None:
+        return templates.TemplateResponse(request, "404.html", status_code=404)
+    return templates.TemplateResponse(request, "admin_topic_edit.html", {"topic": topic})
+
+
+@app.post("/admin/topics", response_class=HTMLResponse)
+async def admin_topic_create(
+    request: Request,
+    title_hint: str = Form(...),
+    description: str = Form(...),
+    audience: str = Form(...),
+    tone: str = Form(...),
+    tags: str = Form(""),
+    outline: str = Form(""),
+    _: None = Depends(require_admin),
+):
+    topics = _load_topics()
+    topic_id = _slugify(title_hint)
+    if any(t["id"] == topic_id for t in topics):
+        topic_id = f"{topic_id}-{len(topics)}"
+    topic = {
+        "id": topic_id,
+        "title_hint": title_hint.strip(),
+        "description": description.strip(),
+        "audience": audience.strip(),
+        "tone": tone.strip(),
+        "tags": [t.strip() for t in tags.split(",") if t.strip()],
+        "outline": [line.strip() for line in outline.splitlines() if line.strip()],
+    }
+    topics.append(topic)
+    _save_topics(topics)
+    return RedirectResponse("/admin/topics", status_code=303)
+
+
+@app.post("/admin/topics/{topic_id}", response_class=HTMLResponse)
+async def admin_topic_update(
+    request: Request,
+    topic_id: str,
+    title_hint: str = Form(...),
+    description: str = Form(...),
+    audience: str = Form(...),
+    tone: str = Form(...),
+    tags: str = Form(""),
+    outline: str = Form(""),
+    _: None = Depends(require_admin),
+):
+    topics = _load_topics()
+    topic = next((t for t in topics if t["id"] == topic_id), None)
+    if topic is None:
+        return templates.TemplateResponse(request, "404.html", status_code=404)
+    topic["title_hint"] = title_hint.strip()
+    topic["description"] = description.strip()
+    topic["audience"] = audience.strip()
+    topic["tone"] = tone.strip()
+    topic["tags"] = [t.strip() for t in tags.split(",") if t.strip()]
+    topic["outline"] = [line.strip() for line in outline.splitlines() if line.strip()]
+    _save_topics(topics)
+    return RedirectResponse("/admin/topics", status_code=303)
+
+
+@app.post("/admin/topics/{topic_id}/delete", response_class=HTMLResponse)
+async def admin_topic_delete(request: Request, topic_id: str, _: None = Depends(require_admin)):
+    topics = _load_topics()
+    topics = [t for t in topics if t["id"] != topic_id]
+    _save_topics(topics)
+    return RedirectResponse("/admin/topics", status_code=303)

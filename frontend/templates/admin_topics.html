@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Daily Topics{% endblock %}
+
+{% block content %}
+<div class="mb-10">
+  <p class="section-heading">Admin</p>
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">Daily Topics</h1>
+  <p class="text-sm text-zinc-500">Topics used by the scheduler to generate blog post drafts. {{ topics | length }} topics in rotation.</p>
+</div>
+
+<div class="mb-6">
+  <a href="/admin/topics/new" class="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors border border-indigo-500/30 rounded-lg px-3 py-1.5 hover:border-indigo-500/50">
+    + Add topic
+  </a>
+</div>
+
+{% if topics %}
+<div class="card overflow-x-auto">
+  <table class="w-full text-xs">
+    <thead>
+      <tr class="border-b border-zinc-800 text-zinc-500 text-left">
+        <th class="pb-2.5 pr-4 font-medium">ID</th>
+        <th class="pb-2.5 pr-4 font-medium">Title Hint</th>
+        <th class="pb-2.5 pr-4 font-medium hidden md:table-cell">Audience</th>
+        <th class="pb-2.5 pr-4 font-medium">Tags</th>
+        <th class="pb-2.5 pr-4 font-medium hidden sm:table-cell">Outline</th>
+        <th class="pb-2.5 font-medium text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in topics %}
+      <tr class="border-b border-zinc-800/50 last:border-0">
+        <td class="py-2.5 pr-4 text-zinc-500 font-mono">{{ t.id }}</td>
+        <td class="py-2.5 pr-4 text-zinc-200 font-medium">{{ t.title_hint }}</td>
+        <td class="py-2.5 pr-4 text-zinc-400 hidden md:table-cell max-w-[200px] truncate">{{ t.audience }}</td>
+        <td class="py-2.5 pr-4">
+          <div class="flex flex-wrap gap-1">
+            {% for tag in t.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+          </div>
+        </td>
+        <td class="py-2.5 pr-4 text-zinc-500 hidden sm:table-cell">{{ t.outline | length }} items</td>
+        <td class="py-2.5 text-right whitespace-nowrap">
+          <a href="/admin/topics/{{ t.id }}/edit" class="btn-ghost text-xs">Edit</a>
+          <form method="post" action="/admin/topics/{{ t.id }}/delete" class="inline">
+            <button
+              type="submit"
+              onclick="return confirm('Delete topic \'{{ t.title_hint }}\'?')"
+              class="text-xs text-red-500 hover:text-red-400 transition-colors px-2 py-1">
+              Delete
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card text-center py-12">
+  <p class="text-sm text-zinc-600">No topics yet. Add one to get started.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit Topic" if topic else "New Topic" }}{% endblock %}
+
+{% block content %}
+<div class="mb-10">
+  <p class="section-heading">Admin</p>
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">{{ "Edit Topic" if topic else "New Topic" }}</h1>
+  <p class="text-sm text-zinc-500">
+    {% if topic %}Editing <span class="font-mono text-zinc-400">{{ topic.id }}</span>{% else %}Add a new topic to the daily generation pool.{% endif %}
+  </p>
+</div>
+
+<form method="post" action="{{ '/admin/topics/' + topic.id if topic else '/admin/topics' }}" class="space-y-5 max-w-2xl">
+  <div>
+    <label for="title_hint" class="block text-xs text-zinc-400 mb-1.5">Title Hint</label>
+    <input id="title_hint" name="title_hint" type="text" required
+      value="{{ topic.title_hint if topic else '' }}"
+      class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+      placeholder="e.g. FastAPI Dependency Injection: The Right Way">
+  </div>
+
+  <div>
+    <label for="description" class="block text-xs text-zinc-400 mb-1.5">Description</label>
+    <textarea id="description" name="description" rows="3" required
+      class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+      placeholder="A practical guide to...">{{ topic.description if topic else '' }}</textarea>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div>
+      <label for="audience" class="block text-xs text-zinc-400 mb-1.5">Audience</label>
+      <input id="audience" name="audience" type="text" required
+        value="{{ topic.audience if topic else '' }}"
+        class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+        placeholder="e.g. Python developers building REST APIs">
+    </div>
+    <div>
+      <label for="tone" class="block text-xs text-zinc-400 mb-1.5">Tone</label>
+      <input id="tone" name="tone" type="text" required
+        value="{{ topic.tone if topic else '' }}"
+        class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+        placeholder="e.g. practical, opinionated, example-driven">
+    </div>
+  </div>
+
+  <div>
+    <label for="tags" class="block text-xs text-zinc-400 mb-1.5">Tags <span class="text-zinc-600">(comma-separated)</span></label>
+    <input id="tags" name="tags" type="text"
+      value="{{ topic.tags | join(', ') if topic else '' }}"
+      class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+      placeholder="e.g. python, fastapi, backend">
+  </div>
+
+  <div>
+    <label for="outline" class="block text-xs text-zinc-400 mb-1.5">Outline <span class="text-zinc-600">(one item per line)</span></label>
+    <textarea id="outline" name="outline" rows="6"
+      class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 font-mono"
+      placeholder="What dependency injection actually solves&#10;FastAPI's Depends() — the basics&#10;Sharing DB connections and service objects">{{ topic.outline | join('\n') if topic else '' }}</textarea>
+  </div>
+
+  <div class="flex items-center gap-3 pt-2">
+    <button type="submit"
+      class="text-xs font-medium text-zinc-100 bg-indigo-600 hover:bg-indigo-500 rounded-lg px-4 py-2 transition-colors">
+      {{ "Save Changes" if topic else "Create Topic" }}
+    </button>
+    <a href="/admin/topics" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Cancel</a>
+  </div>
+</form>
+{% endblock %}
