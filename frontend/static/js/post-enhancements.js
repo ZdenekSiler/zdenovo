@@ -75,6 +75,16 @@
       });
       wrapper.appendChild(btn);
 
+      var lines = (pre.querySelector("code") || pre).textContent.split("\n").length;
+      var toggle = document.createElement("button");
+      toggle.className = "code-toggle";
+      toggle.textContent = "Hide";
+      toggle.addEventListener("click", function () {
+        var collapsed = pre.classList.toggle("code-collapsed");
+        toggle.textContent = collapsed ? "Show (" + lines + " lines)" : "Hide";
+      });
+      wrapper.appendChild(toggle);
+
       if (validationData && validationData[i]) {
         var v = validationData[i];
         var icons = {valid: "✓", error: "✗", warning: "⚠", skipped: "—"};
@@ -83,16 +93,6 @@
         badge.title = (v.language || "unknown") + ": " + v.message;
         badge.textContent = icons[v.status] || icons.skipped;
         wrapper.appendChild(badge);
-
-        var lines = (pre.querySelector("code") || pre).textContent.split("\n").length;
-        var toggle = document.createElement("button");
-        toggle.className = "code-toggle";
-        toggle.textContent = "Hide";
-        toggle.addEventListener("click", function () {
-          var collapsed = pre.classList.toggle("code-collapsed");
-          toggle.textContent = collapsed ? "Show (" + lines + " lines)" : "Hide";
-        });
-        wrapper.appendChild(toggle);
       }
     });
   }
