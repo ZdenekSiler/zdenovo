@@ -247,7 +247,7 @@ def test_home_has_rss_link(client):
 
 def test_related_posts_shown_when_tags_overlap(client):
     from data.posts import get_related_posts
-    related = get_related_posts("type-hints-everywhere", ["python", "frontend"])
+    related = get_related_posts("why-i-switched-to-type-hints", ["python", "frontend"])
     assert len(related) > 0
 
 
@@ -256,3 +256,25 @@ def test_related_posts_shown_when_tags_overlap(client):
 def test_about_has_consulting_cta(client):
     r = client.get("/about")
     assert b"Work with me" in r.content
+
+
+# ── Sources section ──────────────────────────────────────────────────────────
+
+
+def test_post_with_sources_shows_section(client):
+    import json
+    from db import get_conn
+    sources = [{"title": "Python Docs", "url": "https://docs.python.org", "summary": "Official docs."}]
+    with get_conn() as conn:
+        conn.execute("UPDATE posts SET sources = ? WHERE slug = 'why-i-switched-to-type-hints'", (json.dumps(sources),))
+    r = client.get("/blog/why-i-switched-to-type-hints")
+    assert r.status_code == 200
+    assert b"Sources &amp; Further Reading" in r.content or b"Sources & Further Reading" in r.content
+    assert b"Python Docs" in r.content
+    assert b"https://docs.python.org" in r.content
+
+
+def test_post_without_sources_hides_section(client):
+    r = client.get("/blog/why-i-switched-to-type-hints")
+    assert r.status_code == 200
+    assert b"Further Reading" not in r.content

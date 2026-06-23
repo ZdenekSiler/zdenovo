@@ -1,0 +1,34 @@
+{
+  "name": "suggest_sources",
+  "description": "Return 3-5 authoritative sources related to the blog post topic. Each source must be a real, existing URL you found via web search.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Title of the source article or documentation page"
+            },
+            "url": {
+              "type": "string",
+              "description": "Full URL to the source"
+            },
+            "summary": {
+              "type": "string",
+              "description": "1-2 sentence summary of what this source covers and why it's relevant"
+            }
+          },
+          "required": ["title", "url", "summary"]
+        },
+        "minItems": 3,
+        "maxItems": 5,
+        "description": "3-5 authoritative sources: official docs, well-known blog posts, or conference talks related to the post topic"
+      }
+    },
+    "required": ["sources"]
+  }
+}

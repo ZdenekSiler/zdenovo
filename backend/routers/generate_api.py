@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 from config import read_secret
 from db import get_conn
-from routers.posts_api import PostOut, _slugify
+from routers.posts_api import PostOut, Source, _slugify
 
 router = APIRouter(prefix="/api/posts", tags=["generate"])
 
@@ -26,6 +26,8 @@ SYSTEM_PROMPT = (PROMPTS_DIR / "blog_system.md").read_text(encoding="utf-8")
 POST_TOOL = json.loads((PROMPTS_DIR / "blog_tool.json").read_text(encoding="utf-8"))
 REVIEW_SYSTEM_PROMPT = (PROMPTS_DIR / "blog_review.md").read_text(encoding="utf-8")
 REVIEW_TOOL = json.loads((PROMPTS_DIR / "review_tool.json").read_text(encoding="utf-8"))
+SOURCES_TOOL = json.loads((PROMPTS_DIR / "sources_tool.json").read_text(encoding="utf-8"))
+SOURCES_SYSTEM_PROMPT = (PROMPTS_DIR / "sources_system.md").read_text(encoding="utf-8")
 
 MAX_GENERATION_ATTEMPTS = 3
 
@@ -71,6 +73,7 @@ class DraftOut(BaseModel):
   quality_issues: list[str] = Field(default_factory=list)
   quality_strengths: list[str] = Field(default_factory=list)
   admin_remarks: str | None = None
+  sources: list[Source] = Field(default_factory=list)
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -211,6 +214,40 @@ def _review_post(post: PostOut) -> ReviewResult:
   )
 
 
+def _find_sources(post: PostOut) -> list[Source]:
+  api_key = read_secret("anthropic_api_key", "ANTHROPIC_API_KEY")
+  if not api_key:
+    return []
+  prompt = (
+    f"Find sources for this blog post:\n\n"
+    f"Title: {post.title}\n"
+    f"Tags: {', '.join(post.tags)}\n"
+    f"Summary: {post.summary}"
+  )
+  try:
+    client = anthropic.Anthropic(api_key=api_key)
+    message = client.messages.create(
+      model="claude-sonnet-4-6",
+      max_tokens=2048,
+      system=SOURCES_SYSTEM_PROMPT,
+      tools=[
+        {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
+        SOURCES_TOOL,
+      ],
+      tool_choice={"type": "any"},
+      messages=[{"role": "user", "content": prompt}],
+    )
+  except anthropic.APIError as exc:
+    log.warning("Source search failed: %s", exc)
+    return []
+
+  tool_block = next((b for b in message.content if b.type == "tool_use" and b.name == "suggest_sources"), None)
+  if tool_block is None:
+    return []
+  raw_sources = tool_block.input.get("sources", [])
+  return [Source(title=s["title"], url=s["url"], summary=s["summary"]) for s in raw_sources if s.get("url")]
+
+
 def _generate_with_review(user_message: str) -> tuple[PostOut, ReviewResult]:
   """Generate a post and review it. Retry up to MAX_GENERATION_ATTEMPTS if it fails review."""
   best_post = None
@@ -223,6 +260,7 @@ def _generate_with_review(user_message: str) -> tuple[PostOut, ReviewResult]:
       best_review = review
     if review.verdict == "pass":
       break
+  best_post.sources = _find_sources(best_post)
   return best_post, best_review
 
 
@@ -233,12 +271,13 @@ def _insert_draft(post: PostOut, topic_id: str, review: ReviewResult | None = No
   q_score = review.score if review else None
   q_issues = json.dumps(review.issues) if review else "[]"
   q_strengths = json.dumps(review.strengths) if review else "[]"
+  sources_json = json.dumps([s.model_dump() for s in post.sources])
   with get_conn() as conn:
     conn.execute(
       """INSERT INTO drafts
          (id, slug, title, date, summary, tags, content, image, generated_at, topic_id, status,
-          quality_score, quality_issues, quality_strengths)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)""",
+          quality_score, quality_issues, quality_strengths, sources)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)""",
       (
         draft_id,
         post.slug,
@@ -253,6 +292,7 @@ def _insert_draft(post: PostOut, topic_id: str, review: ReviewResult | None = No
         q_score,
         q_issues,
         q_strengths,
+        sources_json,
       ),
     )
   return DraftOut(
@@ -271,6 +311,7 @@ def _insert_draft(post: PostOut, topic_id: str, review: ReviewResult | None = No
     quality_score=q_score,
     quality_issues=review.issues if review else [],
     quality_strengths=review.strengths if review else [],
+    sources=post.sources,
   )
 
 

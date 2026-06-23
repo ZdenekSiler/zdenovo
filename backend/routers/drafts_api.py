@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from code_validator import ValidationSummary, validate_content
 from db import draft_row_to_dict, get_conn, row_to_dict
 from routers.generate_api import (
   DraftOut,
@@ -62,6 +63,7 @@ def _draft_to_out(d: dict) -> DraftOut:
     quality_issues=d.get("quality_issues", []),
     quality_strengths=d.get("quality_strengths", []),
     admin_remarks=d.get("admin_remarks"),
+    sources=d.get("sources", []),
   )
 
 
@@ -225,8 +227,8 @@ def approve_draft(draft_id: str):
       )
 
     conn.execute(
-      """INSERT INTO posts (slug, title, date, summary, tags, content, image)
-         VALUES (?, ?, ?, ?, ?, ?, ?)""",
+      """INSERT INTO posts (slug, title, date, summary, tags, content, image, sources)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
       (
         draft["slug"],
         draft["title"],
@@ -235,6 +237,7 @@ def approve_draft(draft_id: str):
         json.dumps(draft["tags"]),
         draft["content"],
         draft.get("image"),
+        json.dumps(draft.get("sources", [])),
       ),
     )
     conn.execute(
@@ -251,6 +254,15 @@ def approve_draft(draft_id: str):
 @router.post("/{draft_id}/regenerate", response_model=DraftOut)
 def regenerate_draft(draft_id: str, body: RegenerateIn):
   return _regenerate_draft(draft_id, body.remarks)
+
+
+@router.post("/{draft_id}/validate", response_model=ValidationSummary)
+def validate_draft_code(draft_id: str):
+  with get_conn() as conn:
+    row = conn.execute("SELECT content FROM drafts WHERE id = ?", (draft_id,)).fetchone()
+  if row is None:
+    raise HTTPException(status_code=404, detail=f"Draft '{draft_id}' not found")
+  return validate_content(row["content"])
 
 
 @router.delete("/{draft_id}", status_code=204)

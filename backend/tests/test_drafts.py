@@ -196,3 +196,57 @@ def test_admin_draft_preview_returns_200(admin_client, monkeypatch):
 def test_admin_draft_preview_not_found(admin_client):
   resp = admin_client.get("/admin/drafts/nonexistent-id")
   assert resp.status_code == 404
+
+
+# ─── Code validation ────────────────────────────────────────────────────────
+
+def test_validate_draft_code_returns_summary(client, monkeypatch):
+  draft_id = _insert_draft(client, monkeypatch)
+  resp = client.post(f"/api/drafts/{draft_id}/validate")
+  assert resp.status_code == 200
+  data = resp.json()
+  assert "total" in data
+  assert "results" in data
+  assert data["total"] >= 0
+
+
+def test_validate_draft_not_found(client):
+  resp = client.post("/api/drafts/nonexistent-id/validate")
+  assert resp.status_code == 404
+
+
+def test_validate_draft_finds_code_blocks(client, monkeypatch):
+  draft_id = _insert_draft(client, monkeypatch)
+  client.patch(f"/api/drafts/{draft_id}", json={
+    "content": "# Post\n\n```python\nx = 1\n```\n\n```json\n{}\n```"
+  })
+  resp = client.post(f"/api/drafts/{draft_id}/validate")
+  data = resp.json()
+  assert data["total"] == 2
+  assert data["valid"] == 2
+
+
+def test_validate_draft_html_route(admin_client, monkeypatch):
+  draft_id = _insert_draft(admin_client, monkeypatch)
+  resp = admin_client.post(f"/admin/drafts/{draft_id}/validate")
+  assert resp.status_code == 200
+  assert b"Code Validation" in resp.content
+
+
+# ─── Sources ─────────────────────────────────────────────────────────────────
+
+def test_draft_has_sources_field(client, monkeypatch):
+  draft_id = _insert_draft(client, monkeypatch)
+  resp = client.get(f"/api/drafts/{draft_id}")
+  data = resp.json()
+  assert "sources" in data
+  assert isinstance(data["sources"], list)
+
+
+def test_approved_draft_copies_sources(client, monkeypatch):
+  draft_id = _insert_draft(client, monkeypatch)
+  resp = client.post(f"/api/drafts/{draft_id}/approve")
+  assert resp.status_code == 201
+  post = resp.json()
+  assert "sources" in post
+  assert isinstance(post["sources"], list)

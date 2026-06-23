@@ -89,6 +89,18 @@
   </div>
   {% endif %}
 
+  <!-- Code validation -->
+  <div id="code-validation" class="mb-8">
+    <button
+      hx-post="/admin/drafts/{{ draft.id }}/validate"
+      hx-target="#code-validation"
+      hx-swap="innerHTML"
+      class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors border border-zinc-700 rounded-lg px-3 py-1.5 hover:border-zinc-600">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+      Validate Code Blocks
+    </button>
+  </div>
+
   {% if draft.summary %}
   <p class="text-base text-zinc-400 leading-relaxed mb-8 pb-8 border-b border-zinc-800/60">
     {{ draft.summary }}
@@ -103,6 +115,26 @@
     {{ draft.content | markdown | safe }}
   </div>
 </article>
+
+{% if draft.sources %}
+<section class="mt-12 pt-8 border-t border-zinc-800/60">
+  <p class="section-heading">Sources & Further Reading</p>
+  <div class="space-y-3">
+    {% for src in draft.sources %}
+    <div class="flex gap-3">
+      <span class="text-indigo-500 shrink-0 mt-0.5">&rarr;</span>
+      <div>
+        <a href="{{ src.url }}" target="_blank" rel="noopener noreferrer"
+           class="text-sm text-zinc-200 hover:text-indigo-400 transition-colors font-medium">
+          {{ src.title }}
+        </a>
+        <p class="text-xs text-zinc-500 mt-0.5">{{ src.summary }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
 <!-- Regenerate with feedback -->
 <section class="mt-16 pt-8 border-t border-zinc-800/60">

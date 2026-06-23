@@ -13,6 +13,12 @@ router = APIRouter(prefix="/api/posts", tags=["posts"])
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
 
+class Source(BaseModel):
+    title: str
+    url: str
+    summary: str
+
+
 class PostIn(BaseModel):
     title: str = Field(..., min_length=1)
     summary: str = Field(..., min_length=1)
@@ -20,6 +26,7 @@ class PostIn(BaseModel):
     content: str = Field(..., min_length=1)
     date: Date = Field(default_factory=Date.today)
     image: str | None = None
+    sources: list[Source] = Field(default_factory=list)
 
 
 class PostOut(BaseModel):
@@ -31,6 +38,7 @@ class PostOut(BaseModel):
     date: Date
     image: str | None = None
     reading_time: int | None = None
+    sources: list[Source] = Field(default_factory=list)
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,8 +82,9 @@ def create_post(body: PostIn):
         if existing:
             raise HTTPException(status_code=409, detail=f"Slug '{slug}' already exists")
         conn.execute(
-            "INSERT INTO posts (slug, title, date, summary, tags, content, image) VALUES (?,?,?,?,?,?,?)",
-            (slug, body.title, body.date.isoformat(), body.summary, json.dumps(body.tags), body.content, body.image),
+            "INSERT INTO posts (slug, title, date, summary, tags, content, image, sources) VALUES (?,?,?,?,?,?,?,?)",
+            (slug, body.title, body.date.isoformat(), body.summary, json.dumps(body.tags), body.content, body.image,
+             json.dumps([s.model_dump() for s in body.sources])),
         )
     return {**body.model_dump(), "slug": slug}
 
@@ -90,9 +99,10 @@ def update_post(slug: str, body: PostIn):
             raise HTTPException(status_code=404, detail="Post not found")
         conn.execute(
             """UPDATE posts
-               SET title=?, date=?, summary=?, tags=?, content=?, image=?
+               SET title=?, date=?, summary=?, tags=?, content=?, image=?, sources=?
                WHERE slug=?""",
-            (body.title, body.date.isoformat(), body.summary, json.dumps(body.tags), body.content, body.image, slug),
+            (body.title, body.date.isoformat(), body.summary, json.dumps(body.tags), body.content, body.image,
+             json.dumps([s.model_dump() for s in body.sources]), slug),
         )
     return {**body.model_dump(), "slug": slug}
 
@@ -117,10 +127,11 @@ def unpublish_post(slug: str):
         now = datetime.now(timezone.utc).isoformat()
         conn.execute(
             """INSERT INTO drafts (id, slug, title, date, summary, tags, content, image,
-               generated_at, topic_id, status)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', 'pending')""",
+               generated_at, topic_id, status, sources)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', 'pending', ?)""",
             (str(uuid.uuid4()), post["slug"], post["title"], post["date"].isoformat(),
-             post["summary"], json.dumps(post["tags"]), post["content"], post["image"], now),
+             post["summary"], json.dumps(post["tags"]), post["content"], post["image"], now,
+             json.dumps(post.get("sources", []))),
         )
         conn.execute("DELETE FROM comments WHERE post_slug = ?", (slug,))
         conn.execute("DELETE FROM posts WHERE slug = ?", (slug,))

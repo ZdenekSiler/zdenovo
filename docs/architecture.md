@@ -19,6 +19,7 @@ zdenovo/
 │   │   ├── projects.py            # Static project list for /projects
 │   │   ├── daily_topics.json      # Topics for the scheduled draft generator
 │   │   └── post_briefs.json       # On-demand generation briefs (/api/posts/briefs)
+│   ├── code_validator.py           # Code block extraction and syntax validation
 │   ├── routers/
 │   │   ├── posts_api.py           # CRUD REST API for blog posts (/api/posts)
 │   │   ├── comments_api.py        # Comments on posts (/api/comments)
@@ -121,6 +122,7 @@ to `/api/posts` or, for drafts, it's inserted directly by `drafts_api`).
 | `PATCH` | `/api/drafts/{id}` | Partially update a draft (title, content, tags, etc.) |
 | `POST` | `/api/drafts/{id}/approve` | Publish a draft into `posts` (404/409 on conflict) |
 | `POST` | `/api/drafts/{id}/regenerate` | Regenerate draft content with editorial feedback |
+| `POST` | `/api/drafts/{id}/validate` | Validate code blocks in draft content (syntax check) |
 | `DELETE` | `/api/drafts/{id}` | Delete a draft (204 No Content) |
 
 ### Topics — `/api/topics` (`routers/topics_api.py`)
@@ -157,7 +159,9 @@ picks 3 random topics daily to generate drafts.
    (`PostBrief` model, shared with `generate_api`).
 3. Each topic is rendered to a prompt via `_build_brief_message()` and sent to Claude via
    `_call_claude()` (forced `write_post` tool use → `PostOut`).
-4. Results are inserted into the `drafts` table with `status='pending'`.
+4. After review passes, `_find_sources()` uses Claude with `web_search` to find 3-5
+   authoritative external references for the post topic.
+5. Results (including sources) are inserted into the `drafts` table with `status='pending'`.
 5. An admin reviews drafts at `/admin/drafts` / `/admin/drafts/{id}` and either
    `POST /api/drafts/{id}/approve` (copies the row into `posts`, marks `status='approved'`)
    or `DELETE`s it.
@@ -165,9 +169,9 @@ picks 3 random topics daily to generate drafts.
 ## Database
 
 - **Engine**: SQLite (Python built-in, `blog.db` in `backend/`)
-- **`posts`**: `slug` (PK), `title`, `date`, `summary`, `tags` (JSON array), `content`, `image`
+- **`posts`**: `slug` (PK), `title`, `date`, `summary`, `tags` (JSON array), `content`, `image`, `sources` (JSON array)
 - **`drafts`**: `id` (PK, UUID), `slug`, `title`, `date`, `summary`, `tags`, `content`,
-  `image`, `generated_at`, `topic_id`, `status` (`pending` / `approved`)
+  `image`, `generated_at`, `topic_id`, `status` (`pending` / `approved`), `sources` (JSON array)
 - **Seed**: three initial posts inserted from `seed_posts.json` on first startup if `posts`
   is empty
 - `blog.db` is gitignored — delete it to reset to seed data; `init_db()` also migrates

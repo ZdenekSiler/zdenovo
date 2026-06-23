@@ -61,6 +61,10 @@ def init_db() -> None:
             conn.execute("ALTER TABLE drafts ADD COLUMN quality_strengths TEXT DEFAULT '[]'")
         if "admin_remarks" not in draft_cols:
             conn.execute("ALTER TABLE drafts ADD COLUMN admin_remarks TEXT")
+        if "sources" not in draft_cols:
+            conn.execute("ALTER TABLE drafts ADD COLUMN sources TEXT NOT NULL DEFAULT '[]'")
+        if "sources" not in cols:
+            conn.execute("ALTER TABLE posts ADD COLUMN sources TEXT NOT NULL DEFAULT '[]'")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS comments (
                 id         TEXT PRIMARY KEY,
@@ -96,6 +100,7 @@ def row_to_dict(row: sqlite3.Row) -> dict:
     d["tags"] = json.loads(d["tags"])
     d["date"] = date.fromisoformat(d["date"])
     d["reading_time"] = max(1, len(d["content"].split()) // 200)
+    d["sources"] = json.loads(d.get("sources") or "[]")
     return d
 
 
@@ -107,6 +112,7 @@ def draft_row_to_dict(row: sqlite3.Row) -> dict:
     d["reading_time"] = max(1, len(d["content"].split()) // 200)
     d["quality_issues"] = json.loads(d.get("quality_issues") or "[]")
     d["quality_strengths"] = json.loads(d.get("quality_strengths") or "[]")
+    d["sources"] = json.loads(d.get("sources") or "[]")
     return d
 
 
