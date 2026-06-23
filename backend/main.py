@@ -27,6 +27,7 @@ from routers.comments_api import router as comments_router
 from routers.drafts_api import _regenerate_draft, generate_daily_drafts, router as drafts_router
 from routers.generate_api import router as generate_router
 from routers.posts_api import router as posts_router
+from routers.topics_api import router as topics_router
 
 BASE_DIR = Path(__file__).parent.parent  # zdenovo/
 
@@ -41,7 +42,12 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 
-app = FastAPI(title="zdenovo", lifespan=lifespan)
+app = FastAPI(
+    title="Zdenovo API",
+    description="Blog platform API — posts, drafts, comments, topics, and AI generation.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 app.add_middleware(
     SessionMiddleware,
@@ -59,6 +65,7 @@ app.include_router(comments_router)
 app.include_router(drafts_router)
 app.include_router(generate_router)
 app.include_router(posts_router)
+app.include_router(topics_router)
 
 
 def _fmt_date(d) -> str:
@@ -406,19 +413,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
 
 # ─── Topics management ──────────────────────────────────────────────────────
 
-DAILY_TOPICS_PATH = Path(__file__).parent / "data" / "daily_topics.json"
-
-
-def _load_topics() -> list[dict]:
-    return json.loads(DAILY_TOPICS_PATH.read_text())
-
-
-def _save_topics(topics: list[dict]) -> None:
-    DAILY_TOPICS_PATH.write_text(json.dumps(topics, indent=2) + "\n")
-
-
-def _slugify(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+from routers.topics_api import _load_topics, _save_topics, _slugify
 
 
 @app.get("/admin/topics", response_class=HTMLResponse)

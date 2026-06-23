@@ -31,8 +31,8 @@ def topics_file(tmp_path, monkeypatch):
     """Write sample topics to a temp file and patch main.DAILY_TOPICS_PATH."""
     path = tmp_path / "daily_topics.json"
     path.write_text(json.dumps(SAMPLE_TOPICS, indent=2))
-    import main
-    monkeypatch.setattr(main, "DAILY_TOPICS_PATH", path)
+    from routers import topics_api
+    monkeypatch.setattr(topics_api, "DAILY_TOPICS_PATH", path)
     return path
 
 
@@ -208,3 +208,101 @@ def test_admin_hub_shows_topics_count(admin, topics_file):
     assert r.status_code == 200
     assert b"Topics" in r.content
     assert b"/admin/topics" in r.content
+
+
+# ─── REST API: GET /api/topics ────────────────────────────────────────────────
+
+def test_api_list_topics(client, topics_file):
+    r = client.get("/api/topics")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 2
+    assert data[0]["id"] == "test-topic-one"
+    assert data[1]["id"] == "test-topic-two"
+
+
+def test_api_get_topic(client, topics_file):
+    r = client.get("/api/topics/test-topic-one")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["title_hint"] == "Test Topic One"
+    assert data["tags"] == ["python", "testing"]
+
+
+def test_api_get_topic_not_found(client, topics_file):
+    r = client.get("/api/topics/nonexistent")
+    assert r.status_code == 404
+
+
+# ─── REST API: POST /api/topics ───────────────────────────────────────────────
+
+def test_api_create_topic(client, topics_file):
+    r = client.post("/api/topics", json={
+        "title_hint": "New API Topic",
+        "description": "Created via API.",
+        "audience": "API users",
+        "tone": "formal",
+        "tags": ["api"],
+        "outline": ["Intro", "Usage"],
+    })
+    assert r.status_code == 201
+    data = r.json()
+    assert data["id"] == "new-api-topic"
+    assert data["title_hint"] == "New API Topic"
+    topics = json.loads(topics_file.read_text())
+    assert len(topics) == 3
+
+
+def test_api_create_topic_deduplicates_id(client, topics_file):
+    r = client.post("/api/topics", json={
+        "title_hint": "Test Topic One",
+        "description": "Dup.",
+        "audience": "Devs",
+        "tone": "dry",
+    })
+    assert r.status_code == 201
+    assert r.json()["id"] != "test-topic-one"
+
+
+def test_api_create_topic_validation(client, topics_file):
+    r = client.post("/api/topics", json={"title_hint": ""})
+    assert r.status_code == 422
+
+
+# ─── REST API: PUT /api/topics/{id} ──────────────────────────────────────────
+
+def test_api_update_topic(client, topics_file):
+    r = client.put("/api/topics/test-topic-one", json={
+        "title_hint": "Updated Via API",
+        "description": "Updated.",
+        "audience": "Updated audience",
+        "tone": "updated",
+        "tags": ["updated"],
+        "outline": ["New outline"],
+    })
+    assert r.status_code == 200
+    assert r.json()["title_hint"] == "Updated Via API"
+    topics = json.loads(topics_file.read_text())
+    t = next(t for t in topics if t["id"] == "test-topic-one")
+    assert t["title_hint"] == "Updated Via API"
+
+
+def test_api_update_topic_not_found(client, topics_file):
+    r = client.put("/api/topics/nonexistent", json={
+        "title_hint": "X", "description": "X", "audience": "X", "tone": "X",
+    })
+    assert r.status_code == 404
+
+
+# ─── REST API: DELETE /api/topics/{id} ────────────────────────────────────────
+
+def test_api_delete_topic(client, topics_file):
+    r = client.delete("/api/topics/test-topic-one")
+    assert r.status_code == 204
+    topics = json.loads(topics_file.read_text())
+    assert len(topics) == 1
+
+
+def test_api_delete_topic_not_found(client, topics_file):
+    r = client.delete("/api/topics/nonexistent")
+    assert r.status_code == 404

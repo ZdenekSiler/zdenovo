@@ -21,8 +21,10 @@ zdenovo/
 │   │   └── post_briefs.json       # On-demand generation briefs (/api/posts/briefs)
 │   ├── routers/
 │   │   ├── posts_api.py           # CRUD REST API for blog posts (/api/posts)
+│   │   ├── comments_api.py        # Comments on posts (/api/comments)
 │   │   ├── generate_api.py        # Claude-backed post generation (/api/posts/generate*)
-│   │   └── drafts_api.py          # Draft lifecycle (/api/drafts)
+│   │   ├── drafts_api.py          # Draft lifecycle (/api/drafts)
+│   │   └── topics_api.py          # Daily generation topics CRUD (/api/topics)
 │   ├── tests/                     # pytest suite, one file per module (see testing.md)
 │   ├── seed_posts.json            # Initial posts inserted on first startup
 │   ├── blog.db                    # SQLite database (gitignored)
@@ -31,7 +33,9 @@ zdenovo/
     ├── templates/                 # Jinja2 HTML templates
     │   ├── base.html               # Sidebar nav (HTMX), <div id="main-content">, scripts
     │   ├── index.html, projects.html, blog.html, post.html, 404.html
-    │   └── drafts_list.html, draft_preview.html   # Admin views
+    │   ├── admin_hub.html, admin_posts.html, admin_stats.html  # Admin views
+│   ├── admin_topics.html, admin_topic_edit.html            # Topics admin
+│   └── drafts_list.html, draft_preview.html                # Draft admin
     └── static/
         ├── css/style.css           # Custom component classes
         └── js/main.js              # Active nav highlight
@@ -45,17 +49,18 @@ a module or endpoint, see @.claude/rules/architecture.md.
 Two parallel surfaces:
 
 1. **Server-rendered HTML pages** (`/`, `/projects`, `/blog`, `/blog/{slug}`,
-   `/admin/drafts`, `/admin/drafts/{id}`) — Jinja2 templates rendered by `main.py`.
+   `/admin`, `/admin/posts`, `/admin/drafts`, `/admin/comments`, `/admin/topics`,
+   `/admin/stats`) — Jinja2 templates rendered by `main.py`.
    The sidebar nav in `base.html` uses **HTMX** (`hx-get`, `hx-target="#main-content"`,
    `hx-select="#main-content"`, `hx-push-url="true"`, `hx-swap="innerHTML"`) to swap
    the main content area without a full page reload, giving SPA-like navigation with
    zero custom JS. `main.js` only highlights the active nav link based on
    `window.location.pathname`.
 
-2. **JSON REST API** under `/api/*` (posts, generation, drafts) — independent of the
-   HTML pages, documented via Swagger UI at `/docs`. Used for content management and
-   automation (e.g. the scheduler calling `generate_daily_drafts()` directly, or an
-   admin script hitting `/api/drafts/{id}/approve`).
+2. **JSON REST API** under `/api/*` (posts, comments, generation, drafts, topics) —
+   independent of the HTML pages, documented via Swagger UI at `/docs`. Used for content
+   management and automation (e.g. the scheduler calling `generate_daily_drafts()` directly,
+   or an admin script hitting `/api/drafts/{id}/approve`).
 
 ## API Endpoints
 
@@ -68,6 +73,7 @@ Two parallel surfaces:
 | `POST` | `/api/posts` | Create a post (slug auto-derived from title) |
 | `PUT` | `/api/posts/{slug}` | Replace a post's content |
 | `DELETE` | `/api/posts/{slug}` | Delete a post (204 No Content) |
+| `POST` | `/api/posts/{slug}/unpublish` | Move post back to drafts (204 No Content) |
 
 Request body (POST / PUT):
 
@@ -84,6 +90,14 @@ Request body (POST / PUT):
 
 `date` defaults to today if omitted. Slug is derived from `title` on creation and cannot
 be changed via PUT.
+
+### Comments — `/api/comments` (`routers/comments_api.py`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/comments?post_slug={slug}` | List comments for a post (oldest first) |
+| `POST` | `/api/comments` | Create a comment (`{post_slug, author, body}`) |
+| `DELETE` | `/api/comments/{id}` | Delete a comment (204 No Content) |
 
 ### Generation — `/api/posts/...` (`routers/generate_api.py`)
 
@@ -104,8 +118,36 @@ to `/api/posts` or, for drafts, it's inserted directly by `drafts_api`).
 | `GET` | `/api/drafts` | List drafts (newest first) |
 | `GET` | `/api/drafts/{id}` | Get a single draft |
 | `POST` | `/api/drafts/generate` | Trigger daily draft generation (also runs on schedule) |
+| `PATCH` | `/api/drafts/{id}` | Partially update a draft (title, content, tags, etc.) |
 | `POST` | `/api/drafts/{id}/approve` | Publish a draft into `posts` (404/409 on conflict) |
+| `POST` | `/api/drafts/{id}/regenerate` | Regenerate draft content with editorial feedback |
 | `DELETE` | `/api/drafts/{id}` | Delete a draft (204 No Content) |
+
+### Topics — `/api/topics` (`routers/topics_api.py`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/topics` | List all daily generation topics |
+| `GET` | `/api/topics/{id}` | Get a single topic |
+| `POST` | `/api/topics` | Create a topic (id auto-derived from title_hint) |
+| `PUT` | `/api/topics/{id}` | Replace a topic's fields |
+| `DELETE` | `/api/topics/{id}` | Delete a topic (204 No Content) |
+
+Request body (POST / PUT):
+
+```json
+{
+  "title_hint": "FastAPI Dependency Injection: The Right Way",
+  "description": "A practical guide to...",
+  "audience": "Python developers building REST APIs",
+  "tone": "practical, opinionated",
+  "tags": ["python", "fastapi"],
+  "outline": ["What DI solves", "Depends() basics", "Sharing DB connections"]
+}
+```
+
+Topics are stored in `data/daily_topics.json` (file-based, not in SQLite). The scheduler
+picks 3 random topics daily to generate drafts.
 
 ## Draft Generation Pipeline
 

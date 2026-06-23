@@ -25,6 +25,9 @@ Where code goes and how modules depend on each other. For the descriptive refere
   `routers/posts_api.py` → `routers/generate_api.py` → `routers/drafts_api.py`
   - `generate_api` may import from `posts_api` (`PostOut`, `_slugify`)
   - `drafts_api` may import from `generate_api` (`PostBrief`, `_build_brief_message`, `_call_claude`)
+  - `topics_api` and `comments_api` are standalone — they don't import from other routers
+  - `main.py` imports helpers from `topics_api` (`_load_topics`, `_save_topics`, `_slugify`)
+    for the admin HTML routes
   - Never the reverse — this avoids circular imports. If a new module needs something from
     a module "below" it in this chain, that's a sign the shared code belongs in `db.py` or
     a new shared module instead.
@@ -41,7 +44,7 @@ Where code goes and how modules depend on each other. For the descriptive refere
 
 ## Two Communication Surfaces — Keep Them Separate
 
-- **Server-rendered HTML** (`/`, `/projects`, `/blog`, `/blog/{slug}`, `/admin/drafts*`) —
+- **Server-rendered HTML** (`/`, `/projects`, `/blog`, `/blog/{slug}`, `/admin/*`) —
   Jinja2 `TemplateResponse`s defined in `main.py`. Navigation uses HTMX attributes
   (`hx-get`, `hx-target`, `hx-push-url`, `hx-swap`) for partial swaps — never hand-roll
   fetch/XHR for nav.

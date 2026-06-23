@@ -15,7 +15,12 @@ backend/tests/
 ├── test_db.py           # db.py unit tests
 ├── test_data.py         # data/posts.py and data/projects.py
 ├── test_api.py          # /api/posts CRUD endpoints
-└── test_routes.py       # HTML page routes + HTMX structure
+├── test_routes.py       # HTML page routes + HTMX structure
+├── test_auth.py         # Admin login, logout, auth guards
+├── test_comments.py     # /api/comments endpoints + admin page
+├── test_drafts.py       # /api/drafts lifecycle + admin pages
+├── test_topics.py       # /api/topics + admin topics CRUD
+└── test_frontend.py     # Playwright browser tests
 ```
 
 Each test file mirrors the module it covers. Add a new `test_<module>.py` here when
