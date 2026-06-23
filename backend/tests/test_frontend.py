@@ -198,6 +198,36 @@ def test_code_blocks_have_copy_button(page: Page):
         expect(wrappers.first.locator(".copy-btn")).to_be_visible()
 
 
+def test_mermaid_blocks_not_wrapped_with_toggle(page: Page):
+    import requests
+    content = (
+        "## Intro\n\nSome text.\n\n"
+        "```python\nx = 1\n```\n\n"
+        "```mermaid\ngraph LR\n  A --> B\n```\n\n"
+        "Done."
+    )
+    resp = requests.post(f"{BASE}/api/posts", json={
+        "title": "Mermaid Toggle Test Post",
+        "summary": "Test post for mermaid toggle.",
+        "tags": ["test"],
+        "content": content,
+    })
+    assert resp.status_code == 201
+    slug = resp.json()["slug"]
+    try:
+        page.goto(f"{BASE}/blog/{slug}")
+        page.wait_for_timeout(4000)
+        wrappers = page.locator(".code-block-wrapper")
+        assert wrappers.count() == 1, \
+            f"Expected 1 wrapped code block (python only), got {wrappers.count()}"
+        expect(wrappers.first.locator(".code-toggle")).to_be_visible()
+        mermaid_in_wrapper = page.locator(".code-block-wrapper .mermaid")
+        assert mermaid_in_wrapper.count() == 0, \
+            "Mermaid diagram should not be inside a code-block-wrapper"
+    finally:
+        requests.delete(f"{BASE}/api/posts/{slug}")
+
+
 def test_mermaid_diagrams_render_via_htmx(page: Page):
     page.goto(f"{BASE}/blog")
     page.locator("#posts-list article a").first.click()

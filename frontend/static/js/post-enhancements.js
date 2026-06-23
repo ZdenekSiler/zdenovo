@@ -53,6 +53,8 @@
     var validationData = window.__codeValidation;
     pres.forEach(function (pre, i) {
       if (pre.parentElement.classList.contains("code-block-wrapper")) return;
+      var code = pre.querySelector("code");
+      if (code && code.classList.contains("language-mermaid")) return;
       var wrapper = document.createElement("div");
       wrapper.className = "code-block-wrapper";
       pre.parentNode.insertBefore(wrapper, pre);
