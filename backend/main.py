@@ -199,6 +199,7 @@ async def submit_comment(request: Request, slug: str, author: str = Form(...), b
 
 # ─── Admin pages ──────────────────────────────────────────────────────────────
 
+@app.get("/admin/", response_class=HTMLResponse)
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_root(request: Request, _: None = Depends(require_admin)):
     posts = get_all_posts()
