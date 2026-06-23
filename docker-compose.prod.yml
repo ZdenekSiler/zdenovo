@@ -6,11 +6,13 @@ services:
       - db_data:/data
     environment:
       - DB_DIR=/data
+      - CF_ZONE_ID=${CF_ZONE_ID}
     secrets:
       - anthropic_api_key
       - unsplash_access_key
       - admin_password
       - secret_key
+      - cloudflare_api_token
     networks:
       - internal
     healthcheck:
@@ -55,6 +57,8 @@ secrets:
     file: ./secrets/admin_password
   secret_key:
     file: ./secrets/secret_key
+  cloudflare_api_token:
+    file: ./secrets/cloudflare_api_token
 
 networks:
   internal:

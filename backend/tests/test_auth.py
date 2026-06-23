@@ -125,6 +125,18 @@ def test_authenticated_admin_comments_returns_200(admin_client):
     assert r.status_code == 200
 
 
+def test_authenticated_admin_stats_returns_200(admin_client):
+    r = admin_client.get("/admin/stats")
+    assert r.status_code == 200
+    assert b"Site Analytics" in r.content
+
+
+def test_unauthenticated_admin_stats_redirects(client):
+    r = client.get("/admin/stats", follow_redirects=False)
+    assert r.status_code == 303
+    assert "/admin/login" in r.headers["location"]
+
+
 def test_admin_posts_page_shows_stats(admin_client):
     r = admin_client.get("/admin/posts")
     assert b"Published" in r.content

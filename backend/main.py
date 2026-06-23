@@ -1,9 +1,10 @@
 import json
 import os
 import secrets
+import urllib.request
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import mistune
@@ -276,3 +277,114 @@ async def admin_draft_regenerate(
 ):
     _regenerate_draft(draft_id, remarks)
     return RedirectResponse(f"/admin/drafts/{draft_id}", status_code=303)
+
+
+@app.get("/admin/stats", response_class=HTMLResponse)
+async def admin_stats(request: Request, _: None = Depends(require_admin)):
+    cf_token = read_secret("cloudflare_api_token", "CLOUDFLARE_API_TOKEN")
+    zone_id = os.environ.get("CF_ZONE_ID", "")
+
+    if not cf_token or not zone_id:
+        return templates.TemplateResponse(request, "admin_stats.html", {"error": "Analytics not configured. Set CLOUDFLARE_API_TOKEN and CF_ZONE_ID."})
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=6)).strftime("%Y-%m-%d")
+
+    query = """
+    {
+      viewer {
+        zones(filter: {zoneTag: "%s"}) {
+          daily: httpRequests1dGroups(
+            limit: 7
+            filter: {date_geq: "%s", date_leq: "%s"}
+          ) {
+            dimensions { date }
+            sum { requests pageViews }
+            uniq { uniques }
+          }
+          topPaths: httpRequestsAdaptiveGroups(
+            limit: 10
+            filter: {date_geq: "%s", date_leq: "%s", requestSource: "eyeball"}
+            orderBy: [count_DESC]
+          ) {
+            dimensions { clientRequestPath }
+            count
+          }
+          topCountries: httpRequestsAdaptiveGroups(
+            limit: 10
+            filter: {date_geq: "%s", date_leq: "%s", requestSource: "eyeball"}
+            orderBy: [count_DESC]
+          ) {
+            dimensions { clientCountryName }
+            count
+          }
+          topBrowsers: httpRequestsAdaptiveGroups(
+            limit: 5
+            filter: {date_geq: "%s", date_leq: "%s", requestSource: "eyeball"}
+            orderBy: [count_DESC]
+          ) {
+            dimensions { userAgent }
+            count
+          }
+        }
+      }
+    }
+    """ % (zone_id, week_ago, today, today, today, today, today, today, today)
+
+    req = urllib.request.Request(
+        "https://api.cloudflare.com/client/v4/graphql",
+        data=json.dumps({"query": query}).encode(),
+        headers={"Authorization": f"Bearer {cf_token}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except Exception:
+        return templates.TemplateResponse(request, "admin_stats.html", {"error": "Failed to fetch analytics from Cloudflare."})
+
+    if data.get("errors") or not data.get("data"):
+        msg = data.get("errors", [{}])[0].get("message", "Unknown error") if data.get("errors") else "Empty response"
+        return templates.TemplateResponse(request, "admin_stats.html", {"error": f"Cloudflare API error: {msg}"})
+
+    zones = data["data"].get("viewer", {}).get("zones", [{}])
+    zone = zones[0] if zones else {}
+
+    daily_raw = zone.get("daily", [])
+    daily = sorted(
+        [
+            {
+                "date": d["dimensions"]["date"],
+                "page_views": d["sum"]["pageViews"],
+                "requests": d["sum"]["requests"],
+                "uniques": d["uniq"]["uniques"],
+            }
+            for d in daily_raw
+        ],
+        key=lambda d: d["date"],
+    )
+    max_views = max((d["page_views"] for d in daily), default=1) or 1
+    max_uniques = max((d["uniques"] for d in daily), default=1) or 1
+    for d in daily:
+        d["views_pct"] = round(d["page_views"] / max_views * 100)
+        d["uniques_pct"] = round(d["uniques"] / max_uniques * 100)
+        dt = datetime.strptime(d["date"], "%Y-%m-%d")
+        d["day_label"] = dt.strftime("%a")
+        d["date_label"] = dt.strftime("%b %d")
+
+    totals = {
+        "page_views": sum(d["page_views"] for d in daily),
+        "uniques": sum(d["uniques"] for d in daily),
+        "requests": sum(d["requests"] for d in daily),
+    }
+
+    top_pages = [{"path": r["dimensions"]["clientRequestPath"], "count": r["count"]} for r in zone.get("topPaths", [])]
+    top_countries = [{"country": r["dimensions"]["clientCountryName"], "count": r["count"]} for r in zone.get("topCountries", [])]
+    top_browsers = [{"browser": r["dimensions"]["userAgent"], "count": r["count"]} for r in zone.get("topBrowsers", [])]
+
+    return templates.TemplateResponse(request, "admin_stats.html", {
+        "daily": daily,
+        "totals": totals,
+        "top_pages": top_pages,
+        "top_countries": top_countries,
+        "top_browsers": top_browsers,
+    })
