@@ -4,6 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Zdenovo{% endblock %} — Software Engineer</title>
+  <meta name="description" content="{% block meta_description %}Software engineer building backend systems, AI workflows, and developer tooling with Python.{% endblock %}">
+  <link rel="canonical" href="{% block canonical_url %}https://zdenovo.com{{ request.url.path }}{% endblock %}">
+  <link rel="alternate" type="application/rss+xml" title="Zdenovo Blog" href="https://zdenovo.com/feed.xml">
+
+  <!-- Open Graph -->
+  <meta property="og:site_name" content="Zdenovo">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  <meta property="og:title" content="{% block og_title %}Zdenovo — Software Engineer{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}Software engineer building backend systems, AI workflows, and developer tooling with Python.{% endblock %}">
+  <meta property="og:url" content="{% block og_url %}https://zdenovo.com{{ request.url.path }}{% endblock %}">
+  <meta property="og:image" content="{% block og_image %}https://zdenovo.com/static/img/codinghard.png{% endblock %}">
+  {% block extra_meta %}{% endblock %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">

@@ -12,7 +12,7 @@ import mistune
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -20,7 +20,7 @@ from starlette.middleware.sessions import SessionMiddleware
 load_dotenv()  # no-op if .env absent; prod uses file secrets
 
 from config import read_secret
-from data.posts import get_all_posts, get_all_tags, get_post_by_slug, get_posts_page, total_pages
+from data.posts import get_all_posts, get_all_tags, get_post_by_slug, get_posts_page, get_related_posts, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
 from routers.comments_api import router as comments_router
@@ -183,7 +183,10 @@ async def post(request: Request, slug: str):
             "SELECT * FROM comments WHERE post_slug = ? ORDER BY created_at ASC", (slug,)
         ).fetchall()
     comments = [comment_row_to_dict(r) for r in rows]
-    return templates.TemplateResponse(request, "post.html", {"post": article, "comments": comments, "slug": slug})
+    related = get_related_posts(slug, article["tags"])
+    return templates.TemplateResponse(request, "post.html", {
+        "post": article, "comments": comments, "slug": slug, "related_posts": related,
+    })
 
 
 @app.post("/blog/{slug}/comments", response_class=HTMLResponse)
@@ -203,6 +206,85 @@ async def submit_comment(request: Request, slug: str, author: str = Form(...), b
         ).fetchall()
     comments = [comment_row_to_dict(r) for r in rows]
     return templates.TemplateResponse(request, "comments_section.html", {"comments": comments, "slug": slug})
+
+
+# ─── SEO: sitemap, robots.txt, RSS ───────────────────────────────────────────
+
+DOMAIN = "https://zdenovo.com"
+
+
+@app.get("/sitemap.xml")
+async def sitemap():
+    posts = get_all_posts()
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    static_pages = [
+        ("", "weekly", "1.0"),
+        ("/blog", "daily", "0.9"),
+        ("/about", "monthly", "0.7"),
+        ("/projects", "monthly", "0.6"),
+    ]
+    for path, freq, prio in static_pages:
+        lines.append(
+            f"  <url><loc>{DOMAIN}{path}</loc>"
+            f"<changefreq>{freq}</changefreq><priority>{prio}</priority></url>"
+        )
+    for p in posts:
+        date = p["date"].isoformat() if hasattr(p["date"], "isoformat") else str(p["date"])
+        lines.append(
+            f"  <url><loc>{DOMAIN}/blog/{p['slug']}</loc>"
+            f"<lastmod>{date}</lastmod><changefreq>monthly</changefreq>"
+            f"<priority>0.8</priority></url>"
+        )
+    lines.append("</urlset>")
+    return Response(content="\n".join(lines), media_type="application/xml")
+
+
+@app.get("/robots.txt")
+async def robots():
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /admin/\n"
+        "Disallow: /api/\n"
+        f"Sitemap: {DOMAIN}/sitemap.xml\n"
+    )
+    return PlainTextResponse(body)
+
+
+@app.get("/feed.xml")
+async def rss_feed():
+    posts = get_all_posts()[:20]
+    items = []
+    for p in posts:
+        date = p["date"].isoformat() if hasattr(p["date"], "isoformat") else str(p["date"])
+        title = p["title"].replace("&", "&amp;").replace("<", "&lt;")
+        summary = (p["summary"] or "").replace("&", "&amp;").replace("<", "&lt;")
+        items.append(
+            f"    <item>\n"
+            f"      <title>{title}</title>\n"
+            f"      <link>{DOMAIN}/blog/{p['slug']}</link>\n"
+            f"      <guid>{DOMAIN}/blog/{p['slug']}</guid>\n"
+            f"      <pubDate>{date}</pubDate>\n"
+            f"      <description>{summary}</description>\n"
+            f"    </item>"
+        )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
+        "  <channel>\n"
+        "    <title>Zdenovo Blog</title>\n"
+        f"    <link>{DOMAIN}/blog</link>\n"
+        "    <description>Notes on software engineering, AI development, and tooling.</description>\n"
+        "    <language>en</language>\n"
+        f'    <atom:link href="{DOMAIN}/feed.xml" rel="self" type="application/rss+xml"/>\n'
+        + "\n".join(items) + "\n"
+        "  </channel>\n"
+        "</rss>"
+    )
+    return Response(content=xml, media_type="application/rss+xml")
 
 
 # ─── Admin pages ──────────────────────────────────────────────────────────────

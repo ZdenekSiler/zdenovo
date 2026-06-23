@@ -153,3 +153,106 @@ def test_blog_list_shows_post_images(client):
 def test_post_detail_shows_hero_image(client):
     r = client.get("/blog/htmx-is-enough")
     assert b"post-hero" in r.content
+
+
+# ── SEO: sitemap, robots.txt, RSS ────────────────────────────────────────────
+
+def test_sitemap_returns_xml(client):
+    r = client.get("/sitemap.xml")
+    assert r.status_code == 200
+    assert "xml" in r.headers["content-type"]
+
+
+def test_sitemap_contains_posts(client):
+    r = client.get("/sitemap.xml")
+    assert b"/blog/htmx-is-enough" in r.content
+
+
+def test_sitemap_contains_static_pages(client):
+    r = client.get("/sitemap.xml")
+    assert b"/blog</loc>" in r.content
+    assert b"/about</loc>" in r.content
+
+
+def test_robots_txt_returns_plain_text(client):
+    r = client.get("/robots.txt")
+    assert r.status_code == 200
+    assert "text/plain" in r.headers["content-type"]
+
+
+def test_robots_txt_disallows_admin(client):
+    r = client.get("/robots.txt")
+    assert b"Disallow: /admin/" in r.content
+
+
+def test_robots_txt_references_sitemap(client):
+    r = client.get("/robots.txt")
+    assert b"Sitemap:" in r.content
+    assert b"sitemap.xml" in r.content
+
+
+def test_rss_feed_returns_xml(client):
+    r = client.get("/feed.xml")
+    assert r.status_code == 200
+    assert "rss" in r.headers["content-type"]
+
+
+def test_rss_feed_contains_posts(client):
+    r = client.get("/feed.xml")
+    assert b"<item>" in r.content
+    assert b"HTMX Is Enough" in r.content
+
+
+def test_rss_feed_has_channel_info(client):
+    r = client.get("/feed.xml")
+    assert b"<title>Zdenovo Blog</title>" in r.content
+    assert b"<description>" in r.content
+
+
+# ── SEO: meta tags ───────────────────────────────────────────────────────────
+
+def test_home_has_meta_description(client):
+    r = client.get("/")
+    assert b'<meta name="description"' in r.content
+
+
+def test_home_has_og_tags(client):
+    r = client.get("/")
+    assert b'og:title' in r.content
+    assert b'og:description' in r.content
+
+
+def test_post_has_article_og_type(client):
+    r = client.get("/blog/htmx-is-enough")
+    assert b'og:type" content="article' in r.content
+
+
+def test_post_has_json_ld(client):
+    r = client.get("/blog/htmx-is-enough")
+    assert b"application/ld+json" in r.content
+    assert b"BlogPosting" in r.content
+
+
+def test_blog_has_canonical_url(client):
+    r = client.get("/blog")
+    assert b'rel="canonical"' in r.content
+
+
+def test_home_has_rss_link(client):
+    r = client.get("/")
+    assert b'type="application/rss+xml"' in r.content
+
+
+# ── Related posts ────────────────────────────────────────────────────────────
+
+def test_related_posts_shown_when_tags_overlap(client):
+    from data.posts import get_related_posts
+    related = get_related_posts("type-hints-everywhere", ["python", "frontend"])
+    assert len(related) > 0
+
+
+# ── About page CTA ──────────────────────────────────────────────────────────
+
+def test_about_has_consulting_cta(client):
+    r = client.get("/about")
+    assert b"Work with me" in r.content

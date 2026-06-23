@@ -1,5 +1,21 @@
 {% extends "base.html" %}
 {% block title %}About{% endblock %}
+{% block meta_description %}Software engineer and consultant specializing in Python backends, AI-assisted development, and developer tooling. Available for new projects.{% endblock %}
+{% block og_title %}About — Zdenovo{% endblock %}
+{% block og_description %}Software engineer and consultant specializing in Python backends, AI-assisted development, and developer tooling.{% endblock %}
+{% block extra_meta %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "Zdenovo",
+  "url": "https://zdenovo.com",
+  "jobTitle": "Software Engineer",
+  "description": "Backend systems, AI workflows, and developer tooling with Python.",
+  "knowsAbout": ["Python", "FastAPI", "Docker", "AI Agents", "Claude", "SQLite"]
+}
+</script>
+{% endblock %}
 
 {% block content %}
 <div class="mb-10">
@@ -117,6 +133,20 @@
   </div>
 </section>
 {% endif %}
+
+<!-- Work with me -->
+<section class="mt-12">
+  <div class="card border-indigo-500/20 bg-indigo-500/5">
+    <p class="text-sm font-semibold text-zinc-100 mb-2">Work with me</p>
+    <p class="text-xs text-zinc-400 leading-relaxed mb-4">
+      I help teams ship faster with Python backends, AI integrations, and production infrastructure.
+      Whether you need a hands-on engineer or a second pair of eyes on your architecture — let's talk.
+    </p>
+    <a href="mailto:zdenovo@zdenovo.com" class="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors border border-indigo-500/30 rounded-lg px-3 py-1.5 hover:border-indigo-500/50">
+      Get in touch
+    </a>
+  </div>
+</section>
 
 <!-- What I write about -->
 {% if all_tags %}

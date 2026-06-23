@@ -1,5 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Blog{% endblock %}
+{% block meta_description %}{% if current_tag %}Posts tagged {{ current_tag }}{% else %}Notes on software engineering, AI development, tooling, and lessons learned the hard way.{% endif %}{% endblock %}
+{% block og_title %}Blog — Zdenovo{% endblock %}
+{% block og_description %}Notes on software engineering, AI development, tooling, and lessons learned the hard way.{% endblock %}
+{% block extra_meta %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Blog",
+  "name": "Zdenovo Blog",
+  "description": "Notes on software engineering, AI development, and tooling.",
+  "url": "https://zdenovo.com/blog",
+  "author": {"@type": "Person", "name": "Zdenovo", "url": "https://zdenovo.com/about"}
+}
+</script>
+{% endblock %}
 
 {% block sidebar_extra %}
 <div class="border-t border-zinc-800/60">

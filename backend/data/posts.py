@@ -51,3 +51,17 @@ def get_posts_page(page: int, tag: str | None = None) -> tuple[list[dict], int]:
 
 def total_pages(total: int) -> int:
     return max(1, math.ceil(total / PAGE_SIZE))
+
+
+def get_related_posts(slug: str, tags: list[str], limit: int = 3) -> list[dict]:
+    all_posts = get_all_posts()
+    scored = []
+    tag_set = set(tags)
+    for p in all_posts:
+        if p["slug"] == slug:
+            continue
+        overlap = len(tag_set & set(p["tags"]))
+        if overlap > 0:
+            scored.append((overlap, p))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [p for _, p in scored[:limit]]

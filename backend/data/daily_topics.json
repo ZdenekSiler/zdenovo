@@ -118,5 +118,261 @@
       "The tipping point: when to add a build step",
       "Minimal Vite setup for Tailwind without full SPA overhead"
     ]
+  },
+  {
+    "id": "solo-developer-ai-era",
+    "title_hint": "The Solo Developer Era: How AI Lets One Person Build What Teams Couldn't",
+    "description": "AI coding assistants have shifted the economics of software development. A single developer with Claude Code can now ship what used to require a team of five. Here's how the math changed.",
+    "audience": "Solo developers, indie hackers, and tech leads evaluating team size",
+    "tone": "opinionated, data-backed, inspiring but honest",
+    "tags": ["ai", "productivity", "development", "indie"],
+    "outline": [
+      "The old math: why software required teams",
+      "What AI actually automates vs what it doesn't",
+      "Real examples: solo-built products shipping to production",
+      "The new bottleneck: taste and product sense, not coding speed",
+      "When you still need a team — and when AI makes you 10x",
+      "Tools that make solo development viable in 2026"
+    ]
+  },
+  {
+    "id": "building-with-claude-code",
+    "title_hint": "From Idea to Production in a Weekend: Building with Claude Code",
+    "description": "A walkthrough of building and deploying a real web app in 48 hours using Claude Code as an AI pair programmer. Every prompt, every decision, every shortcut.",
+    "audience": "Developers curious about AI-assisted development workflows",
+    "tone": "narrative, honest about failures, practical",
+    "tags": ["claude", "ai", "development", "tutorial"],
+    "outline": [
+      "The project: what we're building and why",
+      "Setting up: Claude Code, project structure, first prompts",
+      "Hour 1-8: core backend with AI pair programming",
+      "Hour 8-24: frontend, tests, and fixing AI mistakes",
+      "Hour 24-48: deployment, debugging, and going live",
+      "What worked, what didn't, and what I'd do differently"
+    ]
+  },
+  {
+    "id": "vibe-coding-production",
+    "title_hint": "Vibe Coding Is Real: How to Ship Production Apps with AI Pair Programming",
+    "description": "Vibe coding isn't just a meme — it's a legitimate development methodology when done right. Here's how to use AI pair programming without shipping garbage.",
+    "audience": "Developers who want to use AI for coding but worry about quality",
+    "tone": "practical, opinionated, framework for decision-making",
+    "tags": ["ai", "development", "productivity", "quality"],
+    "outline": [
+      "What vibe coding actually means (beyond the meme)",
+      "The quality problem: when AI-generated code breaks",
+      "A framework: where to vibe and where to verify",
+      "Testing as the guardrail: letting AI write code but owning the tests",
+      "Production-grade vibe coding: CI, reviews, and safety nets",
+      "The developer's new job: taste, direction, and quality gates"
+    ]
+  },
+  {
+    "id": "ai-agents-ecommerce",
+    "title_hint": "AI Agencies: Why Every E-commerce Store Will Have an AI Agent by 2027",
+    "description": "AI agents are replacing SaaS dashboards for e-commerce operations. From inventory management to customer support, autonomous agents are becoming the new workforce.",
+    "audience": "E-commerce founders, tech leads, and developers building for retail",
+    "tone": "forward-looking, practical examples, business-oriented",
+    "tags": ["ai", "agents", "ecommerce", "business"],
+    "outline": [
+      "The SaaS dashboard fatigue: why clicking buttons doesn't scale",
+      "What an AI agent can do that a dashboard can't",
+      "Real use cases: inventory, pricing, support, marketing",
+      "Architecture: how to build an e-commerce agent",
+      "The cost equation: AI agent vs hiring another ops person",
+      "Getting started: low-hanging fruit for your first agent"
+    ]
+  },
+  {
+    "id": "agent-to-agent-protocols",
+    "title_hint": "Agent-to-Agent Communication: No HTML Needed, Just Protocols",
+    "description": "The next web won't be browsers talking to servers — it'll be agents talking to agents. Forget HTML; think JSON schemas, tool definitions, and binary protocols.",
+    "audience": "Developers and architects building multi-agent systems",
+    "tone": "technical, visionary but grounded, with code examples",
+    "tags": ["ai", "agents", "protocols", "architecture"],
+    "outline": [
+      "Why agents don't need HTML or REST APIs",
+      "The emerging protocol stack: MCP, tool use, structured I/O",
+      "Agent inputs: Markdown files, JSON configs, binary data",
+      "Building agents that discover and negotiate with each other",
+      "Security and trust: how agents verify each other",
+      "A working example: two Claude agents collaborating on a task"
+    ]
+  },
+  {
+    "id": "mcp-tool-use-agent-stack",
+    "title_hint": "MCP, Tool Use, and the Emerging Agent Protocol Stack",
+    "description": "Model Context Protocol is becoming the TCP/IP of AI agents. Combined with tool use, it creates a standard way for agents to interact with the world and each other.",
+    "audience": "Developers building AI integrations or multi-agent systems",
+    "tone": "technical deep-dive, practical integration guide",
+    "tags": ["mcp", "ai", "agents", "claude", "protocols"],
+    "outline": [
+      "What MCP actually is (and isn't)",
+      "The protocol stack: transport, schema, execution",
+      "Building an MCP server: exposing your app to AI agents",
+      "Tool use as the universal API for AI",
+      "Chaining agents through MCP: real-world patterns",
+      "The future: agent marketplaces and composable AI"
+    ]
+  },
+  {
+    "id": "ai-agent-autonomous-workflows",
+    "title_hint": "Your Next Hire Is an AI Agent: Building Autonomous Business Workflows",
+    "description": "AI agents can now handle tasks that used to require a full-time employee — scheduling, data entry, report generation, customer follow-ups. Here's how to build them.",
+    "audience": "Technical founders and developers automating business operations",
+    "tone": "practical, ROI-focused, step-by-step",
+    "tags": ["ai", "agents", "automation", "business"],
+    "outline": [
+      "The economics: what an AI agent costs vs a hire",
+      "Identifying automatable workflows in your business",
+      "Architecture: event-driven agents with Claude and cron",
+      "Building a report-generation agent: full walkthrough",
+      "Monitoring and guardrails: keeping autonomous agents safe",
+      "When agents fail: fallback to human, gracefully"
+    ]
+  },
+  {
+    "id": "production-ai-agents-architecture",
+    "title_hint": "Building Production AI Agents with Claude: A Real-World Architecture",
+    "description": "Most AI agent tutorials stop at 'hello world'. This post covers the production concerns: error handling, retries, cost control, observability, and deployment.",
+    "audience": "Developers shipping AI agents to production, not just prototyping",
+    "tone": "battle-tested, practical, architecture-focused",
+    "tags": ["ai", "claude", "architecture", "production"],
+    "outline": [
+      "The gap between demo agents and production agents",
+      "Architecture: event loop, tool dispatch, state management",
+      "Error handling: retries, fallbacks, and circuit breakers",
+      "Cost control: prompt caching, model selection, token budgets",
+      "Observability: logging agent decisions, not just outputs",
+      "Deployment: Docker, health checks, and graceful degradation"
+    ]
+  },
+  {
+    "id": "context-engineering-beats-rag",
+    "title_hint": "RAG Is Not Enough: Why Context Engineering Beats Retrieval",
+    "description": "Retrieval-Augmented Generation gets all the hype, but context engineering — carefully curating what goes into the prompt — often works better and costs less.",
+    "audience": "AI developers building applications with LLMs",
+    "tone": "contrarian, evidence-based, practical alternatives",
+    "tags": ["ai", "rag", "llm", "architecture"],
+    "outline": [
+      "The RAG hype cycle and where it breaks down",
+      "What context engineering actually means",
+      "Techniques: summarization, pruning, priority ordering",
+      "When RAG is the right tool vs when it adds complexity",
+      "Hybrid approaches: structured context + selective retrieval",
+      "Measuring what works: latency, accuracy, cost"
+    ]
+  },
+  {
+    "id": "prompt-caching-cost-savings",
+    "title_hint": "Prompt Caching Saved Me 90% on API Costs — Here's How",
+    "description": "Anthropic's prompt caching gives a 90% discount on cached input tokens. If you structure your prompts right, you can slash your AI bills dramatically.",
+    "audience": "Developers using Claude API who want to reduce costs",
+    "tone": "tutorial, data-driven with real cost comparisons",
+    "tags": ["claude", "ai", "optimization", "costs"],
+    "outline": [
+      "How prompt caching works: the 5-minute TTL window",
+      "Structuring prompts for maximum cache hits",
+      "System prompts as cached context: the 90% discount",
+      "Real numbers: before and after caching",
+      "Cache-aware architecture: batching, warm-up patterns",
+      "Monitoring cache hit rates and optimizing over time"
+    ]
+  },
+  {
+    "id": "ai-generated-content-quality",
+    "title_hint": "AI-Generated Content That Doesn't Suck: Quality Gates and Human Review",
+    "description": "Most AI-generated content is mediocre because nobody built quality control. Here's how to build a pipeline that generates, scores, and filters content automatically.",
+    "audience": "Content creators and developers building AI content pipelines",
+    "tone": "practical, honest about limitations, systems-thinking",
+    "tags": ["ai", "content", "quality", "automation"],
+    "outline": [
+      "Why raw AI output reads like generic SEO spam",
+      "The quality pipeline: generate, score, filter, publish",
+      "Using AI to review AI: automated quality scoring",
+      "Human-in-the-loop: where review matters most",
+      "Feedback loops: improving generation from rejection patterns",
+      "Our pipeline: how this blog generates and reviews posts"
+    ]
+  },
+  {
+    "id": "ai-agents-replace-saas",
+    "title_hint": "Why AI Agents Will Replace SaaS Dashboards",
+    "description": "SaaS products are dashboards you click through. AI agents are assistants you talk to. The UX paradigm shift is already happening — here's what it means for builders.",
+    "audience": "SaaS founders, product managers, and developers",
+    "tone": "thought-provoking, examples from real products, forward-looking",
+    "tags": ["ai", "agents", "saas", "product"],
+    "outline": [
+      "The dashboard problem: too many tabs, too many clicks",
+      "Agents as the new interface: describe what you want, not how",
+      "Products already making the shift",
+      "What this means for SaaS pricing and business models",
+      "Building agent-first products: architecture patterns",
+      "The transition: adding agents to existing SaaS without rebuilding"
+    ]
+  },
+  {
+    "id": "zero-dollar-startup",
+    "title_hint": "The $0 Startup: How AI Eliminates Your First 3 Hires",
+    "description": "In 2026, you can build, design, deploy, and market a product without hiring anyone. AI handles the code, the copy, the support, and the ops. Here's the playbook.",
+    "audience": "Aspiring founders and solo entrepreneurs",
+    "tone": "provocative, practical playbook, honest about limits",
+    "tags": ["ai", "startup", "indie", "business"],
+    "outline": [
+      "The old startup cost structure vs the AI-powered one",
+      "Developer: Claude Code writes your MVP",
+      "Designer: AI generates your UI and brand",
+      "Ops: automated deployment, monitoring, and scaling",
+      "What you still need humans for (and always will)",
+      "The real risk: building fast but building wrong"
+    ]
+  },
+  {
+    "id": "ai-code-review",
+    "title_hint": "AI-Assisted Code Review: Why Your PR Reviews Will Never Be the Same",
+    "description": "AI can catch bugs, suggest improvements, and review PRs faster than any human. But it also misses context that humans see instantly. Here's how to use both effectively.",
+    "audience": "Engineering leads and developers doing code review",
+    "tone": "balanced, practical workflow recommendations",
+    "tags": ["ai", "code-review", "development", "workflow"],
+    "outline": [
+      "What AI catches that humans miss (and vice versa)",
+      "Setting up AI-powered PR review: tools and integration",
+      "The hybrid workflow: AI as first pass, human as final",
+      "Prompt engineering for better code review",
+      "Measuring impact: review time, bug catch rate, developer happiness",
+      "When to trust the AI and when to override"
+    ]
+  },
+  {
+    "id": "open-source-vs-closed-ai",
+    "title_hint": "Open Source AI vs Closed APIs: A Builder's Honest Comparison",
+    "description": "Should you build on Claude/GPT APIs or self-host Llama/Mistral? The answer depends on your constraints. Here's a framework for deciding, not a religious argument.",
+    "audience": "Developers and CTOs choosing their AI stack",
+    "tone": "balanced, framework-oriented, with real cost comparisons",
+    "tags": ["ai", "open-source", "llm", "architecture"],
+    "outline": [
+      "The real trade-offs: cost, quality, control, latency",
+      "When closed APIs win: speed to market, quality ceiling",
+      "When open source wins: privacy, customization, cost at scale",
+      "The hybrid approach: closed for hard tasks, open for simple ones",
+      "Cost modeling: API bills vs GPU infrastructure",
+      "A decision framework you can actually use"
+    ]
+  },
+  {
+    "id": "developer-with-ai-advantage",
+    "title_hint": "AI Won't Take Your Job — But a Developer With AI Will",
+    "description": "The developers who learn to work with AI effectively are 5-10x more productive. Those who don't are falling behind fast. Here's what the productivity gap actually looks like.",
+    "audience": "All developers, especially those skeptical about AI tools",
+    "tone": "direct, motivating, practical getting-started advice",
+    "tags": ["ai", "productivity", "career", "development"],
+    "outline": [
+      "The productivity gap: measured, not hypothetical",
+      "What AI-augmented development actually looks like day-to-day",
+      "The skills that matter more now: architecture, taste, review",
+      "Getting started: from skeptic to productive in one week",
+      "The meta-skill: knowing when to use AI and when not to",
+      "Career implications: what hiring managers are looking for in 2026"
+    ]
   }
 ]
