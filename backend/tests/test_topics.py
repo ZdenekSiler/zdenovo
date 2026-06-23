@@ -1,4 +1,5 @@
 import json
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -28,11 +29,12 @@ SAMPLE_TOPICS = [
 
 @pytest.fixture()
 def topics_file(tmp_path, monkeypatch):
-    """Write sample topics to a temp file and patch main.DAILY_TOPICS_PATH."""
+    """Write sample topics to a temp file and patch DAILY_TOPICS_PATH everywhere."""
     path = tmp_path / "daily_topics.json"
     path.write_text(json.dumps(SAMPLE_TOPICS, indent=2))
-    from routers import topics_api
+    from routers import drafts_api, topics_api
     monkeypatch.setattr(topics_api, "DAILY_TOPICS_PATH", path)
+    monkeypatch.setattr(drafts_api, "DAILY_TOPICS_PATH", path)
     return path
 
 
@@ -199,6 +201,50 @@ def test_delete_nonexistent_topic_is_safe(admin, topics_file):
     assert r.status_code == 303
     topics = json.loads(topics_file.read_text())
     assert len(topics) == 2
+
+
+# ─── Generate from topic ─────────────────────────────────────────────────────
+
+def _make_mock_client():
+    tool_block = MagicMock()
+    tool_block.type = "tool_use"
+    tool_block.input = {
+        "title": "Test Generated Post",
+        "summary": "A test post.",
+        "tags": ["python"],
+        "content": "## Intro\n\nTest content.",
+    }
+    mock_message = MagicMock()
+    mock_message.content = [tool_block]
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = mock_message
+    return mock_client
+
+
+def test_admin_generate_topic_redirects_to_draft(admin, topics_file, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    mock_client = _make_mock_client()
+    with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+        r = admin.post("/admin/topics/test-topic-one/generate", follow_redirects=False)
+    assert r.status_code == 303
+    assert "/admin/drafts/" in r.headers["location"]
+
+
+def test_admin_generate_topic_creates_draft(admin, topics_file, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    mock_client = _make_mock_client()
+    with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+        admin.post("/admin/topics/test-topic-one/generate", follow_redirects=False)
+    drafts = admin.get("/api/drafts").json()
+    assert len(drafts) == 1
+    assert drafts[0]["topic_id"] == "test-topic-one"
+
+
+def test_admin_topics_page_has_generate_button(admin, topics_file):
+    r = admin.get("/admin/topics")
+    assert r.status_code == 200
+    assert b"Generate" in r.content
+    assert b"/admin/topics/test-topic-one/generate" in r.content
 
 
 # ─── Hub shows topics count ──────────────────────────────────────────────────

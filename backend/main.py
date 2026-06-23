@@ -25,7 +25,7 @@ from data.posts import get_all_posts, get_all_tags, get_post_by_slug, get_posts_
 from data.projects import get_all_projects
 from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
 from routers.comments_api import router as comments_router
-from routers.drafts_api import _regenerate_draft, generate_daily_drafts, router as drafts_router
+from routers.drafts_api import _regenerate_draft, generate_daily_drafts, generate_single_topic, router as drafts_router
 from routers.generate_api import router as generate_router
 from routers.posts_api import router as posts_router
 from routers.topics_api import router as topics_router
@@ -578,6 +578,12 @@ async def admin_topic_update(
     topic["outline"] = [line.strip() for line in outline.splitlines() if line.strip()]
     _save_topics(topics)
     return RedirectResponse("/admin/topics", status_code=303)
+
+
+@app.post("/admin/topics/{topic_id}/generate", response_class=HTMLResponse)
+async def admin_topic_generate(request: Request, topic_id: str, _: None = Depends(require_admin)):
+    draft = generate_single_topic(topic_id)
+    return RedirectResponse(f"/admin/drafts/{draft.id}", status_code=303)
 
 
 @app.post("/admin/topics/{topic_id}/delete", response_class=HTMLResponse)

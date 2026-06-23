@@ -119,6 +119,7 @@ to `/api/posts` or, for drafts, it's inserted directly by `drafts_api`).
 | `GET` | `/api/drafts` | List drafts (newest first) |
 | `GET` | `/api/drafts/{id}` | Get a single draft |
 | `POST` | `/api/drafts/generate` | Trigger daily draft generation (also runs on schedule) |
+| `POST` | `/api/drafts/generate/{topic_id}` | Generate a draft from a specific topic |
 | `PATCH` | `/api/drafts/{id}` | Partially update a draft (title, content, tags, etc.) |
 | `POST` | `/api/drafts/{id}/approve` | Publish a draft into `posts` (404/409 on conflict) |
 | `POST` | `/api/drafts/{id}/regenerate` | Regenerate draft content with editorial feedback |

@@ -185,6 +185,22 @@ def trigger_daily_generation():
   return {"generated": count}
 
 
+def generate_single_topic(topic_id: str) -> DraftOut:
+  """Generate a draft from a specific topic by ID. Used by API route and admin UI."""
+  topics = _load_daily_topics()
+  topic = next((t for t in topics if t.id == topic_id), None)
+  if topic is None:
+    raise HTTPException(status_code=404, detail=f"Topic '{topic_id}' not found")
+  post, review = _generate_with_review(_build_brief_message(topic))
+  return _insert_draft(post, topic_id=topic.id, review=review)
+
+
+@router.post("/generate/{topic_id}", status_code=201, response_model=DraftOut)
+def generate_from_topic(topic_id: str):
+  """Generate a draft from a specific topic by ID."""
+  return generate_single_topic(topic_id)
+
+
 @router.patch("/{draft_id}", response_model=DraftOut)
 def patch_draft(draft_id: str, body: DraftPatch):
   """Edit a draft's title, summary, content, or tags before approving."""

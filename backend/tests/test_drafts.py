@@ -45,6 +45,23 @@ def test_manual_trigger_generates_drafts(client, monkeypatch):
   assert resp.json()["generated"] == 1
 
 
+def test_generate_specific_topic(client, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  mock_client = _make_mock_client()
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+    resp = client.post("/api/drafts/generate/solo-developer-ai-era")
+  assert resp.status_code == 201
+  data = resp.json()
+  assert data["topic_id"] == "solo-developer-ai-era"
+  assert data["status"] == "pending"
+
+
+def test_generate_specific_topic_not_found(client, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  resp = client.post("/api/drafts/generate/nonexistent-topic")
+  assert resp.status_code == 404
+
+
 def test_generated_drafts_have_pending_status(client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
   mock_client = _make_mock_client()

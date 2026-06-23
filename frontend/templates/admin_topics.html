@@ -40,6 +40,14 @@
         </td>
         <td class="py-2.5 pr-4 text-zinc-500 hidden sm:table-cell">{{ t.outline | length }} items</td>
         <td class="py-2.5 text-right whitespace-nowrap">
+          <form method="post" action="/admin/topics/{{ t.id }}/generate" class="inline">
+            <button
+              type="submit"
+              onclick="return confirm('Generate a draft from \'{{ t.title_hint }}\'? This uses API credits.')"
+              class="text-xs text-emerald-500 hover:text-emerald-400 transition-colors px-2 py-1">
+              Generate
+            </button>
+          </form>
           <a href="/admin/topics/{{ t.id }}/edit" class="btn-ghost text-xs">Edit</a>
           <form method="post" action="/admin/topics/{{ t.id }}/delete" class="inline">
             <button
