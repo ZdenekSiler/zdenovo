@@ -278,3 +278,11 @@ def test_post_without_sources_hides_section(client):
     r = client.get("/blog/why-i-switched-to-type-hints")
     assert r.status_code == 200
     assert b"Further Reading" not in r.content
+
+
+# ── Public pages have no inline validation data ─────────────────────────────
+
+def test_public_post_has_no_validation_data(client):
+    r = client.get("/blog/htmx-is-enough")
+    assert r.status_code == 200
+    assert b"__codeValidation" not in r.content

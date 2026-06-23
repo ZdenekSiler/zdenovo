@@ -226,11 +226,22 @@ def test_validate_draft_finds_code_blocks(client, monkeypatch):
   assert data["valid"] == 2
 
 
-def test_validate_draft_html_route(admin_client, monkeypatch):
+def test_draft_preview_includes_inline_validation(admin_client, monkeypatch):
   draft_id = _insert_draft(admin_client, monkeypatch)
-  resp = admin_client.post(f"/admin/drafts/{draft_id}/validate")
+  resp = admin_client.get(f"/admin/drafts/{draft_id}")
+  assert resp.status_code == 200
+  assert b"__codeValidation" in resp.content
+
+
+def test_draft_preview_shows_validation_summary(admin_client, monkeypatch):
+  draft_id = _insert_draft(admin_client, monkeypatch)
+  admin_client.patch(f"/api/drafts/{draft_id}", json={
+    "content": "# Post\n\n```python\nx = 1\n```\n\nSome text."
+  })
+  resp = admin_client.get(f"/admin/drafts/{draft_id}")
   assert resp.status_code == 200
   assert b"Code Validation" in resp.content
+  assert b"1 block" in resp.content
 
 
 # ─── Sources ─────────────────────────────────────────────────────────────────

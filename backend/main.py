@@ -340,7 +340,13 @@ async def admin_draft_preview(request: Request, draft_id: str, _: None = Depends
     if row is None:
         return templates.TemplateResponse(request, "404.html", status_code=404)
     draft = draft_row_to_dict(row)
-    return templates.TemplateResponse(request, "draft_preview.html", {"draft": draft})
+    summary = validate_content(draft["content"])
+    validation_json = json.dumps([r.model_dump() for r in summary.results])
+    return templates.TemplateResponse(request, "draft_preview.html", {
+        "draft": draft,
+        "validation": summary,
+        "validation_json": validation_json,
+    })
 
 
 @app.get("/admin/comments", response_class=HTMLResponse)
@@ -381,24 +387,6 @@ async def admin_draft_regenerate(
 ):
     _regenerate_draft(draft_id, remarks)
     return RedirectResponse(f"/admin/drafts/{draft_id}", status_code=303)
-
-
-@app.post("/admin/drafts/{draft_id}/validate", response_class=HTMLResponse)
-async def admin_draft_validate(
-    request: Request,
-    draft_id: str,
-    _: None = Depends(require_admin),
-):
-    with get_conn() as conn:
-        row = conn.execute("SELECT content FROM drafts WHERE id = ?", (draft_id,)).fetchone()
-    if row is None:
-        return HTMLResponse("<p class='text-xs text-red-400'>Draft not found.</p>", status_code=404)
-    summary = validate_content(row["content"])
-    return templates.TemplateResponse(
-        request,
-        "_code_validation_results.html",
-        {"summary": summary},
-    )
 
 
 @app.get("/admin/stats", response_class=HTMLResponse)

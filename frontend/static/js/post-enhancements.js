@@ -50,7 +50,8 @@
   // ─── Copy button on code blocks ───
   function wrapCodeBlocks(prose) {
     var pres = prose.querySelectorAll("pre");
-    pres.forEach(function (pre) {
+    var validationData = window.__codeValidation;
+    pres.forEach(function (pre, i) {
       if (pre.parentElement.classList.contains("code-block-wrapper")) return;
       var wrapper = document.createElement("div");
       wrapper.className = "code-block-wrapper";
@@ -73,6 +74,26 @@
         });
       });
       wrapper.appendChild(btn);
+
+      if (validationData && validationData[i]) {
+        var v = validationData[i];
+        var icons = {valid: "✓", error: "✗", warning: "⚠", skipped: "—"};
+        var badge = document.createElement("span");
+        badge.className = "code-badge code-badge--" + v.status;
+        badge.title = (v.language || "unknown") + ": " + v.message;
+        badge.textContent = icons[v.status] || icons.skipped;
+        wrapper.appendChild(badge);
+
+        var lines = (pre.querySelector("code") || pre).textContent.split("\n").length;
+        var toggle = document.createElement("button");
+        toggle.className = "code-toggle";
+        toggle.textContent = "Hide";
+        toggle.addEventListener("click", function () {
+          var collapsed = pre.classList.toggle("code-collapsed");
+          toggle.textContent = collapsed ? "Show (" + lines + " lines)" : "Hide";
+        });
+        wrapper.appendChild(toggle);
+      }
     });
   }
 
