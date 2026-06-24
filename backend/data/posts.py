@@ -53,6 +53,14 @@ def total_pages(total: int) -> int:
     return max(1, math.ceil(total / PAGE_SIZE))
 
 
+def get_popular_posts(limit: int = 5) -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM posts ORDER BY views DESC, date DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [row_to_dict(r) for r in rows]
+
+
 def get_related_posts(slug: str, tags: list[str], limit: int = 3) -> list[dict]:
     all_posts = get_all_posts()
     scored = []

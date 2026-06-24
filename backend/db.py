@@ -65,6 +65,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE drafts ADD COLUMN sources TEXT NOT NULL DEFAULT '[]'")
         if "sources" not in cols:
             conn.execute("ALTER TABLE posts ADD COLUMN sources TEXT NOT NULL DEFAULT '[]'")
+        if "views" not in cols:
+            conn.execute("ALTER TABLE posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS comments (
                 id         TEXT PRIMARY KEY,

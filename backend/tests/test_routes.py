@@ -67,9 +67,10 @@ def test_blog_tag_filter_returns_200(client):
 
 def test_blog_tag_filter_hides_other_posts(client):
     r = client.get("/blog?tag=python")
-    # python-tagged post present, frontend-tagged post absent
-    assert b"Type Hints" in r.content
-    assert b"HTMX Is Enough" not in r.content
+    html = r.content.decode()
+    posts_section = html.split('id="posts-list"')[1].split("</main>")[0]
+    assert "Type Hints" in posts_section
+    assert "HTMX Is Enough" not in posts_section
 
 
 def test_blog_tag_buttons_have_htmx_attrs(client):
@@ -129,6 +130,27 @@ def test_blog_pagination_second_page_has_prev_link(client, monkeypatch):
     monkeypatch.setattr(data.posts, "PAGE_SIZE", 2)
     r = client.get("/blog?page=2")
     assert b"page=1" in r.content
+
+
+# ── Blog sidebar ─────────────────────────────────────────────────────────────
+
+def test_blog_sidebar_shows_most_popular(client):
+    r = client.get("/blog")
+    assert b"Most Popular" in r.content
+
+
+def test_blog_sidebar_has_popular_post_links(client):
+    r = client.get("/blog")
+    html = r.content.decode()
+    sidebar = html.split("Most Popular")[1].split("</aside>")[0]
+    assert "/blog/" in sidebar
+
+
+def test_home_sidebar_shows_profile_card(client):
+    r = client.get("/")
+    assert b"Zdenovo" in r.content
+    assert b"Software Engineer" in r.content
+    assert b"Most Popular" not in r.content
 
 
 # ── About ─────────────────────────────────────────────────────────────────────

@@ -21,7 +21,8 @@ load_dotenv()  # no-op if .env absent; prod uses file secrets
 
 from code_validator import validate_content
 from config import read_secret
-from data.posts import get_all_posts, get_all_tags, get_post_by_slug, get_posts_page, get_related_posts, total_pages
+from data.analytics import refresh_popular_posts
+from data.posts import get_all_posts, get_all_tags, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
 from routers.comments_api import router as comments_router
@@ -36,8 +37,10 @@ BASE_DIR = Path(__file__).parent.parent  # zdenovo/
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    refresh_popular_posts()
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(generate_daily_drafts, "cron", hour=2, minute=0)
+    scheduler.add_job(refresh_popular_posts, "cron", hour="6,14,22", minute=0)
     scheduler.start()
     yield
     scheduler.shutdown()
@@ -170,6 +173,7 @@ async def blog(request: Request, tag: str | None = None, page: int = 1):
             "current_tag": tag,
             "page": page,
             "total_pages": n_pages,
+            "popular_posts": get_popular_posts(),
         }
     )
 

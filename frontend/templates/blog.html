@@ -42,6 +42,44 @@
 </div>
 {% endblock %}
 
+{% block sidebar %}
+<div class="border border-zinc-800/60 rounded-xl bg-zinc-900/40 p-4">
+  <h3 class="text-xs font-semibold tracking-widest uppercase text-zinc-500 mb-4">Most Popular</h3>
+  {% if popular_posts %}
+  <div class="space-y-3">
+    {% for p in popular_posts %}
+    <a href="/blog/{{ p.slug }}"
+       hx-get="/blog/{{ p.slug }}"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-push-url="true"
+       hx-swap="innerHTML"
+       hx-indicator="#htmx-indicator"
+       class="flex gap-3 items-start group">
+      {% if p.image %}
+      <img src="{{ p.image }}" alt="" class="w-12 h-12 rounded-lg object-cover shrink-0 border border-zinc-800/60" loading="lazy">
+      {% else %}
+      <div class="w-12 h-12 rounded-lg bg-zinc-800/60 shrink-0 border border-zinc-800/60"></div>
+      {% endif %}
+      <div class="min-w-0 flex-1">
+        <p class="text-xs font-medium text-zinc-300 group-hover:text-indigo-400 transition-colors leading-snug line-clamp-2">{{ p.title }}</p>
+        <div class="flex items-center gap-2 mt-1">
+          <time class="text-[10px] text-zinc-600">{{ p.date | dateformat }}</time>
+          {% if p.views > 0 %}
+          <span class="text-[10px] text-zinc-600">{{ p.views }} views</span>
+          {% endif %}
+        </div>
+      </div>
+    </a>
+    {% if not loop.last %}<hr class="border-zinc-800/40">{% endif %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-xs text-zinc-600">No posts yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="mb-10">
   <p class="section-heading">Writing</p>
