@@ -13,6 +13,15 @@ def test_db(tmp_path, monkeypatch):
     yield tmp_path / "test.db"
 
 
+@pytest.fixture(autouse=True)
+def _reset_blog_generator():
+    """Reset the BlogGenerator singleton between tests so mocked clients don't leak."""
+    from routers.generate_api import blog_generator
+    blog_generator._client = None
+    yield
+    blog_generator._client = None
+
+
 @pytest.fixture()
 def client(test_db, monkeypatch):
     """TestClient wired to a fresh in-memory DB."""

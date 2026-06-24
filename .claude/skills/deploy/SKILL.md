@@ -23,7 +23,7 @@ Deploy the current state to https://zdenovo.com on the Hetzner VPS.
    - Commit with a message. If `$ARGUMENTS` is provided, use it as the commit message. Otherwise, draft one from the diff.
 
 
-3. **Push to main.** Run `git push origin main`. The pre-push hook will automatically run 126+ unit tests and 37 Playwright frontend tests. If tests fail, fix the issue and retry — do NOT use `--no-verify`.
+3. **Push to main.** Run `git push origin main`. The pre-push hook will automatically run the full test suite (unit tests + Playwright frontend tests). If tests fail, fix the issue and retry — do NOT use `--no-verify`.
 
 4. **Deploy to server.** SSH in and pull + rebuild:
    ```bash

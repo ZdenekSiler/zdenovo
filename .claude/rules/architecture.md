@@ -7,10 +7,11 @@ Where code goes and how modules depend on each other. For the descriptive refere
 
 | Code | Goes in |
 |------|---------|
-| HTML page route | `main.py` (or a new router included from `main.py` if the page grows a family of routes) |
+| HTML page route | `main.py` — also hosts auth logic and all admin HTML pages (topics, stats, drafts, comments). If a new admin section grows large, extract to a router. |
 | DB schema, connection, seed/migration logic | `db.py` — no business logic here |
 | Read-only query helper for an HTML page | `data/<name>.py` |
 | Static/config data (topics, briefs) | `data/<name>.json`, loaded by the module that uses it |
+| AI prompt templates | `data/prompts/*.md` (system prompts) and `data/prompts/*.json` (tool schemas) — never inline prompt text in Python |
 | New REST resource | New `routers/<name>_api.py` with its own `APIRouter`, mounted in `main.py` via `app.include_router(...)` |
 | Jinja2 template | `frontend/templates/` |
 | CSS / JS | `frontend/static/css/`, `frontend/static/js/` |

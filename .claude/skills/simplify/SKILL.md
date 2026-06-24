@@ -20,11 +20,17 @@ Review the code changes made in this session and improve their quality.
    - Are comments explaining what the code does rather than why?
    - Is the naming clear and consistent with `.claude/rules/code-style.md`?
 
-3. **Fix issues found** — make targeted edits. Do not refactor code that wasn't changed.
+3. **Project-specific checks** (in addition to the general checks above):
+   - Did new admin routes get added to `main.py`? If a group of related routes is growing, suggest extracting to a router.
+   - Are there multiple `get_conn()` calls in the same route handler? Use a single connection per logical operation.
+   - Was AI prompt text inlined in Python code? It belongs in `data/prompts/` files instead.
+   - Does new code create a fresh `anthropic.Anthropic()` client? It should use the `BlogGenerator` class in `generate_api.py`.
 
-4. **Verify** — check for broken references, then run `cd backend && uv run pytest` and confirm it stays green (per `.claude/rules/testing.md`).
+4. **Fix issues found** — make targeted edits. Do not refactor code that wasn't changed.
 
-5. **Summarize** what was simplified and why.
+5. **Verify** — check for broken references, then run `cd backend && uv run pytest` and confirm it stays green (per `.claude/rules/testing.md`).
+
+6. **Summarize** what was simplified and why.
 
 ## Rules
 

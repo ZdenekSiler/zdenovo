@@ -8,6 +8,12 @@ This is a Claude Code project template demonstrating best practices for AI-assis
 
 See @docs/architecture.md for module layout and key decisions.
 
+**Data model:** SQLite with tables `posts` (slug PK), `drafts` (UUID PK), `comments` (UUID PK).
+Tags stored as JSON arrays. Schema and migrations in `backend/db.py` → `init_db()`.
+
+**AI prompts:** Generation rules live in `backend/data/prompts/` (Markdown + JSON tool schemas),
+not in Python code. Edit the template files to change generation behavior.
+
 ## Workflows
 
 See @docs/workflows.md for the design-then-implement workflow.

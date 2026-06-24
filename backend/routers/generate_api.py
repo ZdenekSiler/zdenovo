@@ -1,33 +1,24 @@
 import json
 import logging
-import os
 import uuid
 from datetime import date as Date, datetime, timezone
 from pathlib import Path
-from urllib.parse import quote_plus
 
 import anthropic
 import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-log = logging.getLogger(__name__)
-
 from config import read_secret
 from db import get_conn
 from routers.posts_api import PostOut, Source, _slugify
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/posts", tags=["generate"])
 
 BRIEFS_PATH = Path(__file__).parent.parent / "data" / "post_briefs.json"
 PROMPTS_DIR = Path(__file__).parent.parent / "data" / "prompts"
-
-SYSTEM_PROMPT = (PROMPTS_DIR / "blog_system.md").read_text(encoding="utf-8")
-POST_TOOL = json.loads((PROMPTS_DIR / "blog_tool.json").read_text(encoding="utf-8"))
-REVIEW_SYSTEM_PROMPT = (PROMPTS_DIR / "blog_review.md").read_text(encoding="utf-8")
-REVIEW_TOOL = json.loads((PROMPTS_DIR / "review_tool.json").read_text(encoding="utf-8"))
-SOURCES_TOOL = json.loads((PROMPTS_DIR / "sources_tool.json").read_text(encoding="utf-8"))
-SOURCES_SYSTEM_PROMPT = (PROMPTS_DIR / "sources_system.md").read_text(encoding="utf-8")
 
 MAX_GENERATION_ATTEMPTS = 3
 
@@ -76,6 +67,194 @@ class DraftOut(BaseModel):
   sources: list[Source] = Field(default_factory=list)
 
 
+# ─── Blog generation client ─────────────────────────────────────────────────
+
+
+class BlogGenerator:
+  """Encapsulates all Claude API interactions for blog post generation, review, and source finding.
+
+  Reuses a single Anthropic client for connection pooling. Loads prompt templates
+  once and marks them with cache_control for Anthropic's prompt caching (90% input
+  token discount on cache hits within the 5-minute TTL).
+  """
+
+  def __init__(self) -> None:
+    self._client: anthropic.Anthropic | None = None
+    self._prompts_loaded = False
+    self._system_prompt = ""
+    self._post_tool: dict = {}
+    self._review_system_prompt = ""
+    self._review_tool: dict = {}
+    self._sources_system_prompt = ""
+    self._sources_tool: dict = {}
+
+  def _ensure_prompts(self) -> None:
+    if self._prompts_loaded:
+      return
+    self._system_prompt = (PROMPTS_DIR / "blog_system.md").read_text(encoding="utf-8")
+    self._post_tool = json.loads((PROMPTS_DIR / "blog_tool.json").read_text(encoding="utf-8"))
+    self._review_system_prompt = (PROMPTS_DIR / "blog_review.md").read_text(encoding="utf-8")
+    self._review_tool = json.loads((PROMPTS_DIR / "review_tool.json").read_text(encoding="utf-8"))
+    self._sources_system_prompt = (PROMPTS_DIR / "sources_system.md").read_text(encoding="utf-8")
+    self._sources_tool = json.loads((PROMPTS_DIR / "sources_tool.json").read_text(encoding="utf-8"))
+    self._prompts_loaded = True
+
+  def _get_client(self) -> anthropic.Anthropic:
+    if self._client is None:
+      api_key = read_secret("anthropic_api_key", "ANTHROPIC_API_KEY")
+      if not api_key:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
+      self._client = anthropic.Anthropic(api_key=api_key)
+    return self._client
+
+  @staticmethod
+  def _log_usage(label: str, message: anthropic.types.Message) -> None:
+    usage = message.usage
+    cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
+    cache_create = getattr(usage, "cache_creation_input_tokens", 0) or 0
+    log.info(
+      "%s: %d input, %d output, %d cache_read, %d cache_create tokens",
+      label, usage.input_tokens, usage.output_tokens, cache_read, cache_create,
+    )
+
+  def generate_post(self, user_message: str) -> PostOut:
+    self._ensure_prompts()
+    try:
+      message = self._get_client().messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=8192,
+        system=[
+          {"type": "text", "text": self._system_prompt, "cache_control": {"type": "ephemeral"}},
+        ],
+        tools=[{**self._post_tool, "cache_control": {"type": "ephemeral"}}],
+        tool_choice={"type": "tool", "name": "write_post"},
+        messages=[{"role": "user", "content": user_message}],
+      )
+    except anthropic.APIError as exc:
+      raise HTTPException(status_code=502, detail=f"Claude API error: {exc}") from exc
+
+    self._log_usage("generate", message)
+
+    tool_block = next((b for b in message.content if b.type == "tool_use"), None)
+    if tool_block is None:
+      raise HTTPException(status_code=422, detail="Claude did not call write_post tool")
+    data = tool_block.input
+    missing = [f for f in ("title", "summary", "tags", "content") if f not in data]
+    if missing:
+      raise HTTPException(status_code=422, detail=f"Claude omitted fields (max_tokens hit?): {missing}")
+
+    content = data["content"]
+    slug = _slugify(data["title"])
+    tags = data.get("tags", [])
+    image_query = data.get("image_query", "")
+    return PostOut(
+      slug=slug,
+      title=data["title"],
+      summary=data["summary"],
+      tags=tags,
+      content=content,
+      date=Date.today(),
+      image=_get_hero_image(image_query, data["title"], tags, slug),
+      reading_time=max(1, len(content.split()) // 200),
+    )
+
+  def review_post(self, post: PostOut) -> ReviewResult:
+    self._ensure_prompts()
+    review_prompt = (
+      f"Review this blog post for AI slop.\n\n"
+      f"Title: {post.title}\n"
+      f"Summary: {post.summary}\n\n"
+      f"Content:\n{post.content}"
+    )
+    try:
+      message = self._get_client().messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=2048,
+        system=[
+          {"type": "text", "text": self._review_system_prompt, "cache_control": {"type": "ephemeral"}},
+        ],
+        tools=[{**self._review_tool, "cache_control": {"type": "ephemeral"}}],
+        tool_choice={"type": "tool", "name": "review_post"},
+        messages=[{"role": "user", "content": review_prompt}],
+      )
+    except anthropic.APIError:
+      return ReviewResult(score=0, verdict="fail", issues=["Review API call failed"], strengths=[])
+
+    self._log_usage("review", message)
+
+    tool_block = next((b for b in message.content if b.type == "tool_use"), None)
+    if tool_block is None:
+      return ReviewResult(score=0, verdict="fail", issues=["Reviewer did not return structured output"], strengths=[])
+    data = tool_block.input
+    score = data.get("score", 0)
+    return ReviewResult(
+      score=score,
+      verdict="pass" if score >= 6 else "fail",
+      issues=data.get("issues", []),
+      strengths=data.get("strengths", []),
+    )
+
+  def find_sources(self, post: PostOut) -> list[Source]:
+    self._ensure_prompts()
+    prompt = (
+      f"Find sources for this blog post:\n\n"
+      f"Title: {post.title}\n"
+      f"Tags: {', '.join(post.tags)}\n"
+      f"Summary: {post.summary}"
+    )
+    try:
+      message = self._get_client().messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=2048,
+        system=[
+          {"type": "text", "text": self._sources_system_prompt, "cache_control": {"type": "ephemeral"}},
+        ],
+        tools=[
+          {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
+          {**self._sources_tool, "cache_control": {"type": "ephemeral"}},
+        ],
+        tool_choice={"type": "any"},
+        messages=[{"role": "user", "content": prompt}],
+      )
+    except anthropic.APIError as exc:
+      log.warning("Source search failed: %s", exc)
+      return []
+
+    self._log_usage("sources", message)
+
+    tool_block = next((b for b in message.content if b.type == "tool_use" and b.name == "suggest_sources"), None)
+    if tool_block is None:
+      return []
+    raw_sources = tool_block.input.get("sources", [])
+    return [Source(title=s["title"], url=s["url"], summary=s["summary"]) for s in raw_sources if s.get("url")]
+
+  def generate_with_review(self, user_message: str) -> tuple[PostOut, ReviewResult]:
+    """Generate a post and review it. Retry up to MAX_GENERATION_ATTEMPTS, feeding review feedback into retries."""
+    best_post = None
+    best_review = None
+    prompt = user_message
+    for attempt in range(MAX_GENERATION_ATTEMPTS):
+      post = self.generate_post(prompt)
+      review = self.review_post(post)
+      if best_review is None or review.score > best_review.score:
+        best_post = post
+        best_review = review
+      if review.verdict == "pass":
+        break
+      if attempt < MAX_GENERATION_ATTEMPTS - 1:
+        prompt = (
+          f"{user_message}\n\n"
+          f"--- Previous attempt was rejected (score {review.score}/10) ---\n"
+          f"Issues found: {'; '.join(review.issues)}\n"
+          f"Fix these specific issues in your next attempt."
+        )
+    best_post.sources = self.find_sources(best_post)
+    return best_post, best_review
+
+
+blog_generator = BlogGenerator()
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _load_briefs() -> list[PostBrief]:
@@ -99,7 +278,6 @@ def _build_brief_message(brief: PostBrief) -> str:
 
 
 def _fetch_unsplash_image(query: str) -> str | None:
-  """Search Unsplash for a topic-relevant hero image. Returns URL or None."""
   access_key = read_secret("unsplash_access_key", "UNSPLASH_ACCESS_KEY")
   if not access_key:
     return None
@@ -128,7 +306,6 @@ def _fetch_unsplash_image(query: str) -> str | None:
 
 
 def _get_hero_image(image_query: str, title: str, tags: list[str], slug: str) -> str:
-  """Try Unsplash with image_query, then tags, then title. Fall back to picsum."""
   for query in [image_query, " ".join(tags[:3]), title]:
     if not query:
       continue
@@ -138,134 +315,23 @@ def _get_hero_image(image_query: str, title: str, tags: list[str], slug: str) ->
   return f"https://picsum.photos/seed/{slug}/800/400"
 
 
+def _generate_with_review(user_message: str) -> tuple[PostOut, ReviewResult]:
+  return blog_generator.generate_with_review(user_message)
+
+
 def _call_claude(user_message: str) -> PostOut:
-  api_key = read_secret("anthropic_api_key", "ANTHROPIC_API_KEY")
-  if not api_key:
-    raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
-  try:
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-      model="claude-sonnet-4-6",
-      max_tokens=8192,
-      system=SYSTEM_PROMPT,
-      tools=[POST_TOOL],
-      tool_choice={"type": "tool", "name": "write_post"},
-      messages=[{"role": "user", "content": user_message}],
-    )
-  except anthropic.APIError as exc:
-    raise HTTPException(status_code=502, detail=f"Claude API error: {exc}") from exc
-
-  tool_block = next((b for b in message.content if b.type == "tool_use"), None)
-  if tool_block is None:
-    raise HTTPException(status_code=422, detail="Claude did not call write_post tool")
-  data = tool_block.input
-  missing = [f for f in ("title", "summary", "tags", "content") if f not in data]
-  if missing:
-    raise HTTPException(status_code=422, detail=f"Claude omitted fields (max_tokens hit?): {missing}")
-
-  content = data["content"]
-  slug = _slugify(data["title"])
-  tags = data.get("tags", [])
-  image_query = data.get("image_query", "")
-  return PostOut(
-    slug=slug,
-    title=data["title"],
-    summary=data["summary"],
-    tags=tags,
-    content=content,
-    date=Date.today(),
-    image=_get_hero_image(image_query, data["title"], tags, slug),
-    reading_time=max(1, len(content.split()) // 200),
-  )
+  return blog_generator.generate_post(user_message)
 
 
 def _review_post(post: PostOut) -> ReviewResult:
-  api_key = read_secret("anthropic_api_key", "ANTHROPIC_API_KEY")
-  if not api_key:
-    return ReviewResult(score=0, verdict="fail", issues=["No API key — review skipped"], strengths=[])
-  review_prompt = (
-    f"Review this blog post for AI slop.\n\n"
-    f"Title: {post.title}\n"
-    f"Summary: {post.summary}\n\n"
-    f"Content:\n{post.content}"
-  )
-  try:
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-      model="claude-haiku-4-5-20251001",
-      max_tokens=2048,
-      system=REVIEW_SYSTEM_PROMPT,
-      tools=[REVIEW_TOOL],
-      tool_choice={"type": "tool", "name": "review_post"},
-      messages=[{"role": "user", "content": review_prompt}],
-    )
-  except anthropic.APIError:
-    return ReviewResult(score=0, verdict="fail", issues=["Review API call failed"], strengths=[])
-
-  tool_block = next((b for b in message.content if b.type == "tool_use"), None)
-  if tool_block is None:
-    return ReviewResult(score=0, verdict="fail", issues=["Reviewer did not return structured output"], strengths=[])
-  data = tool_block.input
-  return ReviewResult(
-    score=data.get("score", 0),
-    verdict=data.get("verdict", "fail"),
-    issues=data.get("issues", []),
-    strengths=data.get("strengths", []),
-  )
+  return blog_generator.review_post(post)
 
 
 def _find_sources(post: PostOut) -> list[Source]:
-  api_key = read_secret("anthropic_api_key", "ANTHROPIC_API_KEY")
-  if not api_key:
-    return []
-  prompt = (
-    f"Find sources for this blog post:\n\n"
-    f"Title: {post.title}\n"
-    f"Tags: {', '.join(post.tags)}\n"
-    f"Summary: {post.summary}"
-  )
-  try:
-    client = anthropic.Anthropic(api_key=api_key)
-    message = client.messages.create(
-      model="claude-haiku-4-5-20251001",
-      max_tokens=2048,
-      system=SOURCES_SYSTEM_PROMPT,
-      tools=[
-        {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
-        SOURCES_TOOL,
-      ],
-      tool_choice={"type": "any"},
-      messages=[{"role": "user", "content": prompt}],
-    )
-  except anthropic.APIError as exc:
-    log.warning("Source search failed: %s", exc)
-    return []
-
-  tool_block = next((b for b in message.content if b.type == "tool_use" and b.name == "suggest_sources"), None)
-  if tool_block is None:
-    return []
-  raw_sources = tool_block.input.get("sources", [])
-  return [Source(title=s["title"], url=s["url"], summary=s["summary"]) for s in raw_sources if s.get("url")]
-
-
-def _generate_with_review(user_message: str) -> tuple[PostOut, ReviewResult]:
-  """Generate a post and review it. Retry up to MAX_GENERATION_ATTEMPTS if it fails review."""
-  best_post = None
-  best_review = None
-  for attempt in range(MAX_GENERATION_ATTEMPTS):
-    post = _call_claude(user_message)
-    review = _review_post(post)
-    if best_review is None or review.score > best_review.score:
-      best_post = post
-      best_review = review
-    if review.verdict == "pass":
-      break
-  best_post.sources = _find_sources(best_post)
-  return best_post, best_review
+  return blog_generator.find_sources(post)
 
 
 def _insert_draft(post: PostOut, topic_id: str, review: ReviewResult | None = None) -> DraftOut:
-  """Save a generated post to the drafts table and return the draft."""
   now = datetime.now(timezone.utc)
   draft_id = str(uuid.uuid4())
   q_score = review.score if review else None
@@ -323,7 +389,7 @@ def list_briefs():
 
 
 @router.post("/generate", response_model=DraftOut, status_code=201)
-def generate_post(body: GenerateIn):
+def generate_post_route(body: GenerateIn):
   user_message = f"Description: {body.description}"
   if body.tags:
     user_message += f"\nSuggested tags: {', '.join(body.tags)}"

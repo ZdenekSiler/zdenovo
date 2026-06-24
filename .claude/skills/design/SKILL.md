@@ -23,6 +23,7 @@ You are the design agent. Your job is to produce a detailed feature spec **befor
 
 4. **Write the spec** to `docs/specs/$ARGUMENTS.md` with these sections:
    - **Overview** — what the feature does and why
+   - **Current State** (if modifying existing flows) — what exists now, how it behaves
    - **Files to Modify** — list with brief reason for each
    - **Files to Create** — list with brief reason for each
    - **Implementation Plan** — step-by-step breakdown
@@ -35,5 +36,6 @@ You are the design agent. Your job is to produce a detailed feature spec **befor
 
 - Do NOT write any code — only write the spec file
 - Do NOT make assumptions about missing context — use Explore agents to find it
+- Keep the spec under 150 lines. If longer, split into phases.
 - Keep the spec concise but complete enough to implement without further research
 - Create `docs/specs/` directory if it doesn't exist

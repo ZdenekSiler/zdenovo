@@ -6,24 +6,19 @@
     "properties": {
       "score": {
         "type": "integer",
-        "description": "Quality score 1-10. 1-4 = reject (AI slop), 5-6 = borderline, 7-10 = publishable."
-      },
-      "verdict": {
-        "type": "string",
-        "enum": ["pass", "fail"],
-        "description": "'pass' if score >= 6, 'fail' otherwise."
+        "description": "Quality score 1-10. 1-4 = reject (AI slop), 5-6 = borderline, 7-10 = publishable. The system derives pass/fail from this score (>= 6 passes)."
       },
       "issues": {
         "type": "array",
         "items": {"type": "string"},
-        "description": "Specific issues found: clichés, filler sentences, generic advice, missing concrete examples, AI-isms like 'delve/landscape/crucial/it's important to note', corporate tone, etc."
+        "description": "Specific issues found: clichés, filler sentences, generic advice, missing concrete examples, AI-isms, corporate tone, structural violations (missing diagram, missing table, missing callouts, word count out of range), code quality problems."
       },
       "strengths": {
         "type": "array",
         "items": {"type": "string"},
-        "description": "What the post does well — specific voice, concrete examples, genuine opinions, etc."
+        "description": "What the post does well — specific voice, concrete examples, genuine opinions, good structure, etc."
       }
     },
-    "required": ["score", "verdict", "issues", "strengths"]
+    "required": ["score", "issues", "strengths"]
   }
 }

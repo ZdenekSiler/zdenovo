@@ -5,6 +5,7 @@
 - **pytest** — test runner (`uv run pytest`)
 - **httpx + TestClient** — FastAPI route tests
 - **pytest-cov** — coverage (`uv run pytest --cov`)
+- **pytest-playwright** — browser tests (`test_frontend.py`, `test_e2e.py`). Requires the dev server running on `localhost:8080` — these are NOT unit tests and are skipped when the server is down.
 - Tests live in `backend/tests/`, named `test_<module>.py`
 
 ## Test Layout
@@ -20,7 +21,8 @@ backend/tests/
 ├── test_comments.py     # /api/comments endpoints + admin page
 ├── test_drafts.py       # /api/drafts lifecycle + admin pages
 ├── test_topics.py       # /api/topics + admin topics CRUD
-└── test_frontend.py     # Playwright browser tests
+├── test_frontend.py     # Playwright browser tests (needs dev server)
+└── test_e2e.py          # End-to-end Playwright tests (needs dev server)
 ```
 
 Each test file mirrors the module it covers. Add a new `test_<module>.py` here when

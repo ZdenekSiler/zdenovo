@@ -24,6 +24,8 @@ You are the implementation coordinator. Your job is to implement a feature that 
 5. **Launch parallel general-purpose subagents** for independent tasks:
    - Each agent gets: the spec content, the specific task it owns, and instructions to write code and tests
    - Agents must NOT overlap on the same files
+   - Reserve shared entry points (`main.py`, `db.py`, `conftest.py`) for the coordinator to edit last — do not assign these to subagents
+   - Each subagent should run `uv run pytest tests/test_<its_module>.py` before reporting completion
    - Typically: 2-4 agents depending on scope
 
 6. **Wait for all agents** to complete.

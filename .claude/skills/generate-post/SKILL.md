@@ -67,6 +67,17 @@ The generation rules live in `backend/data/prompts/`, NOT in Python code:
 
 To change generation rules (e.g., allow 2 diagrams, change word count, adjust tone), edit the relevant prompt file. Changes take effect on the next container rebuild.
 
+## Improving quality
+
+- If a topic consistently produces low-quality drafts, edit the topic's `description` or
+  `outline` in `daily_topics.json` to give Claude more specific constraints.
+- The pipeline automatically feeds review feedback into retry attempts — if the first draft
+  fails review, the issues are included in the retry prompt so Claude can fix them.
+- System prompts and tool schemas are marked with `cache_control: ephemeral` for Anthropic's
+  prompt caching (90% input token discount on cache hits within the 5-minute TTL). Batch
+  generation benefits from this automatically. Avoid putting variable content at the start
+  of messages — keep it at the end so the cached prefix stays stable.
+
 ## Do NOT
 
 - Modify `generate_api.py` to change prompt content — edit the template files instead
