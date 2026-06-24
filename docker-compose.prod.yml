@@ -1,6 +1,9 @@
 services:
   web:
-    build: .
+    build:
+      context: .
+      args:
+        BUILD_COMMIT: ${BUILD_COMMIT:-unknown}
     restart: unless-stopped
     volumes:
       - db_data:/data

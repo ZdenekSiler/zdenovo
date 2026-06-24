@@ -17,6 +17,9 @@ COPY frontend/ ./frontend/
 
 WORKDIR /app/backend
 
+ARG BUILD_COMMIT=unknown
+RUN echo "$BUILD_COMMIT" > /app/BUILD_COMMIT
+
 # Store SQLite DB on a mounted volume for persistence across restarts
 ENV DB_DIR=/data
 

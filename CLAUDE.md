@@ -75,6 +75,7 @@ See `docs/deployment.md` for full deployment guide.
 | `/design <feature>` | Before writing any code — produces a spec in `docs/specs/` |
 | `/implement <feature>` | After `/design` — implements the spec using parallel subagents |
 | `/simplify` | After implementing — reviews code quality and removes redundancy |
+| `/recap deploy` or `/recap debug` | End of a deploy or debug session — prints structured summary of commands and outcomes |
 
 ## Key Principles
 

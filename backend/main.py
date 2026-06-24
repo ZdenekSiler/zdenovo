@@ -80,6 +80,10 @@ def _fmt_date(d) -> str:
 templates.env.filters["dateformat"] = _fmt_date
 templates.env.filters["markdown"] = mistune.html
 
+_commit_file = Path("/app/BUILD_COMMIT")
+templates.env.globals["build_commit"] = _commit_file.read_text().strip() if _commit_file.exists() else "dev"
+templates.env.globals["deploy_time"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 

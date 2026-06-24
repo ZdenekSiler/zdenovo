@@ -25,9 +25,9 @@ Deploy the current state to https://zdenovo.com on the Hetzner VPS.
 
 3. **Push to main.** Run `git push origin main`. The pre-push hook will automatically run the full test suite (unit tests + Playwright frontend tests). If tests fail, fix the issue and retry — do NOT use `--no-verify`.
 
-4. **Deploy to server.** SSH in and pull + rebuild:
+4. **Deploy to server.** SSH in, pull, and rebuild with the commit hash baked in:
    ```bash
-   ssh zdenovo "cd /opt/zdenovo && git pull --ff-only && docker compose -f docker-compose.prod.yml up --build -d web nginx"
+   ssh zdenovo "cd /opt/zdenovo && git pull --ff-only && BUILD_COMMIT=\$(git rev-parse --short HEAD) docker compose -f docker-compose.prod.yml up --build -d web nginx"
    ```
 
 5. **Verify.** Check the site is up:
