@@ -502,13 +502,17 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
 
 # ─── Topics management ──────────────────────────────────────────────────────
 
-from routers.topics_api import _load_topics, _save_topics, _slugify
+from routers.topics_api import _enrich_topics, _load_topics, _save_topics, _slugify
 
 
 @app.get("/admin/topics", response_class=HTMLResponse)
 async def admin_topics(request: Request, _: None = Depends(require_admin)):
-    topics = _load_topics()
-    return templates.TemplateResponse(request, "admin_topics.html", {"topics": topics})
+    topics = _enrich_topics(_load_topics())
+    available_count = sum(1 for t in topics if t["status"] == "available")
+    return templates.TemplateResponse(request, "admin_topics.html", {
+        "topics": topics,
+        "available_count": available_count,
+    })
 
 
 @app.get("/admin/topics/new", response_class=HTMLResponse)

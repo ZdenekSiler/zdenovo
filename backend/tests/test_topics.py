@@ -65,7 +65,7 @@ def test_topics_list_shows_tags(admin, topics_file):
 
 def test_topics_list_shows_topic_count(admin, topics_file):
     r = admin.get("/admin/topics")
-    assert b"2 topics in rotation" in r.content
+    assert b"2 of 2 available" in r.content
 
 
 def test_topics_list_unauthenticated_redirects(client, topics_file):
@@ -352,3 +352,64 @@ def test_api_delete_topic(client, topics_file):
 def test_api_delete_topic_not_found(client, topics_file):
     r = client.delete("/api/topics/nonexistent")
     assert r.status_code == 404
+
+
+# ─── Topic deduplication ─────────────────────────────────────────────────────
+
+def test_api_topics_show_status_available(client, topics_file):
+    r = client.get("/api/topics")
+    for t in r.json():
+        assert t["status"] == "available"
+        assert t["draft_id"] is None
+
+
+def test_api_topic_status_draft_pending(admin, topics_file, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    mock_client = _make_mock_client()
+    with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+        admin.post("/admin/topics/test-topic-one/generate", follow_redirects=False)
+    r = admin.get("/api/topics")
+    topics = {t["id"]: t for t in r.json()}
+    assert topics["test-topic-one"]["status"] == "draft_pending"
+    assert topics["test-topic-one"]["draft_id"] is not None
+    assert topics["test-topic-two"]["status"] == "available"
+
+
+def test_generate_blocks_duplicate_topic(admin, topics_file, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    mock_client = _make_mock_client()
+    with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+        admin.post("/admin/topics/test-topic-one/generate", follow_redirects=False)
+        r = admin.post("/api/drafts/generate/test-topic-one")
+    assert r.status_code == 409
+
+
+def test_delete_draft_makes_topic_available_again(admin, topics_file, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    mock_client = _make_mock_client()
+    with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+        admin.post("/admin/topics/test-topic-one/generate", follow_redirects=False)
+    drafts = admin.get("/api/drafts").json()
+    draft_id = drafts[0]["id"]
+    admin.delete(f"/api/drafts/{draft_id}")
+    r = admin.get("/api/topics/test-topic-one")
+    assert r.json()["status"] == "available"
+
+
+def test_admin_topics_hides_generate_for_used_topic(admin, topics_file, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    mock_client = _make_mock_client()
+    with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+        admin.post("/admin/topics/test-topic-one/generate", follow_redirects=False)
+    r = admin.get("/admin/topics")
+    assert b"/admin/topics/test-topic-one/generate" not in r.content
+    assert b"/admin/topics/test-topic-two/generate" in r.content
+
+
+def test_admin_topics_shows_available_count(admin, topics_file, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    mock_client = _make_mock_client()
+    with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+        admin.post("/admin/topics/test-topic-one/generate", follow_redirects=False)
+    r = admin.get("/admin/topics")
+    assert b"1 of 2 available" in r.content

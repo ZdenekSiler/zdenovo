@@ -200,3 +200,45 @@ no bundler.
 Draft generation (manual or scheduled) writes to a separate `drafts` table with an
 approval step, rather than writing directly to `posts` — generated content is always
 reviewed before it's published.
+
+### AI Model Selection & Cost Management
+
+**Goal:** Minimize API spend without sacrificing output quality. Every Claude call costs
+real money; burn expensive model tokens only where quality demands it.
+
+**Current model allocation:**
+
+| Task | Model | Why |
+|------|-------|-----|
+| Blog post generation | `claude-sonnet-4-6` | Creative writing needs the strongest model — quality directly affects the published blog |
+| Slop review / scoring | `claude-haiku-4-5-20251001` | Classification task — Haiku is fast, cheap, and accurate enough for pass/fail judgments |
+| Source finding | `claude-haiku-4-5-20251001` | Web search + extraction — Haiku handles structured output well at 1/10th the cost |
+
+**Cost reduction levers (in order of impact):**
+
+1. **Topic deduplication** — topics with existing drafts are skipped. This prevents the
+   biggest waste: regenerating posts on the same subject.
+2. **Prompt caching** — system prompts and tool definitions are cache-eligible (90% input
+   discount on cache hits). Keep system prompts stable and front-loaded.
+3. **Use Haiku for all secondary tasks** — review, scoring, source search, classification.
+   Reserve Sonnet for the primary creative generation only.
+4. **DAILY_COUNT = 1** — generate one draft per day, not three. Most drafts get rejected
+   anyway; quality over quantity.
+5. **Generate only when the pool has available topics** — scheduler silently skips when all
+   topics are consumed.
+
+**Why not Ollama / local LLMs on the server?**
+
+The production server is a Hetzner CX32 (shared vCPU, limited RAM). Running even a 7B
+parameter model locally would be too slow for useful output and would compete with the
+web server for CPU. Local inference is only practical on a machine with a GPU or
+dedicated CPU cores.
+
+**When to consider Ollama:** Development-only workflows where API costs add up during
+iteration (e.g., testing prompt changes). Run Ollama on a local dev machine with
+adequate hardware, not on the CX32.
+
+**When to use a cheaper model for generation:** If the blog adds lower-stakes content
+(e.g., short summaries, tag suggestions, auto-categorization), route those through Haiku
+instead of Sonnet. The rule of thumb: if a human would spend < 2 minutes on the task,
+Haiku is enough.

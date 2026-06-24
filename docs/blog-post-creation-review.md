@@ -18,7 +18,7 @@
 
 **3. Generic system prompt.** `"You are a technical blog post writer."` The generated posts will be corporate-bland. The site's whole tone is sarcastic, deploy-fail-fix, caffeine-fueled. Claude doesn't know that.
 
-**4. Topics get reused without tracking.** Daily generation picks randomly from the same static list. Over time the same topic gets regenerated. There's no record of what's been written before.
+**4. ~~Topics get reused without tracking.~~** ✓ Fixed — topics with existing drafts (pending or approved) are now skipped during generation. Deleting a rejected draft returns the topic to the pool.
 
 **5. Slug collision with no escape.** The approve endpoint does a 409 if the slug already exists, with no way to rename it. One bad title from Claude can permanently block a draft from being published.
 
@@ -40,7 +40,7 @@
 
 4. **Add a trigger button in the admin UI** — a simple `<button hx-post="/api/drafts/generate">Generate drafts</button>` so you don't need curl to kick off generation.
 
-5. **Track generated topic IDs.** Add a `generated_topic_ids` column (JSON array) to a settings table or a simple `topic_usage` table. Skip topics already generated in the last 30 days.
+5. ~~**Track generated topic IDs.**~~ ✓ Done — deduplication uses the existing `drafts` table (`topic_id` column). No new tables needed.
 
 6. **Allow slug override on drafts** — add a `slug` field to the draft edit form and use it on approval instead of re-deriving from the title.
 

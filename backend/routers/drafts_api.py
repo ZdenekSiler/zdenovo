@@ -45,6 +45,13 @@ def _load_daily_topics() -> list[PostBrief]:
   return [PostBrief(**item) for item in raw]
 
 
+def _get_used_topic_ids() -> set[str]:
+  """Topic IDs that already have a draft (pending or approved) — skip these for generation."""
+  with get_conn() as conn:
+    rows = conn.execute("SELECT DISTINCT topic_id FROM drafts").fetchall()
+  return {row["topic_id"] for row in rows}
+
+
 def _draft_to_out(d: dict) -> DraftOut:
   return DraftOut(
     id=d["id"],
@@ -146,16 +153,18 @@ def _regenerate_draft(draft_id: str, remarks: str) -> DraftOut:
   return _draft_to_out(draft_row_to_dict(row))
 
 
-def generate_daily_drafts() -> int:
+def generate_daily_drafts() -> dict:
   """Generate DAILY_COUNT drafts from random daily topics. Called by scheduler and manual trigger."""
   topics = _load_daily_topics()
-  chosen = random.sample(topics, min(DAILY_COUNT, len(topics)))
+  used = _get_used_topic_ids()
+  available = [t for t in topics if t.id not in used]
+  chosen = random.sample(available, min(DAILY_COUNT, len(available)))
   generated = 0
   for topic in chosen:
     post, review = _generate_with_review(_build_brief_message(topic))
     _insert_draft(post, topic_id=topic.id, review=review)
     generated += 1
-  return generated
+  return {"generated": generated, "available": len(available) - generated, "total": len(topics)}
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
@@ -181,12 +190,16 @@ def get_draft(draft_id: str):
 @router.post("/generate", status_code=201)
 def trigger_daily_generation():
   """Manually trigger daily draft generation (also called by the scheduler)."""
-  count = generate_daily_drafts()
-  return {"generated": count}
+  return generate_daily_drafts()
 
 
 def generate_single_topic(topic_id: str) -> DraftOut:
   """Generate a draft from a specific topic by ID. Used by API route and admin UI."""
+  if topic_id in _get_used_topic_ids():
+    raise HTTPException(
+      status_code=409,
+      detail=f"Topic '{topic_id}' already has a draft. Delete the existing draft to regenerate.",
+    )
   topics = _load_daily_topics()
   topic = next((t for t in topics if t.id == topic_id), None)
   if topic is None:

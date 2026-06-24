@@ -5,7 +5,7 @@
 <div class="mb-10">
   <p class="section-heading">Admin</p>
   <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">Daily Topics</h1>
-  <p class="text-sm text-zinc-500">Topics used by the scheduler to generate blog post drafts. {{ topics | length }} topics in rotation.</p>
+  <p class="text-sm text-zinc-500">Topics used by the scheduler to generate blog post drafts. {{ available_count }} of {{ topics | length }} available.</p>
 </div>
 
 <div class="mb-6">
@@ -19,7 +19,7 @@
   <table class="w-full text-xs">
     <thead>
       <tr class="border-b border-zinc-800 text-zinc-500 text-left">
-        <th class="pb-2.5 pr-4 font-medium">ID</th>
+        <th class="pb-2.5 pr-4 font-medium">Status</th>
         <th class="pb-2.5 pr-4 font-medium">Title Hint</th>
         <th class="pb-2.5 pr-4 font-medium hidden md:table-cell">Audience</th>
         <th class="pb-2.5 pr-4 font-medium">Tags</th>
@@ -29,8 +29,16 @@
     </thead>
     <tbody>
       {% for t in topics %}
-      <tr class="border-b border-zinc-800/50 last:border-0">
-        <td class="py-2.5 pr-4 text-zinc-500 font-mono">{{ t.id }}</td>
+      <tr class="border-b border-zinc-800/50 last:border-0{% if t.status != 'available' %} opacity-50{% endif %}">
+        <td class="py-2.5 pr-4">
+          {% if t.status == 'available' %}
+            <span class="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Available</span>
+          {% elif t.status == 'draft_pending' %}
+            <a href="/admin/drafts/{{ t.draft_id }}" class="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors">Draft</a>
+          {% elif t.status == 'published' %}
+            <a href="/admin/drafts/{{ t.draft_id }}" class="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors">Published</a>
+          {% endif %}
+        </td>
         <td class="py-2.5 pr-4 text-zinc-200 font-medium">{{ t.title_hint }}</td>
         <td class="py-2.5 pr-4 text-zinc-400 hidden md:table-cell max-w-[200px] truncate">{{ t.audience }}</td>
         <td class="py-2.5 pr-4">
@@ -40,6 +48,7 @@
         </td>
         <td class="py-2.5 pr-4 text-zinc-500 hidden sm:table-cell">{{ t.outline | length }} items</td>
         <td class="py-2.5 text-right whitespace-nowrap">
+          {% if t.status == 'available' %}
           <form method="post" action="/admin/topics/{{ t.id }}/generate" class="inline">
             <button
               type="submit"
@@ -48,6 +57,7 @@
               Generate
             </button>
           </form>
+          {% endif %}
           <a href="/admin/topics/{{ t.id }}/edit" class="btn-ghost text-xs">Edit</a>
           <form method="post" action="/admin/topics/{{ t.id }}/delete" class="inline">
             <button

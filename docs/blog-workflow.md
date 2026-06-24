@@ -63,14 +63,20 @@ Same response shape as Path 1. Saved as a draft with `topic_id: "freeform"`.
 
 ## Path 3 — Scheduled daily drafts
 
-Every day at 02:00 UTC, the scheduler picks 3 random topics from `backend/data/daily_topics.json`
+Every day at 02:00 UTC, the scheduler picks random topics from `backend/data/daily_topics.json`
 and generates drafts automatically. No action needed.
+
+**Topic deduplication:** Topics that already have a draft (pending or approved) are
+automatically skipped. This prevents the same topic from being generated twice. If a draft
+is deleted (rejected), its topic re-enters the pool and can be picked again. The admin
+topics page (`/admin/topics`) shows each topic's status: Available, Draft (pending review),
+or Published.
 
 To trigger manually (same logic as the scheduler):
 
 ```bash
 curl -X POST http://localhost:8000/api/drafts/generate
-# → {"generated": 3}
+# → {"generated": 1, "available": 15, "total": 25}
 ```
 
 Or click **"Generate today's drafts"** button at `/admin/drafts`.
@@ -140,6 +146,7 @@ All generation uses this system prompt (in `routers/generate_api.py`):
 ```
 Brief / description / scheduled topic
         │
+        │  (topics with existing drafts are skipped)
         ▼
   Claude (claude-sonnet-4-6)
   forced write_post tool use
@@ -151,8 +158,8 @@ Brief / description / scheduled topic
         ├── /admin/drafts/{id} ← preview + edit form
         │
         ▼
-  Approve → posts table → live on /blog
-  Reject  → deleted
+  Approve → posts table → live on /blog  (topic stays consumed)
+  Reject  → deleted                       (topic re-enters pool)
 ```
 
 ---
