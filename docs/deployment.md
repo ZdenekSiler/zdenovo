@@ -13,6 +13,7 @@ Complete guide for deploying zdenovo to a Hetzner VPS behind Cloudflare.
 - [Secrets Strategy](#secrets-strategy)
 - [First-Time Server Setup](#first-time-server-setup)
 - [Day-to-Day Deploys](#day-to-day-deploys)
+  - [Availability during deploy](#availability-during-deploy)
 - [Quick Deploy via Claude Code](#quick-deploy-via-claude-code)
 - [Cloudflare Configuration](#cloudflare-configuration)
 - [nginx Configuration](#nginx-configuration)
@@ -322,6 +323,27 @@ commit directly on the server.
 3. nginx waits for web's healthcheck (Python urllib probe on `http://localhost:8000/`)
    before accepting traffic
 4. Typical deploy time: 10-30 seconds
+
+### Availability during deploy
+
+**Strategy: recreate (not rolling).** Docker Compose stops the old web container before
+starting the new one. This means **2-3 seconds of downtime** per deploy while the new
+container starts and passes the health check.
+
+During this window:
+- nginx is still running but returns **502 Bad Gateway** for any request that would
+  proxy to the web container
+- Static assets (`/static/*`) continue to serve normally (nginx serves them directly)
+- Cloudflare may serve cached pages to some visitors, masking the blip
+
+**This is acceptable** for a personal blog with low traffic. If zero-downtime becomes
+a requirement, the options are:
+
+1. **Docker Compose `--scale` blue-green** — start a second web container, wait for
+   health, update nginx upstream, stop the old one. Requires a more complex compose
+   and nginx config.
+2. **Docker Swarm mode** — `docker service update --update-order start-first` natively
+   supports zero-downtime rolling updates with a single command.
 
 ---
 

@@ -73,12 +73,6 @@ def test_blog_tag_filter_hides_other_posts(client):
     assert "HTMX Is Enough" not in posts_section
 
 
-def test_blog_tag_buttons_have_htmx_attrs(client):
-    r = client.get("/blog")
-    assert b"hx-get=" in r.content
-    assert b"posts-list" in r.content
-
-
 # ── Blog post ─────────────────────────────────────────────────────────────────
 
 def test_post_returns_200(client):

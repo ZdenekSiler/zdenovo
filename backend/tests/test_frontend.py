@@ -7,9 +7,13 @@ Requires the app running on localhost:8080 (docker compose up).
 """
 import os
 import re
+from pathlib import Path
 
 import pytest
+from dotenv import load_dotenv
 from playwright.sync_api import Page, expect
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 BASE = "http://localhost:8080"
 ADMIN_PW = os.environ.get("ADMIN_PASSWORD", "admin")
@@ -143,16 +147,6 @@ def test_blog_page_lists_posts(page: Page):
     page.goto(f"{BASE}/blog")
     posts = page.locator("#posts-list article")
     assert posts.count() >= 1, "No posts found on blog page"
-
-
-def test_blog_tag_filter_works(page: Page):
-    page.goto(f"{BASE}/blog")
-    tags = page.locator(".tag-btn")
-    if tags.count() > 1:
-        tag = tags.nth(1)
-        tag.click()
-        page.wait_for_url(re.compile(r"tag="))
-        expect(page.locator("#posts-list")).to_be_visible()
 
 
 def test_blog_post_has_hero_image(page: Page):

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Blog{% endblock %}
-{% block meta_description %}{% if current_tag %}Posts tagged {{ current_tag }}{% else %}Notes on software engineering, AI development, tooling, and lessons learned the hard way.{% endif %}{% endblock %}
+{% block meta_description %}Notes on software engineering, AI development, tooling, and lessons learned the hard way.{% endblock %}
 {% block og_title %}Blog — Zdenovo{% endblock %}
 {% block og_description %}Notes on software engineering, AI development, tooling, and lessons learned the hard way.{% endblock %}
 {% block extra_meta %}
@@ -16,31 +16,6 @@
 </script>
 {% endblock %}
 
-{% block sidebar_extra %}
-<div class="border-t border-zinc-800/60">
-  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-2 overflow-x-auto scrollbar-none">
-    <span class="text-[10px] font-semibold tracking-widest uppercase text-zinc-600 mr-1">Filter:</span>
-    <a href="/blog"
-       hx-get="/blog"
-       hx-target="#posts-list"
-       hx-select="#posts-list"
-       hx-swap="outerHTML"
-       hx-push-url="true"
-       hx-indicator="#htmx-indicator"
-       class="tag-btn {% if not current_tag %}active{% endif %}">all</a>
-    {% for t in all_tags %}
-    <a href="/blog?tag={{ t }}"
-       hx-get="/blog?tag={{ t }}"
-       hx-target="#posts-list"
-       hx-select="#posts-list"
-       hx-swap="outerHTML"
-       hx-push-url="true"
-       hx-indicator="#htmx-indicator"
-       class="tag-btn {% if current_tag == t %}active{% endif %}">{{ t }}</a>
-    {% endfor %}
-  </div>
-</div>
-{% endblock %}
 
 {% block sidebar %}
 <div class="border border-zinc-800/60 rounded-xl bg-zinc-900/40 p-4">
@@ -84,13 +59,7 @@
 <div class="mb-10">
   <p class="section-heading">Writing</p>
   <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">Blog</h1>
-  <p class="text-sm text-zinc-500">
-    {% if current_tag %}
-      Posts tagged <span class="text-indigo-400">{{ current_tag }}</span> — <a href="/blog" hx-get="/blog" hx-target="#posts-list" hx-select="#posts-list" hx-swap="outerHTML" hx-push-url="true" hx-indicator="#htmx-indicator" class="text-zinc-500 hover:text-zinc-300 underline underline-offset-2 transition-colors">clear filter</a>
-    {% else %}
-      Notes on software engineering, tooling, and things I've learned the hard way.
-    {% endif %}
-  </p>
+  <p class="text-sm text-zinc-500">Notes on software engineering, tooling, and things I've learned the hard way.</p>
 </div>
 
 <div id="posts-list" class="space-y-6">

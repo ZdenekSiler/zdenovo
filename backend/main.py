@@ -169,7 +169,6 @@ async def blog(request: Request, tag: str | None = None, page: int = 1):
     return templates.TemplateResponse(
         request, "blog.html", {
             "posts": posts,
-            "all_tags": get_all_tags(),
             "current_tag": tag,
             "page": page,
             "total_pages": n_pages,
