@@ -6,6 +6,13 @@ PROJECTS = [
         "url": "https://github.com/ZdenekSiler/zdenovo",
         "featured": True,
     },
+    {
+        "name": "Fakturant",
+        "description": "Czech invoicing app with PDF export, ARES company lookup, and payment QR codes.",
+        "tags": ["python", "fastapi", "invoicing"],
+        "url": "https://fakturant.zdenovo.com",
+        "featured": True,
+    },
 ]
 
 

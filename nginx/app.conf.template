@@ -8,6 +8,7 @@ gzip_types text/css application/json application/javascript text/xml application
 limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
 limit_req_zone $binary_remote_addr zone=admin:10m rate=5r/s;
 limit_req_zone $binary_remote_addr zone=login:10m rate=3r/m;
+limit_req_zone $binary_remote_addr zone=fakturant_auth:10m rate=10r/m;
 
 # HTTP — redirect to HTTPS + serve ACME challenge
 server {
@@ -103,5 +104,80 @@ server {
         proxy_read_timeout 30s;
         proxy_connect_timeout 10s;
         client_max_body_size 5m;
+    }
+}
+
+# ─── Fakturant (fakturant.${DOMAIN}) ─────────────────────────────────────────
+
+# HTTP — redirect to HTTPS + serve ACME challenge
+server {
+    listen 80;
+    server_name fakturant.${DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# HTTPS — proxy to Fakturant containers
+server {
+    listen 443 ssl;
+    server_name fakturant.${DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/fakturant.${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fakturant.${DOMAIN}/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:FAKTURANT_SSL:10m;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Auth endpoints — strict rate limit
+    location ~ ^/auth/(login|signup|forgot-password|resend-verification)$ {
+        limit_req zone=fakturant_auth burst=5 nodelay;
+        proxy_pass http://fakturant-backend:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+        client_max_body_size 10m;
+    }
+
+    # Backend: API, preview, validate, PDF, health, login/signup pages, auth
+    location ~ ^/(api|preview|validate|generate-pdf|health|login|signup|auth) {
+        proxy_pass http://fakturant-backend:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+        client_max_body_size 10m;
+    }
+
+    # Static assets from the frontend container
+    location /static/ {
+        proxy_pass http://fakturant-frontend:80/static/;
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # SPA fallback
+    location / {
+        proxy_pass http://fakturant-frontend:80;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
 }

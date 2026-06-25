@@ -42,6 +42,7 @@ services:
     restart: unless-stopped
     networks:
       - internal
+      - zdenovo_public
     healthcheck:
       test: ["CMD-SHELL", "wget -qO /dev/null http://localhost:80/ || exit 1"]
       interval: 15s
@@ -71,6 +72,8 @@ secrets:
 
 networks:
   internal:
+  zdenovo_public:
+    name: zdenovo_public
 
 volumes:
   db_data:

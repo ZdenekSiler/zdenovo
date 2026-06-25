@@ -44,6 +44,11 @@ help:
 	@echo "    make secret-set    Update a secret: make secret-set NAME=x VALUE=y"
 	@echo "    make backup        Download blog.db from server"
 	@echo ""
+	@echo "  FAKTURANT (subdomain app)"
+	@echo "    make cert-init-fakturant  Bootstrap SSL cert for fakturant.DOMAIN"
+	@echo "    make fakturant-deploy     Deploy fakturant app on server"
+	@echo "    make fakturant-check      Health check fakturant subdomain"
+	@echo ""
 	@echo "  Prerequisites: copy .env.example → .env and fill in values"
 	@echo ""
 
@@ -132,6 +137,10 @@ check: _require-env
 	@curl -sf https://$(DOMAIN)/api/posts \
 		| python3 -c "import sys,json; p=json.load(sys.stdin); print(f'  ✓ API OK ({len(p)} posts)')" \
 		|| echo "  ✗ API failed"
+	@echo "Checking fakturant.$(DOMAIN)..."
+	@curl -sf -o /dev/null https://fakturant.$(DOMAIN)/health \
+		&& echo "  ✓ Fakturant HTTPS + health OK" \
+		|| echo "  ✗ Fakturant health check failed"
 
 # ─── Remote deployment (run locally) ──────────────────────────────────────────
 
@@ -215,9 +224,11 @@ _check-certs:
 	@docker run --rm -v zdenovo_certbot_conf:/certs alpine \
 		test -f /certs/live/$(DOMAIN)/fullchain.pem 2>/dev/null \
 		&& echo "  ✓ SSL cert found for $(DOMAIN)" \
-		|| (echo "  ✗ SSL cert MISSING in certbot_conf volume!" && \
-			echo "    Fix: docker run --rm -v zdenovo_certbot_conf:/dest -v /etc/letsencrypt:/src:ro alpine sh -c 'cp -a /src/. /dest/'" && \
-			echo "    Or:  make cert-init" && exit 1)
+		|| (echo "  ✗ SSL cert MISSING for $(DOMAIN)! Run: make cert-init" && exit 1)
+	@docker run --rm -v zdenovo_certbot_conf:/certs alpine \
+		test -f /certs/live/fakturant.$(DOMAIN)/fullchain.pem 2>/dev/null \
+		&& echo "  ✓ SSL cert found for fakturant.$(DOMAIN)" \
+		|| echo "  ⚠ SSL cert MISSING for fakturant.$(DOMAIN) — run: make cert-init-fakturant"
 
 _post-deploy-check:
 	@echo "→ Post-deploy health check..."
@@ -235,3 +246,39 @@ _post-deploy-check:
 		&& echo "  ✓ nginx can reach web container" \
 		|| echo "  ⚠ nginx→web connectivity check skipped (wget not available)"
 	@echo "→ Production: https://$(DOMAIN)"
+
+# ─── Fakturant (subdomain app) ───────────────────────────────────────────────
+
+FAKTURANT_DIR ?= /opt/fakturant
+FAKTURANT_COMPOSE = docker compose -f docker-compose.yml -f docker-compose.prod.yml
+
+.PHONY: cert-init-fakturant fakturant-deploy fakturant-check
+
+cert-init-fakturant: _require-env
+	@echo "→ Requesting certificate for fakturant.$(DOMAIN)..."
+	$(COMPOSE_PROD) run --rm certbot certonly \
+		--webroot \
+		--webroot-path=/var/www/certbot \
+		--email $(CERTBOT_EMAIL) \
+		--agree-tos \
+		--no-eff-email \
+		-d fakturant.$(DOMAIN)
+	$(MAKE) _gen-nginx-conf
+	$(COMPOSE_PROD) exec nginx nginx -s reload
+	@echo "✓ Certificate issued for fakturant.$(DOMAIN)."
+
+fakturant-deploy: _require-env
+	@echo "→ Deploying Fakturant on $(SERVER_USER)@$(SERVER_HOST)..."
+	$(SSH_CMD) \
+		"cd $(FAKTURANT_DIR) && git pull --ff-only && $(FAKTURANT_COMPOSE) up -d --build --remove-orphans"
+	@echo "→ Verifying..."
+	@sleep 3
+	@curl -sf -o /dev/null --max-time 10 https://fakturant.$(DOMAIN)/health \
+		&& echo "  ✓ Fakturant is live: https://fakturant.$(DOMAIN)" \
+		|| echo "  ✗ Fakturant health check failed"
+
+fakturant-check: _require-env
+	@echo "Checking fakturant.$(DOMAIN)..."
+	@curl -sf -o /dev/null https://fakturant.$(DOMAIN)/health \
+		&& echo "  ✓ HTTPS + health OK" \
+		|| echo "  ✗ Health check failed"
