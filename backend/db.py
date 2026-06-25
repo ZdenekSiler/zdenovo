@@ -69,13 +69,17 @@ def init_db() -> None:
             conn.execute("ALTER TABLE posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS comments (
-                id         TEXT PRIMARY KEY,
-                post_slug  TEXT NOT NULL,
-                author     TEXT NOT NULL,
-                body       TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                id           TEXT PRIMARY KEY,
+                post_slug    TEXT NOT NULL,
+                author       TEXT NOT NULL,
+                body         TEXT NOT NULL,
+                created_at   TEXT NOT NULL,
+                is_generated INTEGER NOT NULL DEFAULT 0
             )
         """)
+        comment_cols = {row[1] for row in conn.execute("PRAGMA table_info(comments)")}
+        if "is_generated" not in comment_cols:
+            conn.execute("ALTER TABLE comments ADD COLUMN is_generated INTEGER NOT NULL DEFAULT 0")
         conn.execute(
             "UPDATE posts SET image = 'https://picsum.photos/seed/' || slug || '/800/400' WHERE image IS NULL"
         )
@@ -121,4 +125,5 @@ def draft_row_to_dict(row: sqlite3.Row) -> dict:
 def comment_row_to_dict(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["created_at"] = datetime.fromisoformat(d["created_at"])
+    d["is_generated"] = bool(d.get("is_generated", 0))
     return d

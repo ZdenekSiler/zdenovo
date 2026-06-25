@@ -28,7 +28,12 @@
   <a href="/admin/comments" class="card group hover:border-zinc-700 transition-colors">
     <div class="flex items-center justify-between mb-3">
       <p class="text-sm font-semibold text-zinc-200 group-hover:text-emerald-400 transition-colors">Comments</p>
-      <span class="text-2xl font-bold text-emerald-400">{{ comment_count }}</span>
+      <div class="text-right">
+        <span class="text-2xl font-bold text-emerald-400">{{ comment_count }}</span>
+        {% if generated_comment_count %}
+        <p class="text-[10px] text-zinc-600">{{ real_comment_count }} real + {{ generated_comment_count }} AI</p>
+        {% endif %}
+      </div>
     </div>
     <p class="text-xs text-zinc-500">Moderate reader comments.</p>
   </a>

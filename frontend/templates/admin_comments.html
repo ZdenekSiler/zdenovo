@@ -8,8 +8,30 @@
   <p class="text-sm text-zinc-500">All reader comments. Delete any that need moderation.</p>
 </div>
 
-<div class="mb-6">
-  <span class="text-xs text-zinc-600">{{ comments | length }} comment{% if comments | length != 1 %}s{% endif %}</span>
+<div class="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+  <span class="text-xs text-zinc-600">
+    {{ comments | length }} comment{% if comments | length != 1 %}s{% endif %}
+    {% if generated_count %}
+      <span class="text-zinc-700">({{ real_count }} real, {{ generated_count }} AI)</span>
+    {% endif %}
+  </span>
+</div>
+
+<!-- Generate comments form -->
+<div class="card mb-6">
+  <form hx-post="/api/comments/generate"
+        hx-swap="none"
+        hx-on::after-request="if(event.detail.successful) location.reload()"
+        class="flex items-end gap-3">
+    <div class="flex-1">
+      <label class="block text-[10px] font-semibold tracking-widest uppercase text-zinc-500 mb-1">Generate AI comments</label>
+      <input type="text" name="post_slug" placeholder="Post slug" required
+             class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
+    </div>
+    <button type="submit" class="shrink-0 text-xs font-medium text-indigo-400 border border-indigo-500/30 rounded-lg px-3 py-2 hover:border-indigo-500/50 hover:text-indigo-300 transition-colors">
+      Generate
+    </button>
+  </form>
 </div>
 
 {% if comments %}
@@ -19,6 +41,9 @@
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2 mb-1 flex-wrap">
         <span class="text-sm font-semibold text-zinc-200">{{ c.author }}</span>
+        {% if c.is_generated %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-violet-900/60 text-violet-400 border border-violet-800/50 uppercase tracking-wide">AI</span>
+        {% endif %}
         <span class="text-zinc-800">·</span>
         <a href="/blog/{{ c.post_slug }}" class="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors">{{ c.post_slug }}</a>
         <span class="text-zinc-800">·</span>

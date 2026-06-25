@@ -14,12 +14,15 @@ def test_db(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _reset_blog_generator():
-    """Reset the BlogGenerator singleton between tests so mocked clients don't leak."""
+def _reset_singletons():
+    """Reset singleton clients between tests so mocks don't leak."""
     from routers.generate_api import blog_generator
+    from routers.comments_api import comment_generator
     blog_generator._client = None
+    comment_generator._client = None
     yield
     blog_generator._client = None
+    comment_generator._client = None
 
 
 @pytest.fixture()

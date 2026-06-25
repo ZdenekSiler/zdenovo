@@ -127,3 +127,95 @@ def test_comment_form_submit_returns_partial(client):
   )
   assert resp.status_code == 200
   assert b"Eve" in resp.content
+
+
+# ─── is_generated flag ──────────────────────────────────────────────────────
+
+def test_create_comment_is_generated_defaults_to_false(client):
+  resp = client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": "Nice!"})
+  assert resp.json()["is_generated"] is False
+
+
+def test_comment_out_includes_is_generated_field(client):
+  _insert_comment(client)
+  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+  assert "is_generated" in comments[0]
+  assert comments[0]["is_generated"] is False
+
+
+def test_public_post_does_not_show_generated_flag(client):
+  _insert_comment(client)
+  resp = client.get(f"/blog/{SEED_SLUG}")
+  assert b"AI" not in resp.content or b"is_generated" not in resp.content
+
+
+# ─── Generate endpoint ───────────────────────────────────────────────────────
+
+def _mock_comment_response():
+  """Return a mock Anthropic message with a write_comments tool_use block."""
+  from unittest.mock import MagicMock
+  msg = MagicMock()
+  msg.usage.input_tokens = 100
+  msg.usage.output_tokens = 50
+  msg.usage.cache_read_input_tokens = 0
+  msg.usage.cache_creation_input_tokens = 0
+  tool_block = MagicMock()
+  tool_block.type = "tool_use"
+  tool_block.input = {
+    "comments": [
+      {"author": "Mika", "body": "The dependency injection section was spot on.", "sentiment": "positive"},
+    ]
+  }
+  msg.content = [tool_block]
+  return msg
+
+
+def test_generate_comments_returns_201(client, monkeypatch):
+  from unittest.mock import MagicMock
+  from routers.comments_api import comment_generator
+  mock_client = MagicMock()
+  mock_client.messages.create.return_value = _mock_comment_response()
+  comment_generator._client = mock_client
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+  resp = client.post(f"/api/comments/generate?post_slug={SEED_SLUG}")
+  assert resp.status_code == 201
+
+
+def test_generate_comments_post_not_found_returns_404(client):
+  resp = client.post("/api/comments/generate?post_slug=nonexistent")
+  assert resp.status_code == 404
+
+
+def test_generate_comments_inserts_with_is_generated_true(client, monkeypatch):
+  from unittest.mock import MagicMock
+  from routers.comments_api import comment_generator
+  mock_client = MagicMock()
+  mock_client.messages.create.return_value = _mock_comment_response()
+  comment_generator._client = mock_client
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+  client.post(f"/api/comments/generate?post_slug={SEED_SLUG}")
+  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+  generated = [c for c in comments if c["is_generated"]]
+  assert len(generated) == 1
+  assert generated[0]["author"] == "Mika"
+
+
+def test_admin_comments_shows_ai_badge_for_generated(admin_client, monkeypatch):
+  from unittest.mock import MagicMock
+  from routers.comments_api import comment_generator
+  mock_client = MagicMock()
+  mock_client.messages.create.return_value = _mock_comment_response()
+  comment_generator._client = mock_client
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+  admin_client.post(f"/api/comments/generate?post_slug={SEED_SLUG}")
+  resp = admin_client.get("/admin/comments")
+  assert b"AI" in resp.content
+
+
+def test_admin_comments_no_ai_badge_for_real(admin_client):
+  _insert_comment(admin_client, author="RealPerson", body="Real comment")
+  resp = admin_client.get("/admin/comments")
+  assert b"RealPerson" in resp.content

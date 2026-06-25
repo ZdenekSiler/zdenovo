@@ -1,4 +1,5 @@
 import json
+import logging
 import random
 from datetime import datetime, timezone
 from pathlib import Path
@@ -8,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from code_validator import ValidationSummary, validate_content
 from db import draft_row_to_dict, get_conn, row_to_dict
+from routers.comments_api import comment_generator
 from routers.generate_api import (
   DraftOut,
   PostBrief,
@@ -272,6 +274,13 @@ def approve_draft(draft_id: str):
     conn.execute(
       "UPDATE drafts SET status = 'approved' WHERE id = ?", (draft_id,)
     )
+
+  try:
+    comment_generator.generate_and_insert(
+      draft["slug"], draft["title"], draft["content"], draft["date"].isoformat(),
+    )
+  except Exception:
+    logging.getLogger(__name__).warning("Failed to generate comments for %s", draft["slug"])
 
   with get_conn() as conn:
     post_row = conn.execute(

@@ -205,7 +205,7 @@ async def submit_comment(request: Request, slug: str, author: str = Form(...), b
     if author.strip() and body.strip():
         with get_conn() as conn:
             conn.execute(
-                "INSERT INTO comments (id, post_slug, author, body, created_at) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated) VALUES (?, ?, ?, ?, ?, 0)",
                 (str(uuid.uuid4()), slug, author.strip()[:80], body.strip()[:2000], datetime.now(timezone.utc).isoformat()),
             )
     with get_conn() as conn:
@@ -306,11 +306,17 @@ async def admin_root(request: Request, _: None = Depends(require_admin)):
             "SELECT COUNT(*) FROM drafts WHERE status = 'pending'"
         ).fetchone()[0]
         comment_count = conn.execute("SELECT COUNT(*) FROM comments").fetchone()[0]
+        generated_comment_count = conn.execute(
+            "SELECT COUNT(*) FROM comments WHERE is_generated = 1"
+        ).fetchone()[0]
+    real_comment_count = comment_count - generated_comment_count
     topic_count = len(_load_topics())
     return templates.TemplateResponse(request, "admin_hub.html", {
         "post_count": len(posts),
         "pending_count": pending_count,
         "comment_count": comment_count,
+        "real_comment_count": real_comment_count,
+        "generated_comment_count": generated_comment_count,
         "topic_count": topic_count,
     })
 
@@ -362,8 +368,16 @@ async def admin_comments(request: Request, _: None = Depends(require_admin)):
         rows = conn.execute(
             "SELECT * FROM comments ORDER BY created_at DESC"
         ).fetchall()
+        generated_count = conn.execute(
+            "SELECT COUNT(*) FROM comments WHERE is_generated = 1"
+        ).fetchone()[0]
     comments = [comment_row_to_dict(r) for r in rows]
-    return templates.TemplateResponse(request, "admin_comments.html", {"comments": comments})
+    real_count = len(comments) - generated_count
+    return templates.TemplateResponse(request, "admin_comments.html", {
+        "comments": comments,
+        "real_count": real_count,
+        "generated_count": generated_count,
+    })
 
 
 @app.post("/admin/drafts/{draft_id}", response_class=HTMLResponse)

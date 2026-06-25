@@ -1,0 +1,35 @@
+{
+  "name": "write_comments",
+  "description": "Output realistic blog comments for a post.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "comments": {
+        "type": "array",
+        "description": "1-2 realistic comments for the post",
+        "items": {
+          "type": "object",
+          "properties": {
+            "author": {
+              "type": "string",
+              "description": "A realistic first name for the commenter"
+            },
+            "body": {
+              "type": "string",
+              "description": "The comment text, 1-3 sentences, casual tone"
+            },
+            "sentiment": {
+              "type": "string",
+              "enum": ["positive", "negative", "neutral"],
+              "description": "The overall sentiment of the comment"
+            }
+          },
+          "required": ["author", "body", "sentiment"]
+        },
+        "minItems": 1,
+        "maxItems": 2
+      }
+    },
+    "required": ["comments"]
+  }
+}
