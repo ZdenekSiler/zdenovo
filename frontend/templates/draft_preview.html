@@ -145,10 +145,15 @@
 {% endif %}
 
 <!-- Regenerate with feedback -->
-<section class="mt-16 pt-8 border-t border-zinc-800/60">
+<section id="regen-section" class="mt-16 pt-8 border-t border-zinc-800/60">
   <p class="section-heading">Regenerate with feedback</p>
-  <form method="POST" action="/admin/drafts/{{ draft.id }}/regenerate"
-        onsubmit="return confirm('Regenerate this draft? Current content will be replaced.')"
+  <form hx-post="/admin/drafts/{{ draft.id }}/regenerate"
+        hx-target="#regen-section"
+        hx-swap="innerHTML"
+        hx-confirm="Regenerate this draft? Current content will be replaced."
+        hx-indicator="#regen-spinner"
+        hx-timeout="120000"
+        hx-disabled-elt="button[type='submit']"
         class="space-y-4">
     <div>
       <label class="block text-[10px] font-semibold tracking-widest uppercase text-zinc-500 mb-1.5">
@@ -161,7 +166,16 @@
     </div>
     <div class="flex items-center justify-between">
       <p class="text-xs text-zinc-600">Only the targeted section is rewritten. Keeps the same image.</p>
-      <button type="submit" class="btn-primary text-xs">Regenerate</button>
+      <div class="flex items-center gap-3">
+        <div id="regen-spinner" class="htmx-indicator flex items-center gap-2 text-xs text-indigo-400">
+          <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          Regenerating with Claude — this takes 30-60s...
+        </div>
+        <button type="submit" class="btn-primary text-xs">Regenerate</button>
+      </div>
     </div>
   </form>
 </section>

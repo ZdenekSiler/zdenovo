@@ -407,6 +407,10 @@ async def admin_draft_regenerate(
     _: None = Depends(require_admin),
 ):
     _regenerate_draft(draft_id, remarks)
+    if request.headers.get("HX-Request"):
+        response = Response(status_code=200)
+        response.headers["HX-Redirect"] = f"/admin/drafts/{draft_id}"
+        return response
     return RedirectResponse(f"/admin/drafts/{draft_id}", status_code=303)
 
 
