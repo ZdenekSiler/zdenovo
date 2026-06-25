@@ -497,6 +497,30 @@
     ]
   },
   {
+    "id": "ai-democratizes-builders",
+    "title_hint": "The Age of the Accidental Builder: AI Is Handing Everyone a Shovel",
+    "description": "AI is demolishing the barrier between 'I have an idea' and 'I shipped a product'. Anyone with a laptop and enough stubbornness can now build invoicing apps, SaaS tools, or whatever they convinced themselves the world needs. The entry cost to building is approaching zero — the exit cost of a bad idea hasn't changed. Explore the real pros and cons of this democratization, draw parallels with building Fakturant (a Czech invoicing app built solo with Claude Code), and make honest predictions about where this trend is heading — complete with the uncomfortable parts nobody wants to say out loud.",
+    "audience": "Indie hackers, aspiring founders, developers considering building solo, and anyone watching AI eat the startup world",
+    "tone": "sarcastic, honest, darkly optimistic, with moments of genuine insight — think a builder who shipped something real and lived to write about it",
+    "tags": [
+      "ai",
+      "indie",
+      "startup",
+      "building",
+      "productivity"
+    ],
+    "outline": [
+      "The old gatekeepers: why building used to require a team, a budget, and a therapist",
+      "What AI actually changed — and what it just made faster to do badly",
+      "Pros: the genuine good news (anyone can ship, ideas get tested, small problems get solved)",
+      "Cons: the uncomfortable truth (market of half-finished apps, code you don't understand breaking at 2am)",
+      "The Fakturant parallel: how a Czech invoicing app got built in spare time with Claude Code, and what that says about the new era",
+      "Who benefits most and who gets left behind",
+      "Predictions: where this goes in 2-5 years — more builders, more noise, fewer excuses",
+      "The thing that AI can't democratize: knowing what's worth building"
+    ]
+  },
+  {
     "id": "token-burn-enterprise-monitoring",
     "title_hint": "Token Burn: When Your Enterprise Starts Watching Your AI Usage",
     "description": "A post about the growing trend of enterprises monitoring and auditing AI model token usage. As companies scale AI adoption, management starts checking whether engineers use tokens efficiently \u2014 quotas, dashboards, cost attribution, and the inevitable bureaucracy of AI spend oversight. The tone should be a mix of dark humor and practical advice.",
