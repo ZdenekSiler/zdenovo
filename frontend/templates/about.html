@@ -102,7 +102,19 @@
   <p class="section-heading">Featured Projects</p>
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
     {% for project in featured_projects %}
-    <a href="{{ project.url }}" target="_blank" rel="noopener noreferrer" class="card group block">
+    <a href="{{ project.url }}"
+       {% if project.internal %}
+       hx-get="{{ project.url }}"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-push-url="true"
+       hx-swap="innerHTML"
+       hx-indicator="#htmx-indicator"
+       {% else %}
+       target="_blank"
+       rel="noopener noreferrer"
+       {% endif %}
+       class="card group block">
       <div class="flex items-center gap-2 mb-2">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"

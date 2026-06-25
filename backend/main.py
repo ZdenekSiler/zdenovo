@@ -167,6 +167,11 @@ async def projects(request: Request):
     )
 
 
+@app.get("/projects/fakturant", response_class=HTMLResponse)
+async def project_fakturant(request: Request):
+    return templates.TemplateResponse(request, "fakturant.html", {})
+
+
 @app.get("/blog", response_class=HTMLResponse)
 async def blog(request: Request, tag: str | None = None, page: int = 1):
     posts, total = get_posts_page(page, tag=tag)
@@ -234,6 +239,7 @@ async def sitemap():
         ("/blog", "daily", "0.9"),
         ("/about", "monthly", "0.7"),
         ("/projects", "monthly", "0.6"),
+        ("/projects/fakturant", "monthly", "0.5"),
     ]
     for path, freq, prio in static_pages:
         lines.append(

@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Fakturant — Czech Invoicing App{% endblock %}
+{% block meta_description %}Fakturant is a Czech invoicing app built with FastAPI and vanilla JS. Create, track, and export PDF invoices with ARES company lookup, payment QR codes, and multi-user support.{% endblock %}
+{% block og_title %}Fakturant — Czech Invoicing App{% endblock %}
+{% block og_description %}Create, track, and export PDF invoices with ARES company lookup, payment QR codes, and a full dashboard.{% endblock %}
+
+{% block content %}
+<!-- Hero -->
+<div class="mb-12">
+  <a href="/projects"
+     hx-get="/projects"
+     hx-target="#main-content"
+     hx-select="#main-content"
+     hx-push-url="true"
+     hx-swap="innerHTML"
+     hx-indicator="#htmx-indicator"
+     class="text-xs text-zinc-500 hover:text-indigo-400 transition-colors mb-4 inline-block">&larr; Projects</a>
+  <div class="flex items-center gap-3 mb-3">
+    <div class="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-lg font-bold">F</div>
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight text-zinc-100">Fakturant</h1>
+      <p class="text-xs text-zinc-500">Czech invoicing for freelancers & small teams</p>
+    </div>
+  </div>
+  <p class="text-sm text-zinc-400 leading-relaxed max-w-lg">
+    A full-stack invoicing app built for Czech law. Create invoices, track payments, generate PDFs,
+    look up companies in the ARES registry, and manage everything from a real-time dashboard.
+    No subscription, no vendor lock-in &mdash; self-hosted on your own server.
+  </p>
+  <div class="flex flex-wrap gap-2 mt-4">
+    <a href="https://fakturant.zdenovo.com"
+       target="_blank" rel="noopener noreferrer"
+       class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-100 bg-indigo-500 hover:bg-indigo-400 transition-colors rounded-lg px-4 py-2">
+      Open Fakturant
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 7h10v10"/><path d="M7 17 17 7"/>
+      </svg>
+    </a>
+    <a href="https://github.com/ZdenekSiler/fakturant"
+       target="_blank" rel="noopener noreferrer"
+       class="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors border border-indigo-500/30 rounded-lg px-4 py-2 hover:border-indigo-500/50">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/>
+        <path d="M9 18c-4.51 2-5-2-7-2"/>
+      </svg>
+      Source Code
+    </a>
+  </div>
+</div>
+
+<!-- Key stats -->
+<section class="grid grid-cols-4 gap-3 mb-12">
+  {% set stats = [
+    ("6", "Invoice states", "Draft to paid lifecycle"),
+    ("3", "PDF templates", "Modern, classic, minimal"),
+    ("0", "Dependencies*", "*No npm, no bundler"),
+    ("100%", "Czech law", "Compliant with 235/2004 Sb."),
+  ] %}
+  {% for value, label, sublabel in stats %}
+  <div class="card text-center py-3">
+    <p class="text-xl font-bold text-indigo-400 mb-0.5">{{ value }}</p>
+    <p class="text-[10px] font-semibold text-zinc-300 uppercase tracking-wider">{{ label }}</p>
+    <p class="text-[9px] text-zinc-600 mt-0.5">{{ sublabel }}</p>
+  </div>
+  {% endfor %}
+</section>
+
+<!-- Core Features -->
+<section class="mb-12">
+  <p class="section-heading">Core Features</p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+    <div class="card">
+      <div class="flex items-center gap-2 mb-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.5" class="text-indigo-400 shrink-0">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        <h3 class="text-sm font-semibold text-zinc-200">Invoice Editor</h3>
+      </div>
+      <p class="text-xs text-zinc-500 leading-relaxed">Full invoice form with line items, supplier/customer details, VAT rates, and variable symbols. Split-pane live preview updates as you type (400ms debounce). Auto-save every 1.5 seconds.</p>
+    </div>
+
+    <div class="card">
+      <div class="flex items-center gap-2 mb-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.5" class="text-indigo-400 shrink-0">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <h3 class="text-sm font-semibold text-zinc-200">PDF Export</h3>
+      </div>
+      <p class="text-xs text-zinc-500 leading-relaxed">Pixel-perfect PDF generation via WeasyPrint. Three templates &mdash; modern, classic, minimal. Embeds your logo and signature as base64. Same Jinja2 templates render both the preview and the final PDF.</p>
+    </div>
+
+    <div class="card">
+      <div class="flex items-center gap-2 mb-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.5" class="text-indigo-400 shrink-0">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>
+        </svg>
+        <h3 class="text-sm font-semibold text-zinc-200">Dashboard</h3>
+      </div>
+      <p class="text-xs text-zinc-500 leading-relaxed">KPI cards for outstanding, overdue, monthly, and YTD revenue. 12-month bar chart (issued vs. paid), status donut, aging analysis by days overdue, and a recent invoices table. Powered by Chart.js.</p>
+    </div>
+
+    <div class="card">
+      <div class="flex items-center gap-2 mb-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.5" class="text-indigo-400 shrink-0">
+          <circle cx="12" cy="12" r="10"/><path d="M16 8l-8 8"/><path d="M8 8h8v8"/>
+        </svg>
+        <h3 class="text-sm font-semibold text-zinc-200">ARES Lookup</h3>
+      </div>
+      <p class="text-xs text-zinc-500 leading-relaxed">Search the Czech business registry (ARES) by company name or tax ID. Auto-fills supplier and customer fields &mdash; name, address, DI&#268;, I&#268;O. Async HTTP client, returns results in under a second.</p>
+    </div>
+
+    <div class="card">
+      <div class="flex items-center gap-2 mb-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.5" class="text-indigo-400 shrink-0">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 7h.01"/><path d="M17 7h.01"/><path d="M7 17h.01"/><path d="M17 17h.01"/><path d="M7 12h10"/><path d="M12 7v10"/>
+        </svg>
+        <h3 class="text-sm font-semibold text-zinc-200">Payment QR Codes</h3>
+      </div>
+      <p class="text-xs text-zinc-500 leading-relaxed">Generates Czech SPD-standard QR codes for bank transfers. Customers scan with their banking app to auto-fill the payment &mdash; account number, amount, variable symbol, all pre-populated.</p>
+    </div>
+
+    <div class="card">
+      <div class="flex items-center gap-2 mb-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.5" class="text-indigo-400 shrink-0">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <h3 class="text-sm font-semibold text-zinc-200">Multi-User Auth</h3>
+      </div>
+      <p class="text-xs text-zinc-500 leading-relaxed">Email + password signup with Argon2id hashing. Signed session cookies, row-level data isolation (each user sees only their invoices). Optional email verification and password reset via Resend API.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- Invoice Lifecycle -->
+<section class="mb-12">
+  <p class="section-heading">Invoice Lifecycle</p>
+  <div class="card">
+    <div class="flex flex-wrap items-center gap-2 text-xs">
+      <div class="flex items-center gap-1.5 bg-zinc-500/10 border border-zinc-500/20 rounded-full px-2.5 py-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>
+        <span class="text-zinc-400 font-medium">Koncept</span>
+      </div>
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-700 shrink-0"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      <div class="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full px-2.5 py-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+        <span class="text-blue-400 font-medium">Vystavena</span>
+      </div>
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-700 shrink-0"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      <div class="flex items-center gap-1.5 bg-violet-500/10 border border-violet-500/20 rounded-full px-2.5 py-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-violet-400"></span>
+        <span class="text-violet-400 font-medium">Odesl&aacute;no</span>
+      </div>
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-700 shrink-0"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      <div class="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2.5 py-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span class="text-emerald-400 font-medium">Zaplaceno</span>
+      </div>
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-700 shrink-0"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      <div class="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full px-2.5 py-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        <span class="text-amber-400 font-medium">Po splatnosti</span>
+      </div>
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-zinc-700 shrink-0"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      <div class="flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 rounded-full px-2.5 py-1">
+        <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>
+        <span class="text-red-400 font-medium">Stornov&aacute;no</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4">
+      <div class="text-[10px] text-zinc-500"><span class="text-zinc-400 font-medium">Koncept</span> &mdash; Draft, editable, not yet numbered</div>
+      <div class="text-[10px] text-zinc-500"><span class="text-blue-400 font-medium">Vystavena</span> &mdash; Issued, locked, sequentially numbered</div>
+      <div class="text-[10px] text-zinc-500"><span class="text-violet-400 font-medium">Odesl&aacute;no</span> &mdash; Sent to the customer</div>
+      <div class="text-[10px] text-zinc-500"><span class="text-emerald-400 font-medium">Zaplaceno</span> &mdash; Fully paid (within 1 K&#269; tolerance)</div>
+      <div class="text-[10px] text-zinc-500"><span class="text-amber-400 font-medium">Po splatnosti</span> &mdash; Overdue, auto-detected daily</div>
+      <div class="text-[10px] text-zinc-500"><span class="text-red-400 font-medium">Stornov&aacute;no</span> &mdash; Cancelled with optional credit note</div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech Stack -->
+<section class="mb-12">
+  <p class="section-heading">Tech Stack</p>
+  <div class="grid grid-cols-2 gap-3">
+    {% set tech = [
+      ("Backend", ["FastAPI", "Python 3.13", "SQLite", "aiosqlite", "Pydantic v2", "WeasyPrint"]),
+      ("Frontend", ["Vanilla JS", "No build step", "Chart.js 4", "CSS custom props"]),
+      ("Auth", ["Argon2id", "Signed cookies", "Email verification", "Password reset"]),
+      ("Infrastructure", ["Docker Compose", "nginx", "Let's Encrypt", "Hetzner VPS"]),
+    ] %}
+    {% for group, items in tech %}
+    <div class="skill-card">
+      <h3 class="text-[10px] font-semibold tracking-widest text-indigo-400 uppercase mb-2.5">{{ group }}</h3>
+      <div class="flex flex-wrap gap-1.5">
+        {% for item in items %}
+        <span class="tag">{{ item }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- Additional Features -->
+<section class="mb-12">
+  <p class="section-heading">Also Included</p>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    {% set extras = [
+      ("Sequential Numbering", "FA-2026-001 format with per-user, per-year counters. Gap detection warns but doesn't block."),
+      ("Credit Notes", "One-click credit note creation with DD-prefix numbering. Items auto-negated from the original invoice."),
+      ("Payment Tracking", "Record partial or full payments. Auto-settlement detection within 1 K&#269; rounding tolerance."),
+      ("CSV Import", "Bulk import invoices from CSV files with per-row validation and error reporting."),
+      ("Contact Book", "Auto-saved customer and supplier details from ARES lookups. Reuse across invoices."),
+      ("Logo & Signature", "Drag-and-drop upload, base64-encoded and embedded directly in the PDF output."),
+    ] %}
+    {% for title, desc in extras %}
+    <div class="card">
+      <h3 class="text-xs font-semibold text-zinc-200 mb-1">{{ title }}</h3>
+      <p class="text-[11px] text-zinc-500 leading-relaxed">{{ desc }}</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="mb-8">
+  <div class="card border-indigo-500/20 bg-indigo-500/5">
+    <p class="text-sm font-semibold text-zinc-100 mb-2">Self-hosted, open source, no subscriptions</p>
+    <p class="text-xs text-zinc-400 leading-relaxed mb-4">
+      Fakturant runs on a single VPS with Docker Compose. Your data stays on your server &mdash;
+      no third-party analytics, no tracking, no monthly fees. Fork it, extend it, make it yours.
+    </p>
+    <div class="flex flex-wrap gap-2">
+      <a href="https://fakturant.zdenovo.com"
+         target="_blank" rel="noopener noreferrer"
+         class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-100 bg-indigo-500 hover:bg-indigo-400 transition-colors rounded-lg px-4 py-2">
+        Try Fakturant
+      </a>
+      <a href="https://github.com/ZdenekSiler/fakturant"
+         target="_blank" rel="noopener noreferrer"
+         class="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors border border-indigo-500/30 rounded-lg px-4 py-2 hover:border-indigo-500/50">
+        View on GitHub
+      </a>
+    </div>
+  </div>
+</section>
+{% endblock %}

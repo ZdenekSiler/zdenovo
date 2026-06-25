@@ -33,6 +33,22 @@
           {% endfor %}
         </div>
       </div>
+      {% if project.internal %}
+      <a href="{{ project.url }}"
+         hx-get="{{ project.url }}"
+         hx-target="#main-content"
+         hx-select="#main-content"
+         hx-push-url="true"
+         hx-swap="innerHTML"
+         hx-indicator="#htmx-indicator"
+         class="shrink-0 text-zinc-700 hover:text-indigo-400 transition-colors mt-0.5"
+         aria-label="Open {{ project.name }}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+        </svg>
+      </a>
+      {% else %}
       <a href="{{ project.url }}"
          target="_blank"
          rel="noopener noreferrer"
@@ -43,6 +59,7 @@
           <path d="M7 7h10v10"/><path d="M7 17 17 7"/>
         </svg>
       </a>
+      {% endif %}
     </div>
   </article>
   {% endfor %}
