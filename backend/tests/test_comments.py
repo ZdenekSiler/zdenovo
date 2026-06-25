@@ -219,3 +219,47 @@ def test_admin_comments_no_ai_badge_for_real(admin_client):
   _insert_comment(admin_client, author="RealPerson", body="Real comment")
   resp = admin_client.get("/admin/comments")
   assert b"RealPerson" in resp.content
+
+
+# ─── Scheduled generation ──────────────────────────────────────────────────
+
+def test_slug_delay_hours_is_deterministic():
+  from routers.comments_api import _slug_delay_hours
+  d1 = _slug_delay_hours("my-post")
+  d2 = _slug_delay_hours("my-post")
+  assert d1 == d2
+  assert 48 <= d1 <= 168
+
+
+def test_slug_delay_hours_varies_by_slug():
+  from routers.comments_api import _slug_delay_hours
+  d1 = _slug_delay_hours("post-alpha")
+  d2 = _slug_delay_hours("post-beta")
+  assert d1 != d2
+
+
+def test_generate_pending_comments_skips_too_recent(client, monkeypatch):
+  from routers.comments_api import generate_pending_comments
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  result = generate_pending_comments()
+  assert result == 0
+
+
+def test_generate_pending_comments_generates_after_delay(client, monkeypatch):
+  from unittest.mock import MagicMock
+  from routers.comments_api import comment_generator, generate_pending_comments
+  mock_client = MagicMock()
+  mock_client.messages.create.return_value = _mock_comment_response()
+  comment_generator._client = mock_client
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+  from db import get_conn
+  with get_conn() as conn:
+    conn.execute("UPDATE posts SET date = '2020-01-01T00:00:00' WHERE slug = ?", (SEED_SLUG,))
+
+  result = generate_pending_comments()
+  assert result >= 1
+
+  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+  generated = [c for c in comments if c["is_generated"]]
+  assert len(generated) >= 1

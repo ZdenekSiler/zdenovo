@@ -25,7 +25,7 @@ from data.analytics import refresh_popular_posts
 from data.posts import get_all_posts, get_all_tags, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
-from routers.comments_api import router as comments_router
+from routers.comments_api import generate_pending_comments, router as comments_router
 from routers.drafts_api import _regenerate_draft, generate_daily_drafts, generate_single_topic, router as drafts_router
 from routers.generate_api import router as generate_router
 from routers.posts_api import router as posts_router
@@ -41,6 +41,7 @@ async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(generate_daily_drafts, "cron", hour=2, minute=0)
     scheduler.add_job(refresh_popular_posts, "cron", hour="6,14,22", minute=0)
+    scheduler.add_job(generate_pending_comments, "interval", hours=4)
     scheduler.start()
     yield
     scheduler.shutdown()

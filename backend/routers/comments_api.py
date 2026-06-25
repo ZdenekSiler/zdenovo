@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import random
@@ -133,6 +134,41 @@ class CommentGenerator:
 
 
 comment_generator = CommentGenerator()
+
+
+def _slug_delay_hours(slug: str) -> float:
+    """Deterministic random delay (48-168h) seeded from slug, survives restarts."""
+    h = int(hashlib.sha256(slug.encode()).hexdigest(), 16)
+    return 48 + (h % 10000) / 10000 * 120  # 48h to 168h (7 days)
+
+
+def generate_pending_comments() -> int:
+    """Check for posts without generated comments and generate after a random delay."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT p.slug, p.title, p.content, p.date
+               FROM posts p
+               LEFT JOIN comments c ON c.post_slug = p.slug AND c.is_generated = 1
+               WHERE c.id IS NULL"""
+        ).fetchall()
+
+    generated = 0
+    now = datetime.now(timezone.utc)
+    for row in rows:
+        post_date = datetime.fromisoformat(row["date"]).replace(tzinfo=timezone.utc)
+        delay = timedelta(hours=_slug_delay_hours(row["slug"]))
+        if now - post_date < delay:
+            continue
+        try:
+            comment_generator.generate_and_insert(
+                row["slug"], row["title"], row["content"], row["date"],
+            )
+            generated += 1
+        except Exception:
+            log.warning("Failed to generate comments for %s", row["slug"])
+    if generated:
+        log.info("Scheduled comment generation: %d post(s)", generated)
+    return generated
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
