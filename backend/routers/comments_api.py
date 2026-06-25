@@ -65,8 +65,15 @@ class CommentGenerator:
         """Generate 1-2 fake comments and insert them into the database."""
         self._ensure_prompts()
         count = random.randint(1, 2)
+        name_pool = [
+            "Jake", "Amara", "Wei", "Sofia", "Tomás", "Kenji", "Fatima", "Liam",
+            "Ayo", "Nina", "Raj", "Elena", "Dmitri", "Mei", "Carlos", "Ingrid",
+            "Tariq", "Hana", "Oluwaseun", "Yuki", "Sven", "Aisha", "Marco", "Daria",
+        ]
+        suggested = random.sample(name_pool, count)
         user_message = (
-            f"Write {count} comment{'s' if count > 1 else ''} for this blog post.\n\n"
+            f"Write {count} comment{'s' if count > 1 else ''} for this blog post.\n"
+            f"Use these names for the commenters: {', '.join(suggested)}.\n\n"
             f"Title: {post_title}\n\n"
             f"Content (first 1500 chars):\n{post_content[:1500]}"
         )
