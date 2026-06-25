@@ -2,13 +2,18 @@
   {
     "id": "fastapi-dependency-injection",
     "title_hint": "FastAPI Dependency Injection: The Right Way",
-    "description": "A practical guide to FastAPI's dependency injection system — why it exists, how it works, and patterns for keeping your routes thin and your logic testable.",
+    "description": "A practical guide to FastAPI's dependency injection system \u2014 why it exists, how it works, and patterns for keeping your routes thin and your logic testable.",
     "audience": "Python developers building REST APIs with FastAPI",
     "tone": "practical, opinionated, example-driven",
-    "tags": ["fastapi", "python", "backend", "architecture"],
+    "tags": [
+      "fastapi",
+      "python",
+      "backend",
+      "architecture"
+    ],
     "outline": [
       "What dependency injection actually solves",
-      "FastAPI's Depends() — the basics",
+      "FastAPI's Depends() \u2014 the basics",
       "Sharing DB connections and service objects",
       "Overriding dependencies in tests",
       "Common pitfalls and how to avoid them"
@@ -20,9 +25,14 @@
     "description": "SQLite gets dismissed as a toy database, but for many production workloads it outperforms Postgres in simplicity, latency, and cost. Here's when to use it and how.",
     "audience": "Backend developers choosing a database for a small-to-medium web app",
     "tone": "data-driven, pragmatic, contrarian",
-    "tags": ["sqlite", "database", "backend", "architecture"],
+    "tags": [
+      "sqlite",
+      "database",
+      "backend",
+      "architecture"
+    ],
     "outline": [
-      "The SQLite stigma — and why it's mostly wrong",
+      "The SQLite stigma \u2014 and why it's mostly wrong",
       "Read-heavy workloads where SQLite excels",
       "WAL mode: enabling concurrent reads and writes",
       "Backup strategies: Litestream and .dump",
@@ -35,10 +45,15 @@
     "description": "async/await looks simple until you hit blocking calls, event loop conflicts, or subtle concurrency bugs. This post maps the landmines so you can avoid them.",
     "audience": "Python developers new to async programming or debugging async bugs",
     "tone": "candid, technical, example-heavy with code snippets",
-    "tags": ["python", "async", "concurrency", "debugging"],
+    "tags": [
+      "python",
+      "async",
+      "concurrency",
+      "debugging"
+    ],
     "outline": [
       "How the event loop actually works",
-      "Blocking the loop with sync I/O — the #1 mistake",
+      "Blocking the loop with sync I/O \u2014 the #1 mistake",
       "asyncio.gather vs asyncio.TaskGroup",
       "Running sync code in a thread pool",
       "Testing async code with pytest-asyncio"
@@ -47,10 +62,15 @@
   {
     "id": "docker-multi-stage-builds",
     "title_hint": "Docker Multi-Stage Builds for Lean Python Images",
-    "description": "A production Python Docker image shouldn't weigh 1 GB. Multi-stage builds let you compile, install, and copy only what you need — here's how to do it with uv.",
+    "description": "A production Python Docker image shouldn't weigh 1 GB. Multi-stage builds let you compile, install, and copy only what you need \u2014 here's how to do it with uv.",
     "audience": "Python developers containerising their apps for the first time or optimising existing images",
     "tone": "step-by-step tutorial, practical, includes full Dockerfile examples",
-    "tags": ["docker", "python", "devops", "tooling"],
+    "tags": [
+      "docker",
+      "python",
+      "devops",
+      "tooling"
+    ],
     "outline": [
       "Why image size matters in production",
       "The builder stage: installing deps with uv",
@@ -65,11 +85,16 @@
     "description": "uv replaces pip, pip-tools, virtualenv, and pyenv in a single Rust binary that runs 10-100x faster. Here's what it does differently and why it matters.",
     "audience": "Python developers frustrated with slow installs, complex tooling, or dependency hell",
     "tone": "enthusiastic but measured, benchmark-driven, practical migration tips",
-    "tags": ["python", "tooling", "uv", "packaging"],
+    "tags": [
+      "python",
+      "tooling",
+      "uv",
+      "packaging"
+    ],
     "outline": [
       "The fragmented Python packaging landscape",
       "uv's resolver: why it's so fast",
-      "uv sync, uv add, uv run — daily workflow",
+      "uv sync, uv add, uv run \u2014 daily workflow",
       "Lockfiles and reproducible builds",
       "Migrating from pip + requirements.txt"
     ]
@@ -80,7 +105,12 @@
     "description": "HTMX lets you build dynamic UIs with almost no JS by putting hypermedia back in control. These five patterns cover the majority of real-world interactivity needs.",
     "audience": "Backend developers who want richer UIs without learning a JS framework",
     "tone": "practical, pattern-oriented, includes HTML snippets",
-    "tags": ["htmx", "frontend", "html", "web"],
+    "tags": [
+      "htmx",
+      "frontend",
+      "html",
+      "web"
+    ],
     "outline": [
       "Inline form submission and server-rendered feedback",
       "Infinite scroll and load-more pagination",
@@ -92,10 +122,15 @@
   {
     "id": "anthropic-tool-use",
     "title_hint": "Structured Outputs with Anthropic Tool Use",
-    "description": "The best way to get reliable JSON from Claude isn't prompt engineering — it's tool use. Here's how to define a tool schema and extract structured data every time.",
+    "description": "The best way to get reliable JSON from Claude isn't prompt engineering \u2014 it's tool use. Here's how to define a tool schema and extract structured data every time.",
     "audience": "Developers integrating Claude into apps who need predictable, structured output",
     "tone": "technical, tutorial-style with full Python code examples",
-    "tags": ["anthropic", "claude", "ai", "python"],
+    "tags": [
+      "anthropic",
+      "claude",
+      "ai",
+      "python"
+    ],
     "outline": [
       "Why plain prompts fail for structured output",
       "Defining a tool schema: types, descriptions, required fields",
@@ -110,11 +145,16 @@
     "description": "You don't always need a Node.js pipeline to use Tailwind. The Play CDN covers many use cases. Here's when it's fine and when you'll eventually need a build.",
     "audience": "Backend developers and indie hackers building simple sites without a JS build system",
     "tone": "balanced, honest about trade-offs, practical advice for picking the right approach",
-    "tags": ["tailwind", "css", "frontend", "tooling"],
+    "tags": [
+      "tailwind",
+      "css",
+      "frontend",
+      "tooling"
+    ],
     "outline": [
       "What the Play CDN actually does at runtime",
       "Performance implications: when it matters, when it doesn't",
-      "Custom config via the CDN — what's possible",
+      "Custom config via the CDN \u2014 what's possible",
       "The tipping point: when to add a build step",
       "Minimal Vite setup for Tailwind without full SPA overhead"
     ]
@@ -125,13 +165,18 @@
     "description": "AI coding assistants have shifted the economics of software development. A single developer with Claude Code can now ship what used to require a team of five. Here's how the math changed.",
     "audience": "Solo developers, indie hackers, and tech leads evaluating team size",
     "tone": "opinionated, data-backed, inspiring but honest",
-    "tags": ["ai", "productivity", "development", "indie"],
+    "tags": [
+      "ai",
+      "productivity",
+      "development",
+      "indie"
+    ],
     "outline": [
       "The old math: why software required teams",
       "What AI actually automates vs what it doesn't",
       "Real examples: solo-built products shipping to production",
       "The new bottleneck: taste and product sense, not coding speed",
-      "When you still need a team — and when AI makes you 10x",
+      "When you still need a team \u2014 and when AI makes you 10x",
       "Tools that make solo development viable in 2026"
     ]
   },
@@ -141,7 +186,12 @@
     "description": "A walkthrough of building and deploying a real web app in 48 hours using Claude Code as an AI pair programmer. Every prompt, every decision, every shortcut.",
     "audience": "Developers curious about AI-assisted development workflows",
     "tone": "narrative, honest about failures, practical",
-    "tags": ["claude", "ai", "development", "tutorial"],
+    "tags": [
+      "claude",
+      "ai",
+      "development",
+      "tutorial"
+    ],
     "outline": [
       "The project: what we're building and why",
       "Setting up: Claude Code, project structure, first prompts",
@@ -154,10 +204,15 @@
   {
     "id": "vibe-coding-production",
     "title_hint": "Vibe Coding Is Real: How to Ship Production Apps with AI Pair Programming",
-    "description": "Vibe coding isn't just a meme — it's a legitimate development methodology when done right. Here's how to use AI pair programming without shipping garbage.",
+    "description": "Vibe coding isn't just a meme \u2014 it's a legitimate development methodology when done right. Here's how to use AI pair programming without shipping garbage.",
     "audience": "Developers who want to use AI for coding but worry about quality",
     "tone": "practical, opinionated, framework for decision-making",
-    "tags": ["ai", "development", "productivity", "quality"],
+    "tags": [
+      "ai",
+      "development",
+      "productivity",
+      "quality"
+    ],
     "outline": [
       "What vibe coding actually means (beyond the meme)",
       "The quality problem: when AI-generated code breaks",
@@ -173,7 +228,12 @@
     "description": "AI agents are replacing SaaS dashboards for e-commerce operations. From inventory management to customer support, autonomous agents are becoming the new workforce.",
     "audience": "E-commerce founders, tech leads, and developers building for retail",
     "tone": "forward-looking, practical examples, business-oriented",
-    "tags": ["ai", "agents", "ecommerce", "business"],
+    "tags": [
+      "ai",
+      "agents",
+      "ecommerce",
+      "business"
+    ],
     "outline": [
       "The SaaS dashboard fatigue: why clicking buttons doesn't scale",
       "What an AI agent can do that a dashboard can't",
@@ -186,10 +246,15 @@
   {
     "id": "agent-to-agent-protocols",
     "title_hint": "Agent-to-Agent Communication: No HTML Needed, Just Protocols",
-    "description": "The next web won't be browsers talking to servers — it'll be agents talking to agents. Forget HTML; think JSON schemas, tool definitions, and binary protocols.",
+    "description": "The next web won't be browsers talking to servers \u2014 it'll be agents talking to agents. Forget HTML; think JSON schemas, tool definitions, and binary protocols.",
     "audience": "Developers and architects building multi-agent systems",
     "tone": "technical, visionary but grounded, with code examples",
-    "tags": ["ai", "agents", "protocols", "architecture"],
+    "tags": [
+      "ai",
+      "agents",
+      "protocols",
+      "architecture"
+    ],
     "outline": [
       "Why agents don't need HTML or REST APIs",
       "The emerging protocol stack: MCP, tool use, structured I/O",
@@ -205,7 +270,13 @@
     "description": "Model Context Protocol is becoming the TCP/IP of AI agents. Combined with tool use, it creates a standard way for agents to interact with the world and each other.",
     "audience": "Developers building AI integrations or multi-agent systems",
     "tone": "technical deep-dive, practical integration guide",
-    "tags": ["mcp", "ai", "agents", "claude", "protocols"],
+    "tags": [
+      "mcp",
+      "ai",
+      "agents",
+      "claude",
+      "protocols"
+    ],
     "outline": [
       "What MCP actually is (and isn't)",
       "The protocol stack: transport, schema, execution",
@@ -218,10 +289,15 @@
   {
     "id": "ai-agent-autonomous-workflows",
     "title_hint": "Your Next Hire Is an AI Agent: Building Autonomous Business Workflows",
-    "description": "AI agents can now handle tasks that used to require a full-time employee — scheduling, data entry, report generation, customer follow-ups. Here's how to build them.",
+    "description": "AI agents can now handle tasks that used to require a full-time employee \u2014 scheduling, data entry, report generation, customer follow-ups. Here's how to build them.",
     "audience": "Technical founders and developers automating business operations",
     "tone": "practical, ROI-focused, step-by-step",
-    "tags": ["ai", "agents", "automation", "business"],
+    "tags": [
+      "ai",
+      "agents",
+      "automation",
+      "business"
+    ],
     "outline": [
       "The economics: what an AI agent costs vs a hire",
       "Identifying automatable workflows in your business",
@@ -237,7 +313,12 @@
     "description": "Most AI agent tutorials stop at 'hello world'. This post covers the production concerns: error handling, retries, cost control, observability, and deployment.",
     "audience": "Developers shipping AI agents to production, not just prototyping",
     "tone": "battle-tested, practical, architecture-focused",
-    "tags": ["ai", "claude", "architecture", "production"],
+    "tags": [
+      "ai",
+      "claude",
+      "architecture",
+      "production"
+    ],
     "outline": [
       "The gap between demo agents and production agents",
       "Architecture: event loop, tool dispatch, state management",
@@ -250,10 +331,15 @@
   {
     "id": "context-engineering-beats-rag",
     "title_hint": "RAG Is Not Enough: Why Context Engineering Beats Retrieval",
-    "description": "Retrieval-Augmented Generation gets all the hype, but context engineering — carefully curating what goes into the prompt — often works better and costs less.",
+    "description": "Retrieval-Augmented Generation gets all the hype, but context engineering \u2014 carefully curating what goes into the prompt \u2014 often works better and costs less.",
     "audience": "AI developers building applications with LLMs",
     "tone": "contrarian, evidence-based, practical alternatives",
-    "tags": ["ai", "rag", "llm", "architecture"],
+    "tags": [
+      "ai",
+      "rag",
+      "llm",
+      "architecture"
+    ],
     "outline": [
       "The RAG hype cycle and where it breaks down",
       "What context engineering actually means",
@@ -265,11 +351,16 @@
   },
   {
     "id": "prompt-caching-cost-savings",
-    "title_hint": "Prompt Caching Saved Me 90% on API Costs — Here's How",
+    "title_hint": "Prompt Caching Saved Me 90% on API Costs \u2014 Here's How",
     "description": "Anthropic's prompt caching gives a 90% discount on cached input tokens. If you structure your prompts right, you can slash your AI bills dramatically.",
     "audience": "Developers using Claude API who want to reduce costs",
     "tone": "tutorial, data-driven with real cost comparisons",
-    "tags": ["claude", "ai", "optimization", "costs"],
+    "tags": [
+      "claude",
+      "ai",
+      "optimization",
+      "costs"
+    ],
     "outline": [
       "How prompt caching works: the 5-minute TTL window",
       "Structuring prompts for maximum cache hits",
@@ -285,7 +376,12 @@
     "description": "Most AI-generated content is mediocre because nobody built quality control. Here's how to build a pipeline that generates, scores, and filters content automatically.",
     "audience": "Content creators and developers building AI content pipelines",
     "tone": "practical, honest about limitations, systems-thinking",
-    "tags": ["ai", "content", "quality", "automation"],
+    "tags": [
+      "ai",
+      "content",
+      "quality",
+      "automation"
+    ],
     "outline": [
       "Why raw AI output reads like generic SEO spam",
       "The quality pipeline: generate, score, filter, publish",
@@ -298,10 +394,15 @@
   {
     "id": "ai-agents-replace-saas",
     "title_hint": "Why AI Agents Will Replace SaaS Dashboards",
-    "description": "SaaS products are dashboards you click through. AI agents are assistants you talk to. The UX paradigm shift is already happening — here's what it means for builders.",
+    "description": "SaaS products are dashboards you click through. AI agents are assistants you talk to. The UX paradigm shift is already happening \u2014 here's what it means for builders.",
     "audience": "SaaS founders, product managers, and developers",
     "tone": "thought-provoking, examples from real products, forward-looking",
-    "tags": ["ai", "agents", "saas", "product"],
+    "tags": [
+      "ai",
+      "agents",
+      "saas",
+      "product"
+    ],
     "outline": [
       "The dashboard problem: too many tabs, too many clicks",
       "Agents as the new interface: describe what you want, not how",
@@ -317,7 +418,12 @@
     "description": "In 2026, you can build, design, deploy, and market a product without hiring anyone. AI handles the code, the copy, the support, and the ops. Here's the playbook.",
     "audience": "Aspiring founders and solo entrepreneurs",
     "tone": "provocative, practical playbook, honest about limits",
-    "tags": ["ai", "startup", "indie", "business"],
+    "tags": [
+      "ai",
+      "startup",
+      "indie",
+      "business"
+    ],
     "outline": [
       "The old startup cost structure vs the AI-powered one",
       "Developer: Claude Code writes your MVP",
@@ -333,7 +439,12 @@
     "description": "AI can catch bugs, suggest improvements, and review PRs faster than any human. But it also misses context that humans see instantly. Here's how to use both effectively.",
     "audience": "Engineering leads and developers doing code review",
     "tone": "balanced, practical workflow recommendations",
-    "tags": ["ai", "code-review", "development", "workflow"],
+    "tags": [
+      "ai",
+      "code-review",
+      "development",
+      "workflow"
+    ],
     "outline": [
       "What AI catches that humans miss (and vice versa)",
       "Setting up AI-powered PR review: tools and integration",
@@ -349,7 +460,12 @@
     "description": "Should you build on Claude/GPT APIs or self-host Llama/Mistral? The answer depends on your constraints. Here's a framework for deciding, not a religious argument.",
     "audience": "Developers and CTOs choosing their AI stack",
     "tone": "balanced, framework-oriented, with real cost comparisons",
-    "tags": ["ai", "open-source", "llm", "architecture"],
+    "tags": [
+      "ai",
+      "open-source",
+      "llm",
+      "architecture"
+    ],
     "outline": [
       "The real trade-offs: cost, quality, control, latency",
       "When closed APIs win: speed to market, quality ceiling",
@@ -361,11 +477,16 @@
   },
   {
     "id": "developer-with-ai-advantage",
-    "title_hint": "AI Won't Take Your Job — But a Developer With AI Will",
+    "title_hint": "AI Won't Take Your Job \u2014 But a Developer With AI Will",
     "description": "The developers who learn to work with AI effectively are 5-10x more productive. Those who don't are falling behind fast. Here's what the productivity gap actually looks like.",
     "audience": "All developers, especially those skeptical about AI tools",
     "tone": "direct, motivating, practical getting-started advice",
-    "tags": ["ai", "productivity", "career", "development"],
+    "tags": [
+      "ai",
+      "productivity",
+      "career",
+      "development"
+    ],
     "outline": [
       "The productivity gap: measured, not hypothetical",
       "What AI-augmented development actually looks like day-to-day",
@@ -373,6 +494,27 @@
       "Getting started: from skeptic to productive in one week",
       "The meta-skill: knowing when to use AI and when not to",
       "Career implications: what hiring managers are looking for in 2026"
+    ]
+  },
+  {
+    "id": "token-burn-enterprise-monitoring",
+    "title_hint": "Token Burn: When Your Enterprise Starts Watching Your AI Usage",
+    "description": "A post about the growing trend of enterprises monitoring and auditing AI model token usage. As companies scale AI adoption, management starts checking whether engineers use tokens efficiently \u2014 quotas, dashboards, cost attribution, and the inevitable bureaucracy of AI spend oversight. The tone should be a mix of dark humor and practical advice.",
+    "audience": "Software engineers and team leads at companies adopting AI tools",
+    "tone": "sarcastic, darkly humorous, practical",
+    "tags": [
+      "ai",
+      "enterprise",
+      "tokens",
+      "management"
+    ],
+    "outline": [
+      "The moment your company discovers the API bill",
+      "Token dashboards and the new Big Brother",
+      "The efficiency audit \u2014 are you prompting wrong?",
+      "Quotas, budgets, and the death of experimentation",
+      "How to survive the token police \u2014 practical tips",
+      "The irony: spending tokens to monitor token spending"
     ]
   }
 ]
