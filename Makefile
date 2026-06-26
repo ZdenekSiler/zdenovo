@@ -78,6 +78,8 @@ test:
 .PHONY: prod prod-logs prod-stop prod-down
 
 prod: _require-env _gen-nginx-conf _check-certs
+	@echo "→ Backing up database before deploy..."
+	@/opt/zdenovo/backup-db.sh
 	$(COMPOSE_PROD) up --build -d
 	@echo "→ Waiting for containers to stabilize..."
 	@sleep 5
