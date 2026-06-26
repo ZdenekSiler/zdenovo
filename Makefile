@@ -79,8 +79,8 @@ test:
 
 prod: _require-env _gen-nginx-conf _check-certs
 	@echo "→ Backing up database before deploy..."
-	@/opt/zdenovo/backup-db.sh
-	$(COMPOSE_PROD) up --build -d
+	@/opt/zdenovo/backup-db.sh || (echo "ERROR: backup failed — aborting deploy" && exit 1)
+	BUILD_COMMIT=$$(git rev-parse --short HEAD) $(COMPOSE_PROD) up --build -d
 	@echo "→ Reloading nginx to pick up new web container IP..."
 	@docker exec zdenovo-nginx-1 nginx -s reload 2>/dev/null || true
 	@echo "→ Waiting for containers to stabilize..."
