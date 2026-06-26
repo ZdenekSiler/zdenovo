@@ -9,3 +9,12 @@ services:
     environment:
       - DB_DIR=/data
     restart: unless-stopped
+    networks:
+      default:
+      zdenovo_public:
+        aliases:
+          - web
+
+networks:
+  zdenovo_public:
+    external: true
