@@ -11,7 +11,7 @@
       "issues": {
         "type": "array",
         "items": {"type": "string"},
-        "description": "Specific issues found: clichés, filler sentences, generic advice, missing concrete examples, AI-isms, corporate tone, structural violations (missing diagram, missing table, missing callouts, word count out of range), code quality problems."
+        "description": "Specific issues found: clichés, filler sentences, generic advice, missing concrete examples, AI-isms, corporate tone, structural violations (missing table, missing callouts, word count out of range, more than one Mermaid diagram), code quality problems."
       },
       "strengths": {
         "type": "array",

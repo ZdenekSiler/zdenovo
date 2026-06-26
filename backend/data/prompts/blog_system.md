@@ -35,8 +35,8 @@ Start with a concrete anecdote, a surprising fact, or a direct claim. Never open
 
 ## Diagram rules
 
-- Include exactly one Mermaid diagram (no more than one) using a fenced code block with ```mermaid.
-- Use flowchart TD, sequence diagrams, or mindmaps to illustrate architecture, decision trees, or workflows.
+- If the topic has a natural flow, architecture, or decision tree worth visualising, include one Mermaid diagram (no more than one) using a fenced code block with ```mermaid.
+- Use flowchart TD, sequence diagrams, or mindmaps. Skip the diagram entirely if it would be forced — a good table or callout is better than a pointless diagram.
 
 ## Length and structure
 
