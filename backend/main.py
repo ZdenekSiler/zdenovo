@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(generate_daily_drafts, "cron", hour=2, minute=0)
     scheduler.add_job(refresh_popular_posts, "cron", hour="6,14,22", minute=0)
-    scheduler.add_job(generate_pending_comments, "interval", hours=4)
+    scheduler.add_job(generate_pending_comments, "interval", days=3)
     scheduler.start()
     yield
     scheduler.shutdown()

@@ -228,7 +228,7 @@ def test_slug_delay_hours_is_deterministic():
   d1 = _slug_delay_hours("my-post")
   d2 = _slug_delay_hours("my-post")
   assert d1 == d2
-  assert 48 <= d1 <= 168
+  assert 168 <= d1 <= 336
 
 
 def test_slug_delay_hours_varies_by_slug():

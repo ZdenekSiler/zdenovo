@@ -137,9 +137,9 @@ comment_generator = CommentGenerator()
 
 
 def _slug_delay_hours(slug: str) -> float:
-    """Deterministic random delay (48-168h) seeded from slug, survives restarts."""
+    """Deterministic random delay (168-336h) seeded from slug, survives restarts."""
     h = int(hashlib.sha256(slug.encode()).hexdigest(), 16)
-    return 48 + (h % 10000) / 10000 * 120  # 48h to 168h (7 days)
+    return 168 + (h % 10000) / 10000 * 168  # 168h to 336h (1-2 weeks)
 
 
 def generate_pending_comments() -> int:
