@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from db import get_conn
@@ -10,6 +10,12 @@ from db import get_conn
 router = APIRouter(prefix="/api/topics", tags=["topics"])
 
 DAILY_TOPICS_PATH = Path(__file__).resolve().parent.parent / "data" / "daily_topics.json"
+
+
+# Import require_admin at usage time to avoid circular imports
+def _get_require_admin():
+    from routers.auth import require_admin
+    return require_admin
 
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -90,7 +96,7 @@ def get_topic(topic_id: str):
 
 
 @router.post("", response_model=TopicOut, status_code=201)
-def create_topic(body: TopicIn):
+def create_topic(body: TopicIn, _: None = Depends(_get_require_admin)):
     topics = _load_topics()
     topic_id = _slugify(body.title_hint)
     if any(t["id"] == topic_id for t in topics):
@@ -102,7 +108,7 @@ def create_topic(body: TopicIn):
 
 
 @router.put("/{topic_id}", response_model=TopicOut)
-def update_topic(topic_id: str, body: TopicIn):
+def update_topic(topic_id: str, body: TopicIn, _: None = Depends(_get_require_admin)):
     topics = _load_topics()
     topic = next((t for t in topics if t["id"] == topic_id), None)
     if topic is None:
@@ -113,7 +119,7 @@ def update_topic(topic_id: str, body: TopicIn):
 
 
 @router.delete("/{topic_id}", status_code=204)
-def delete_topic(topic_id: str):
+def delete_topic(topic_id: str, _: None = Depends(_get_require_admin)):
     topics = _load_topics()
     filtered = [t for t in topics if t["id"] != topic_id]
     if len(filtered) == len(topics):

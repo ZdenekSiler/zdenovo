@@ -1,21 +1,29 @@
+"""Zdenovo FastAPI blog application.
+
+Main entry point with lifespan management, HTML page routes, and middleware setup.
+Admin APIs and SEO routes are extracted to dedicated modules for clarity.
+"""
+
 import json
+import logging
 import os
-import re
-import secrets
-import urllib.request
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import mistune
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from sanitize import safe_markdown
 
 load_dotenv()  # no-op if .env absent; prod uses file secrets
 
@@ -25,17 +33,30 @@ from data.analytics import refresh_popular_posts
 from data.posts import get_all_posts, get_all_tags, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
+from middleware.csrf import CSRFMiddleware
 from routers.comments_api import generate_pending_comments, router as comments_router
 from routers.drafts_api import _regenerate_draft, generate_daily_drafts, generate_single_topic, router as drafts_router
 from routers.generate_api import router as generate_router
 from routers.posts_api import router as posts_router
-from routers.topics_api import router as topics_router
+from routers.topics_api import _enrich_topics, _load_topics, _save_topics, _slugify, router as topics_router
+from routers.auth import AdminRequired, _is_admin, require_admin, validate_redirect_url, verify_admin_password
+from routers.seo import router as seo_router
 
 BASE_DIR = Path(__file__).parent.parent  # zdenovo/
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+log = logging.getLogger(__name__)
+
+
+# ─── Lifespan & Scheduler ─────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Initialize database and start scheduler on app startup."""
     init_db()
     refresh_popular_posts()
     scheduler = AsyncIOScheduler(timezone="UTC")
@@ -54,23 +75,41 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+@app.exception_handler(RateLimitExceeded)
+async def ratelimit_handler(request: Request, exc: RateLimitExceeded):
+    """Handle rate limit exceeded errors."""
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many requests. Please try again later."}
+    )
+
+
+# ─── Middleware ───────────────────────────────────────────────────────────────
+
+secret_key = read_secret("secret_key", "SECRET_KEY")
+if not secret_key:
+    raise RuntimeError("SECRET_KEY not configured. Set /run/secrets/secret_key or SECRET_KEY env var.")
+
 app.add_middleware(
     SessionMiddleware,
-    secret_key=read_secret("secret_key", "SECRET_KEY") or "dev-insecure-key-change-in-prod",
+    secret_key=secret_key,
     session_cookie="zdenovo_session",
     max_age=60 * 60 * 24 * 7,  # 7 days
-    https_only=False,           # set True in prod behind HTTPS
+    https_only=os.getenv("HTTPS_ONLY", "False").lower() == "true",
+    same_site="lax",  # CSRF defense
 )
+
+# Add CSRF middleware AFTER SessionMiddleware (middleware order is reversed)
+app.add_middleware(CSRFMiddleware)
 
 app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend" / "static"), name="static")
 
 templates = Jinja2Templates(directory=BASE_DIR / "frontend" / "templates")
-
-app.include_router(comments_router)
-app.include_router(drafts_router)
-app.include_router(generate_router)
-app.include_router(posts_router)
-app.include_router(topics_router)
 
 
 def _fmt_date(d) -> str:
@@ -79,36 +118,34 @@ def _fmt_date(d) -> str:
 
 
 templates.env.filters["dateformat"] = _fmt_date
-templates.env.filters["markdown"] = mistune.html
+templates.env.filters["markdown"] = safe_markdown
 
 _commit_file = Path("/app/BUILD_COMMIT")
 templates.env.globals["build_commit"] = _commit_file.read_text().strip() if _commit_file.exists() else "dev"
 templates.env.globals["deploy_time"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-
-# ─── Auth ─────────────────────────────────────────────────────────────────────
-
-def _is_admin(request: Request) -> bool:
-    return request.session.get("admin") is True
-
-
-def require_admin(request: Request) -> None:
-    if not _is_admin(request):
-        raise _AdminRequired(next_url=str(request.url.path))
+# Include API routers
+app.include_router(comments_router)
+app.include_router(drafts_router)
+app.include_router(generate_router)
+app.include_router(posts_router)
+app.include_router(topics_router)
+app.include_router(seo_router)
 
 
-class _AdminRequired(Exception):
-    def __init__(self, next_url: str = "/admin/posts"):
-        self.next_url = next_url
+# ─── Auth Exception Handler ────────────────────────────────────────────────────
 
-
-@app.exception_handler(_AdminRequired)
-async def _admin_required_handler(request: Request, exc: _AdminRequired):
+@app.exception_handler(AdminRequired)
+async def admin_required_handler(request: Request, exc: AdminRequired):
+    """Redirect unauthenticated requests to login page."""
     return RedirectResponse(f"/admin/login?next={exc.next_url}", status_code=303)
 
 
+# ─── Auth Routes ──────────────────────────────────────────────────────────────
+
 @app.get("/admin/login", response_class=HTMLResponse)
-async def admin_login_page(request: Request, next: str = "/admin/posts"):
+async def admin_login_page(request: Request, next: str = "/admin/posts") -> str:
+    """Display admin login page."""
     if _is_admin(request):
         return RedirectResponse(next, status_code=303)
     return templates.TemplateResponse(request, "admin_login.html", {"next": next})
@@ -120,10 +157,11 @@ async def admin_login(
     password: str = Form(...),
     next: str = Form("/admin/posts"),
 ):
-    admin_password = read_secret("admin_password", "ADMIN_PASSWORD")
-    if admin_password and secrets.compare_digest(password.encode(), admin_password.encode()):
+    """Handle admin login form submission."""
+    if verify_admin_password(password):
         request.session["admin"] = True
-        return RedirectResponse(next if next.startswith("/admin") else "/admin/posts", status_code=303)
+        next_url = validate_redirect_url(next)
+        return RedirectResponse(next_url, status_code=303)
     return templates.TemplateResponse(
         request, "admin_login.html", {"next": next, "error": "Wrong password."},
         status_code=401,
@@ -132,14 +170,16 @@ async def admin_login(
 
 @app.post("/admin/logout")
 async def admin_logout(request: Request):
+    """Handle admin logout."""
     request.session.clear()
     return RedirectResponse("/admin/login", status_code=303)
 
 
-# ─── HTML pages ───────────────────────────────────────────────────────────────
+# ─── Public HTML Pages ────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
+async def home(request: Request) -> str:
+    """Home page with featured projects and recent posts."""
     posts = get_all_posts()[:3]
     projects = [p for p in get_all_projects() if p["featured"]]
     tags = get_all_tags()
@@ -151,7 +191,8 @@ async def home(request: Request):
 
 
 @app.get("/about", response_class=HTMLResponse)
-async def about(request: Request):
+async def about(request: Request) -> str:
+    """About page with featured projects."""
     projects = [p for p in get_all_projects() if p["featured"]]
     tags = get_all_tags()
     return templates.TemplateResponse(request, "about.html", {
@@ -161,19 +202,22 @@ async def about(request: Request):
 
 
 @app.get("/projects", response_class=HTMLResponse)
-async def projects(request: Request):
+async def projects(request: Request) -> str:
+    """Projects showcase page."""
     return templates.TemplateResponse(
         request, "projects.html", {"projects": get_all_projects()}
     )
 
 
 @app.get("/projects/fakturant", response_class=HTMLResponse)
-async def project_fakturant(request: Request):
+async def project_fakturant(request: Request) -> str:
+    """Fakturant project details page."""
     return templates.TemplateResponse(request, "fakturant.html", {})
 
 
 @app.get("/blog", response_class=HTMLResponse)
-async def blog(request: Request, tag: str | None = None, page: int = 1):
+async def blog(request: Request, tag: str | None = None, page: int = 1) -> str:
+    """Blog listing page with pagination and tag filtering."""
     posts, total = get_posts_page(page, tag=tag)
     n_pages = total_pages(total)
     return templates.TemplateResponse(
@@ -188,7 +232,8 @@ async def blog(request: Request, tag: str | None = None, page: int = 1):
 
 
 @app.get("/blog/{slug}", response_class=HTMLResponse)
-async def post(request: Request, slug: str):
+async def post(request: Request, slug: str) -> str:
+    """Individual blog post page with comments."""
     article = get_post_by_slug(slug)
     if article is None:
         return templates.TemplateResponse(request, "404.html", status_code=404)
@@ -206,15 +251,26 @@ async def post(request: Request, slug: str):
 
 
 @app.post("/blog/{slug}/comments", response_class=HTMLResponse)
-async def submit_comment(request: Request, slug: str, author: str = Form(...), body: str = Form(...)):
+@limiter.limit("5/minute")
+async def submit_comment(request: Request, slug: str, author: str = Form(...), body: str = Form(...)) -> str:
+    """Submit a comment on a blog post (rate limited)."""
     article = get_post_by_slug(slug)
     if article is None:
         return templates.TemplateResponse(request, "404.html", status_code=404)
-    if author.strip() and body.strip():
+    
+    # Validate input lengths
+    author = author.strip()
+    body = body.strip()
+    if not (1 <= len(author) <= 80):
+        raise HTTPException(status_code=400, detail="Author must be 1-80 characters")
+    if not (1 <= len(body) <= 2000):
+        raise HTTPException(status_code=400, detail="Body must be 1-2000 characters")
+    
+    if author and body:
         with get_conn() as conn:
             conn.execute(
                 "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated) VALUES (?, ?, ?, ?, ?, 0)",
-                (str(uuid.uuid4()), slug, author.strip()[:80], body.strip()[:2000], datetime.now(timezone.utc).isoformat()),
+                (str(uuid.uuid4()), slug, author[:80], body[:2000], datetime.now(timezone.utc).isoformat()),
             )
     with get_conn() as conn:
         rows = conn.execute(
@@ -226,91 +282,12 @@ async def submit_comment(request: Request, slug: str, author: str = Form(...), b
     return templates.TemplateResponse(request, "comments_section.html", {"comments": comments, "slug": slug})
 
 
-# ─── SEO: sitemap, robots.txt, RSS ───────────────────────────────────────────
-
-DOMAIN = "https://zdenovo.com"
-
-
-@app.get("/sitemap.xml")
-async def sitemap():
-    posts = get_all_posts()
-    lines = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ]
-    static_pages = [
-        ("", "weekly", "1.0"),
-        ("/blog", "daily", "0.9"),
-        ("/about", "monthly", "0.7"),
-        ("/projects", "monthly", "0.6"),
-        ("/projects/fakturant", "monthly", "0.5"),
-    ]
-    for path, freq, prio in static_pages:
-        lines.append(
-            f"  <url><loc>{DOMAIN}{path}</loc>"
-            f"<changefreq>{freq}</changefreq><priority>{prio}</priority></url>"
-        )
-    for p in posts:
-        date = p["date"].isoformat() if hasattr(p["date"], "isoformat") else str(p["date"])
-        lines.append(
-            f"  <url><loc>{DOMAIN}/blog/{p['slug']}</loc>"
-            f"<lastmod>{date}</lastmod><changefreq>monthly</changefreq>"
-            f"<priority>0.8</priority></url>"
-        )
-    lines.append("</urlset>")
-    return Response(content="\n".join(lines), media_type="application/xml")
-
-
-@app.get("/robots.txt")
-async def robots():
-    body = (
-        "User-agent: *\n"
-        "Allow: /\n"
-        "Disallow: /admin/\n"
-        "Disallow: /api/\n"
-        f"Sitemap: {DOMAIN}/sitemap.xml\n"
-    )
-    return PlainTextResponse(body)
-
-
-@app.get("/feed.xml")
-async def rss_feed():
-    posts = get_all_posts()[:20]
-    items = []
-    for p in posts:
-        date = p["date"].isoformat() if hasattr(p["date"], "isoformat") else str(p["date"])
-        title = p["title"].replace("&", "&amp;").replace("<", "&lt;")
-        summary = (p["summary"] or "").replace("&", "&amp;").replace("<", "&lt;")
-        items.append(
-            f"    <item>\n"
-            f"      <title>{title}</title>\n"
-            f"      <link>{DOMAIN}/blog/{p['slug']}</link>\n"
-            f"      <guid>{DOMAIN}/blog/{p['slug']}</guid>\n"
-            f"      <pubDate>{date}</pubDate>\n"
-            f"      <description>{summary}</description>\n"
-            f"    </item>"
-        )
-    xml = (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">\n'
-        "  <channel>\n"
-        "    <title>Zdenovo Blog</title>\n"
-        f"    <link>{DOMAIN}/blog</link>\n"
-        "    <description>Notes on software engineering, AI development, and tooling.</description>\n"
-        "    <language>en</language>\n"
-        f'    <atom:link href="{DOMAIN}/feed.xml" rel="self" type="application/rss+xml"/>\n'
-        + "\n".join(items) + "\n"
-        "  </channel>\n"
-        "</rss>"
-    )
-    return Response(content=xml, media_type="application/rss+xml")
-
-
-# ─── Admin pages ──────────────────────────────────────────────────────────────
+# ─── Admin Dashboard & Posts ──────────────────────────────────────────────────
 
 @app.get("/admin/", response_class=HTMLResponse)
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_root(request: Request, _: None = Depends(require_admin)):
+async def admin_root(request: Request, _: None = Depends(require_admin)) -> str:
+    """Admin dashboard with statistics."""
     posts = get_all_posts()
     with get_conn() as conn:
         pending_count = conn.execute(
@@ -337,7 +314,8 @@ async def admin_root(request: Request, _: None = Depends(require_admin)):
 
 
 @app.get("/admin/posts", response_class=HTMLResponse)
-async def admin_posts(request: Request, _: None = Depends(require_admin)):
+async def admin_posts(request: Request, _: None = Depends(require_admin)) -> str:
+    """Admin page listing all published posts."""
     posts = get_all_posts()
     with get_conn() as conn:
         pending_count = conn.execute(
@@ -352,7 +330,8 @@ async def admin_posts(request: Request, _: None = Depends(require_admin)):
 
 
 @app.post("/api/posts/{slug}/toggle-ai-comments", response_class=HTMLResponse)
-async def toggle_ai_comments(slug: str, _: None = Depends(require_admin)):
+async def toggle_ai_comments(slug: str, _: None = Depends(require_admin)) -> str:
+    """Toggle AI comment generation for a post."""
     with get_conn() as conn:
         row = conn.execute("SELECT ai_comments FROM posts WHERE slug = ?", (slug,)).fetchone()
         if not row:
@@ -363,6 +342,7 @@ async def toggle_ai_comments(slug: str, _: None = Depends(require_admin)):
 
 
 def _ai_toggle_btn(slug: str, enabled: bool) -> str:
+    """HTML for AI toggle button."""
     label = "AI: on" if enabled else "AI: off"
     cls = "text-emerald-400 border-emerald-900/40 hover:border-emerald-700/60" if enabled else "text-zinc-500"
     return (
@@ -373,8 +353,11 @@ def _ai_toggle_btn(slug: str, enabled: bool) -> str:
     )
 
 
+# ─── Admin Drafts ─────────────────────────────────────────────────────────────
+
 @app.get("/admin/drafts", response_class=HTMLResponse)
-async def admin_drafts(request: Request, _: None = Depends(require_admin)):
+async def admin_drafts(request: Request, _: None = Depends(require_admin)) -> str:
+    """List all drafts."""
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM drafts ORDER BY generated_at DESC"
@@ -384,7 +367,8 @@ async def admin_drafts(request: Request, _: None = Depends(require_admin)):
 
 
 @app.get("/admin/drafts/{draft_id}", response_class=HTMLResponse)
-async def admin_draft_preview(request: Request, draft_id: str, _: None = Depends(require_admin)):
+async def admin_draft_preview(request: Request, draft_id: str, _: None = Depends(require_admin)) -> str:
+    """View and edit a draft."""
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
     if row is None:
@@ -399,8 +383,48 @@ async def admin_draft_preview(request: Request, draft_id: str, _: None = Depends
     })
 
 
+@app.post("/admin/drafts/{draft_id}", response_class=HTMLResponse)
+async def admin_draft_edit(
+    request: Request,
+    draft_id: str,
+    title: str = Form(...),
+    summary: str = Form(...),
+    content: str = Form(...),
+    tags: str = Form(""),
+    _: None = Depends(require_admin),
+) -> RedirectResponse:
+    """Update a draft's content."""
+    tags_list = [t.strip() for t in tags.split(",") if t.strip()]
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE drafts SET title=?, summary=?, content=?, tags=? WHERE id=?",
+            (title, summary, content, json.dumps(tags_list), draft_id),
+        )
+    return RedirectResponse(f"/admin/drafts/{draft_id}", status_code=303)
+
+
+@app.post("/admin/drafts/{draft_id}/regenerate", response_class=HTMLResponse)
+async def admin_draft_regenerate(
+    request: Request,
+    draft_id: str,
+    remarks: str = Form(...),
+    _: None = Depends(require_admin),
+):
+    """Regenerate a draft based on editorial feedback."""
+    _regenerate_draft(draft_id, remarks)
+    if request.headers.get("HX-Request"):
+        from fastapi.responses import Response
+        response = Response(status_code=200)
+        response.headers["HX-Redirect"] = f"/admin/drafts/{draft_id}"
+        return response
+    return RedirectResponse(f"/admin/drafts/{draft_id}", status_code=303)
+
+
+# ─── Admin Comments ───────────────────────────────────────────────────────────
+
 @app.get("/admin/comments", response_class=HTMLResponse)
-async def admin_comments(request: Request, _: None = Depends(require_admin)):
+async def admin_comments(request: Request, _: None = Depends(require_admin)) -> str:
+    """List all comments."""
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM comments ORDER BY created_at DESC"
@@ -425,42 +449,14 @@ async def admin_comments(request: Request, _: None = Depends(require_admin)):
     })
 
 
-@app.post("/admin/drafts/{draft_id}", response_class=HTMLResponse)
-async def admin_draft_edit(
-    request: Request,
-    draft_id: str,
-    title: str = Form(...),
-    summary: str = Form(...),
-    content: str = Form(...),
-    tags: str = Form(""),
-    _: None = Depends(require_admin),
-):
-    tags_list = [t.strip() for t in tags.split(",") if t.strip()]
-    with get_conn() as conn:
-        conn.execute(
-            "UPDATE drafts SET title=?, summary=?, content=?, tags=? WHERE id=?",
-            (title, summary, content, json.dumps(tags_list), draft_id),
-        )
-    return RedirectResponse(f"/admin/drafts/{draft_id}", status_code=303)
-
-
-@app.post("/admin/drafts/{draft_id}/regenerate", response_class=HTMLResponse)
-async def admin_draft_regenerate(
-    request: Request,
-    draft_id: str,
-    remarks: str = Form(...),
-    _: None = Depends(require_admin),
-):
-    _regenerate_draft(draft_id, remarks)
-    if request.headers.get("HX-Request"):
-        response = Response(status_code=200)
-        response.headers["HX-Redirect"] = f"/admin/drafts/{draft_id}"
-        return response
-    return RedirectResponse(f"/admin/drafts/{draft_id}", status_code=303)
-
+# ─── Admin Stats ──────────────────────────────────────────────────────────────
 
 @app.get("/admin/stats", response_class=HTMLResponse)
-async def admin_stats(request: Request, _: None = Depends(require_admin)):
+async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str:
+    """Display analytics from Cloudflare."""
+    import urllib.request
+    from datetime import timedelta
+    
     cf_token = read_secret("cloudflare_api_token", "CLOUDFLARE_API_TOKEN")
     zone_id = os.environ.get("CF_ZONE_ID", "")
 
@@ -471,12 +467,12 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
     week_ago = (datetime.now(timezone.utc) - timedelta(days=6)).strftime("%Y-%m-%d")
 
     query = """
-    {
+    query($zoneTag: String!, $dateGt: String!, $dateLe: String!) {
       viewer {
-        zones(filter: {zoneTag: "%s"}) {
+        zones(filter: {zoneTag: $zoneTag}) {
           daily: httpRequests1dGroups(
             limit: 7
-            filter: {date_geq: "%s", date_leq: "%s"}
+            filter: {date_geq: $dateGt, date_leq: $dateLe}
           ) {
             dimensions { date }
             sum { requests pageViews }
@@ -484,7 +480,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
           }
           topPaths: httpRequestsAdaptiveGroups(
             limit: 10
-            filter: {date_geq: "%s", date_leq: "%s", requestSource: "eyeball"}
+            filter: {date_geq: $dateGt, date_leq: $dateLe, requestSource: "eyeball"}
             orderBy: [count_DESC]
           ) {
             dimensions { clientRequestPath }
@@ -492,7 +488,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
           }
           topCountries: httpRequestsAdaptiveGroups(
             limit: 10
-            filter: {date_geq: "%s", date_leq: "%s", requestSource: "eyeball"}
+            filter: {date_geq: $dateGt, date_leq: $dateLe, requestSource: "eyeball"}
             orderBy: [count_DESC]
           ) {
             dimensions { clientCountryName }
@@ -500,7 +496,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
           }
           topBrowsers: httpRequestsAdaptiveGroups(
             limit: 5
-            filter: {date_geq: "%s", date_leq: "%s", requestSource: "eyeball"}
+            filter: {date_geq: $dateGt, date_leq: $dateLe, requestSource: "eyeball"}
             orderBy: [count_DESC]
           ) {
             dimensions { userAgent }
@@ -509,18 +505,29 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
         }
       }
     }
-    """ % (zone_id, week_ago, today, today, today, today, today, today, today)
+    """
 
     req = urllib.request.Request(
         "https://api.cloudflare.com/client/v4/graphql",
-        data=json.dumps({"query": query}).encode(),
+        data=json.dumps({
+            "query": query,
+            "variables": {
+                "zoneTag": zone_id,
+                "dateGt": week_ago,
+                "dateLe": today,
+            }
+        }).encode(),
         headers={"Authorization": f"Bearer {cf_token}", "Content-Type": "application/json"},
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
-    except Exception:
-        return templates.TemplateResponse(request, "admin_stats.html", {"error": "Failed to fetch analytics from Cloudflare."})
+    except Exception as exc:
+        log.error("Cloudflare API request failed: %s", exc, exc_info=True)
+        return templates.TemplateResponse(
+            request, "admin_stats.html",
+            {"error": "Failed to fetch analytics from Cloudflare."}
+        )
 
     if data.get("errors") or not data.get("data"):
         msg = data.get("errors", [{}])[0].get("message", "Unknown error") if data.get("errors") else "Empty response"
@@ -570,13 +577,11 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
     })
 
 
-# ─── Topics management ──────────────────────────────────────────────────────
-
-from routers.topics_api import _enrich_topics, _load_topics, _save_topics, _slugify
-
+# ─── Admin Topics ─────────────────────────────────────────────────────────────
 
 @app.get("/admin/topics", response_class=HTMLResponse)
-async def admin_topics(request: Request, _: None = Depends(require_admin)):
+async def admin_topics(request: Request, _: None = Depends(require_admin)) -> str:
+    """List all generation topics."""
     topics = _enrich_topics(_load_topics())
     available_count = sum(1 for t in topics if t["status"] == "available")
     return templates.TemplateResponse(request, "admin_topics.html", {
@@ -586,12 +591,14 @@ async def admin_topics(request: Request, _: None = Depends(require_admin)):
 
 
 @app.get("/admin/topics/new", response_class=HTMLResponse)
-async def admin_topic_new(request: Request, _: None = Depends(require_admin)):
+async def admin_topic_new(request: Request, _: None = Depends(require_admin)) -> str:
+    """New topic creation form."""
     return templates.TemplateResponse(request, "admin_topic_edit.html", {"topic": None})
 
 
 @app.get("/admin/topics/{topic_id}/edit", response_class=HTMLResponse)
-async def admin_topic_edit(request: Request, topic_id: str, _: None = Depends(require_admin)):
+async def admin_topic_edit(request: Request, topic_id: str, _: None = Depends(require_admin)) -> str:
+    """Edit topic form."""
     topics = _load_topics()
     topic = next((t for t in topics if t["id"] == topic_id), None)
     if topic is None:
@@ -609,7 +616,8 @@ async def admin_topic_create(
     tags: str = Form(""),
     outline: str = Form(""),
     _: None = Depends(require_admin),
-):
+) -> RedirectResponse:
+    """Create a new topic."""
     topics = _load_topics()
     topic_id = _slugify(title_hint)
     if any(t["id"] == topic_id for t in topics):
@@ -639,7 +647,8 @@ async def admin_topic_update(
     tags: str = Form(""),
     outline: str = Form(""),
     _: None = Depends(require_admin),
-):
+) -> RedirectResponse:
+    """Update a topic."""
     topics = _load_topics()
     topic = next((t for t in topics if t["id"] == topic_id), None)
     if topic is None:
@@ -655,13 +664,15 @@ async def admin_topic_update(
 
 
 @app.post("/admin/topics/{topic_id}/generate", response_class=HTMLResponse)
-async def admin_topic_generate(request: Request, topic_id: str, _: None = Depends(require_admin)):
+async def admin_topic_generate(request: Request, topic_id: str, _: None = Depends(require_admin)) -> RedirectResponse:
+    """Generate a draft from a topic."""
     draft = generate_single_topic(topic_id)
     return RedirectResponse(f"/admin/drafts/{draft.id}", status_code=303)
 
 
 @app.post("/admin/topics/{topic_id}/delete", response_class=HTMLResponse)
-async def admin_topic_delete(request: Request, topic_id: str, _: None = Depends(require_admin)):
+async def admin_topic_delete(request: Request, topic_id: str, _: None = Depends(require_admin)) -> RedirectResponse:
+    """Delete a topic."""
     topics = _load_topics()
     topics = [t for t in topics if t["id"] != topic_id]
     _save_topics(topics)

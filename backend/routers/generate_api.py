@@ -6,7 +6,7 @@ from pathlib import Path
 
 import anthropic
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from config import read_secret
@@ -17,9 +17,16 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/posts", tags=["generate"])
 
+
 BRIEFS_PATH = Path(__file__).parent.parent / "data" / "post_briefs.json"
 PROMPTS_DIR = Path(__file__).parent.parent / "data" / "prompts"
 
+
+
+# Import require_admin at usage time to avoid circular imports
+def _get_require_admin():
+    from routers.auth import require_admin
+    return require_admin
 MAX_GENERATION_ATTEMPTS = 3
 
 
@@ -389,7 +396,7 @@ def list_briefs():
 
 
 @router.post("/generate", response_model=DraftOut, status_code=201)
-def generate_post_route(body: GenerateIn):
+def generate_post_route(body: GenerateIn, _: None = Depends(_get_require_admin)):
   user_message = f"Description: {body.description}"
   if body.tags:
     user_message += f"\nSuggested tags: {', '.join(body.tags)}"
@@ -398,7 +405,7 @@ def generate_post_route(body: GenerateIn):
 
 
 @router.post("/generate/{brief_id}", response_model=DraftOut, status_code=201)
-def generate_from_brief(brief_id: str):
+def generate_from_brief(brief_id: str, _: None = Depends(_get_require_admin)):
   briefs = _load_briefs()
   brief = next((b for b in briefs if b.id == brief_id), None)
   if brief is None:
