@@ -3,7 +3,7 @@ import re
 import uuid
 from datetime import date as Date, datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from db import get_conn, row_to_dict
@@ -72,8 +72,14 @@ def get_post(slug: str):
     return row_to_dict(row)
 
 
+# Import require_admin at usage time to avoid circular imports
+def _get_require_admin():
+    from main import require_admin
+    return require_admin
+
+
 @router.post("", response_model=PostOut, status_code=201)
-def create_post(body: PostIn):
+def create_post(body: PostIn, _: None = Depends(_get_require_admin)):
     slug = _slugify(body.title)
     with get_conn() as conn:
         existing = conn.execute(
@@ -90,7 +96,7 @@ def create_post(body: PostIn):
 
 
 @router.put("/{slug}", response_model=PostOut)
-def update_post(slug: str, body: PostIn):
+def update_post(slug: str, body: PostIn, _: None = Depends(_get_require_admin)):
     with get_conn() as conn:
         row = conn.execute(
             "SELECT slug FROM posts WHERE slug = ?", (slug,)
@@ -108,7 +114,7 @@ def update_post(slug: str, body: PostIn):
 
 
 @router.delete("/{slug}", status_code=204)
-def delete_post(slug: str):
+def delete_post(slug: str, _: None = Depends(_get_require_admin)):
     with get_conn() as conn:
         conn.execute("DELETE FROM comments WHERE post_slug = ?", (slug,))
         result = conn.execute("DELETE FROM posts WHERE slug = ?", (slug,))
@@ -117,7 +123,7 @@ def delete_post(slug: str):
 
 
 @router.post("/{slug}/unpublish", status_code=204)
-def unpublish_post(slug: str):
+def unpublish_post(slug: str, _: None = Depends(_get_require_admin)):
     """Move a published post back to drafts (status=pending) and remove it from posts."""
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM posts WHERE slug = ?", (slug,)).fetchone()

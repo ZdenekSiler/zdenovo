@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import anthropic
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from config import read_secret
@@ -17,6 +17,12 @@ router = APIRouter(prefix="/api/comments", tags=["comments"])
 log = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent.parent / "data" / "prompts"
+
+
+# Import require_admin at usage time to avoid circular imports
+def _get_require_admin():
+    from main import require_admin
+    return require_admin
 
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -185,7 +191,7 @@ def list_comments(post_slug: str) -> list[dict]:
 
 
 @router.post("", response_model=CommentOut, status_code=201)
-def create_comment(body: CommentIn) -> dict:
+def create_comment(body: CommentIn, _: None = Depends(_get_require_admin)) -> dict:
     with get_conn() as conn:
         post = conn.execute(
             "SELECT slug FROM posts WHERE slug = ?", (body.post_slug,)
@@ -205,7 +211,7 @@ def create_comment(body: CommentIn) -> dict:
 
 
 @router.post("/generate", status_code=201)
-def generate_fake_comments(post_slug: str) -> list[dict]:
+def generate_fake_comments(post_slug: str, _: None = Depends(_get_require_admin)) -> list[dict]:
     """Generate 1-2 AI comments for a post."""
     with get_conn() as conn:
         post = conn.execute(
@@ -219,7 +225,7 @@ def generate_fake_comments(post_slug: str) -> list[dict]:
 
 
 @router.delete("/{comment_id}", status_code=204)
-def delete_comment(comment_id: str) -> None:
+def delete_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> None:
     with get_conn() as conn:
         result = conn.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
     if result.rowcount == 0:
@@ -227,7 +233,7 @@ def delete_comment(comment_id: str) -> None:
 
 
 @router.patch("/{comment_id}/approve", response_model=CommentOut)
-def approve_comment(comment_id: str) -> dict:
+def approve_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> dict:
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
         if row is None:
@@ -240,7 +246,7 @@ def approve_comment(comment_id: str) -> dict:
 
 
 @router.patch("/{comment_id}/publish", response_model=CommentOut)
-def publish_comment(comment_id: str) -> dict:
+def publish_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> dict:
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
         if row is None:

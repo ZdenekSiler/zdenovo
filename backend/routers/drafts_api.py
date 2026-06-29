@@ -3,7 +3,7 @@ import random
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from code_validator import ValidationSummary, validate_content
@@ -23,6 +23,12 @@ router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
 DAILY_TOPICS_PATH = Path(__file__).parent.parent / "data" / "daily_topics.json"
 DAILY_COUNT = 1
+
+
+# Import require_admin at usage time to avoid circular imports
+def _get_require_admin():
+    from main import require_admin
+    return require_admin
 
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -188,7 +194,7 @@ def get_draft(draft_id: str):
 
 
 @router.post("/generate", status_code=201)
-def trigger_daily_generation():
+def trigger_daily_generation(_: None = Depends(_get_require_admin)):
   """Manually trigger daily draft generation (also called by the scheduler)."""
   return generate_daily_drafts()
 
@@ -209,13 +215,13 @@ def generate_single_topic(topic_id: str) -> DraftOut:
 
 
 @router.post("/generate/{topic_id}", status_code=201, response_model=DraftOut)
-def generate_from_topic(topic_id: str):
+def generate_from_topic(topic_id: str, _: None = Depends(_get_require_admin)):
   """Generate a draft from a specific topic by ID."""
   return generate_single_topic(topic_id)
 
 
 @router.patch("/{draft_id}", response_model=DraftOut)
-def patch_draft(draft_id: str, body: DraftPatch):
+def patch_draft(draft_id: str, body: DraftPatch, _: None = Depends(_get_require_admin)):
   """Edit a draft's title, summary, content, or tags before approving."""
   with get_conn() as conn:
     row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
@@ -239,7 +245,7 @@ def patch_draft(draft_id: str, body: DraftPatch):
 
 
 @router.post("/{draft_id}/approve", status_code=201)
-def approve_draft(draft_id: str):
+def approve_draft(draft_id: str, _: None = Depends(_get_require_admin)):
   """Publish a draft to the live blog. Returns the published post slug."""
   with get_conn() as conn:
     row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
@@ -281,7 +287,7 @@ def approve_draft(draft_id: str):
 
 
 @router.post("/{draft_id}/regenerate", response_model=DraftOut)
-def regenerate_draft(draft_id: str, body: RegenerateIn):
+def regenerate_draft(draft_id: str, body: RegenerateIn, _: None = Depends(_get_require_admin)):
   return _regenerate_draft(draft_id, body.remarks)
 
 
@@ -295,7 +301,7 @@ def validate_draft_code(draft_id: str):
 
 
 @router.delete("/{draft_id}", status_code=204)
-def delete_draft(draft_id: str):
+def delete_draft(draft_id: str, _: None = Depends(_get_require_admin)):
   with get_conn() as conn:
     result = conn.execute("DELETE FROM drafts WHERE id = ?", (draft_id,))
   if result.rowcount == 0:
