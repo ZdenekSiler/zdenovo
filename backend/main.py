@@ -74,10 +74,10 @@ app.add_middleware(
     session_cookie="zdenovo_session",
     max_age=60 * 60 * 24 * 7,  # 7 days
     https_only=os.getenv("HTTPS_ONLY", "False").lower() == "true",
-    samesite="lax",  # CSRF defense
+    same_site="lax",  # CSRF defense
 )
 
-# CSRF Protection middleware
+# Add CSRF middleware AFTER SessionMiddleware (middleware order is reversed)
 app.add_middleware(CSRFMiddleware)
 
 app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend" / "static"), name="static")
