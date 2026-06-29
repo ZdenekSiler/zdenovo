@@ -149,7 +149,7 @@ def generate_pending_comments() -> int:
             """SELECT p.slug, p.title, p.content, p.date
                FROM posts p
                LEFT JOIN comments c ON c.post_slug = p.slug AND c.is_generated = 1
-               WHERE c.id IS NULL"""
+               WHERE c.id IS NULL AND p.ai_comments = 1"""
         ).fetchall()
 
     generated = 0

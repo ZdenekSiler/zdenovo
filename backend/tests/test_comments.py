@@ -263,3 +263,49 @@ def test_generate_pending_comments_generates_after_delay(client, monkeypatch):
   comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
   generated = [c for c in comments if c["is_generated"]]
   assert len(generated) >= 1
+
+
+# ─── AI comments toggle ───────────────────────────────────────────────────────
+
+def test_toggle_ai_comments_off_returns_button_html(admin_client):
+  resp = admin_client.post(f"/api/posts/{SEED_SLUG}/toggle-ai-comments")
+  assert resp.status_code == 200
+  assert b"AI: off" in resp.content
+  assert b'hx-post="/api/posts/' in resp.content
+
+
+def test_toggle_ai_comments_back_on(admin_client):
+  admin_client.post(f"/api/posts/{SEED_SLUG}/toggle-ai-comments")  # off
+  resp = admin_client.post(f"/api/posts/{SEED_SLUG}/toggle-ai-comments")  # on
+  assert resp.status_code == 200
+  assert b"AI: on" in resp.content
+
+
+def test_toggle_ai_comments_unknown_slug_returns_404(admin_client):
+  resp = admin_client.post("/api/posts/no-such-post/toggle-ai-comments")
+  assert resp.status_code == 404
+
+
+def test_toggle_ai_comments_requires_admin(client):
+  resp = client.post(f"/api/posts/{SEED_SLUG}/toggle-ai-comments", follow_redirects=False)
+  assert resp.status_code == 303
+
+
+def test_generate_skips_post_with_ai_comments_disabled(client, monkeypatch):
+  from unittest.mock import MagicMock
+  from routers.comments_api import comment_generator, generate_pending_comments
+
+  from db import get_conn
+  with get_conn() as conn:
+    conn.execute("UPDATE posts SET date = '2020-01-01T00:00:00', ai_comments = 0")
+
+  mock_client = MagicMock()
+  mock_client.messages.create.return_value = _mock_comment_response()
+  comment_generator._client = mock_client
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+  result = generate_pending_comments()
+  assert result == 0
+
+  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+  assert not any(c["is_generated"] for c in comments)

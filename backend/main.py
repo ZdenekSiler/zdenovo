@@ -11,7 +11,7 @@ from pathlib import Path
 import mistune
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Form, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -341,6 +341,28 @@ async def admin_posts(request: Request, _: None = Depends(require_admin)):
         "pending_count": pending_count,
         "comment_count": comment_count,
     })
+
+
+@app.post("/api/posts/{slug}/toggle-ai-comments", response_class=HTMLResponse)
+async def toggle_ai_comments(slug: str, _: None = Depends(require_admin)):
+    with get_conn() as conn:
+        row = conn.execute("SELECT ai_comments FROM posts WHERE slug = ?", (slug,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Post not found")
+        new_val = 0 if row["ai_comments"] else 1
+        conn.execute("UPDATE posts SET ai_comments = ? WHERE slug = ?", (new_val, slug))
+    return _ai_toggle_btn(slug, bool(new_val))
+
+
+def _ai_toggle_btn(slug: str, enabled: bool) -> str:
+    label = "AI: on" if enabled else "AI: off"
+    cls = "text-emerald-400 border-emerald-900/40 hover:border-emerald-700/60" if enabled else "text-zinc-500"
+    return (
+        f'<button hx-post="/api/posts/{slug}/toggle-ai-comments" '
+        f'hx-target="this" hx-swap="outerHTML" '
+        f'class="btn-ghost text-xs {cls}">'
+        f'{label}</button>'
+    )
 
 
 @app.get("/admin/drafts", response_class=HTMLResponse)
