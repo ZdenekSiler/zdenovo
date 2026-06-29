@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/posts", tags=["generate"])
 
+
 BRIEFS_PATH = Path(__file__).parent.parent / "data" / "post_briefs.json"
 PROMPTS_DIR = Path(__file__).parent.parent / "data" / "prompts"
 

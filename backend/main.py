@@ -17,6 +17,10 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from sanitize import safe_markdown
 
 load_dotenv()  # no-op if .env absent; prod uses file secrets
 
@@ -63,6 +67,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+@app.exception_handler(RateLimitExceeded)
+async def ratelimit_handler(request: Request, exc: RateLimitExceeded):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many requests. Please try again later."}
+    )
+
+
 # SessionMiddleware with secure settings
 secret_key = read_secret("secret_key", "SECRET_KEY")
 if not secret_key:
@@ -91,7 +108,7 @@ def _fmt_date(d) -> str:
 
 
 templates.env.filters["dateformat"] = _fmt_date
-templates.env.filters["markdown"] = mistune.html
+templates.env.filters["markdown"] = safe_markdown
 
 _commit_file = Path("/app/BUILD_COMMIT")
 templates.env.globals["build_commit"] = _commit_file.read_text().strip() if _commit_file.exists() else "dev"
@@ -230,6 +247,7 @@ async def post(request: Request, slug: str):
 
 
 @app.post("/blog/{slug}/comments", response_class=HTMLResponse)
+@limiter.limit("5/minute")
 async def submit_comment(request: Request, slug: str, author: str = Form(...), body: str = Form(...)):
     article = get_post_by_slug(slug)
     if article is None:

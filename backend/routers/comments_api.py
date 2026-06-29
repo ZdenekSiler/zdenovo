@@ -14,6 +14,7 @@ from config import read_secret
 from db import comment_row_to_dict, get_conn
 
 router = APIRouter(prefix="/api/comments", tags=["comments"])
+
 log = logging.getLogger(__name__)
 
 PROMPTS_DIR = Path(__file__).parent.parent / "data" / "prompts"
