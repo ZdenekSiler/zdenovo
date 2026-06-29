@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import secrets
@@ -25,6 +26,7 @@ from data.analytics import refresh_popular_posts
 from data.posts import get_all_posts, get_all_tags, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
+from middleware.csrf import CSRFMiddleware
 from routers.comments_api import generate_pending_comments, router as comments_router
 from routers.drafts_api import _regenerate_draft, generate_daily_drafts, generate_single_topic, router as drafts_router
 from routers.generate_api import router as generate_router
@@ -32,6 +34,13 @@ from routers.posts_api import router as posts_router
 from routers.topics_api import router as topics_router
 
 BASE_DIR = Path(__file__).parent.parent  # zdenovo/
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -54,23 +63,26 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# SessionMiddleware with secure settings
+secret_key = read_secret("secret_key", "SECRET_KEY")
+if not secret_key:
+    raise RuntimeError("SECRET_KEY not configured. Set /run/secrets/secret_key or SECRET_KEY env var.")
+
 app.add_middleware(
     SessionMiddleware,
-    secret_key=read_secret("secret_key", "SECRET_KEY") or "dev-insecure-key-change-in-prod",
+    secret_key=secret_key,
     session_cookie="zdenovo_session",
     max_age=60 * 60 * 24 * 7,  # 7 days
-    https_only=False,           # set True in prod behind HTTPS
+    https_only=os.getenv("HTTPS_ONLY", "False").lower() == "true",
+    samesite="lax",  # CSRF defense
 )
+
+# CSRF Protection middleware
+app.add_middleware(CSRFMiddleware)
 
 app.mount("/static", StaticFiles(directory=BASE_DIR / "frontend" / "static"), name="static")
 
 templates = Jinja2Templates(directory=BASE_DIR / "frontend" / "templates")
-
-app.include_router(comments_router)
-app.include_router(drafts_router)
-app.include_router(generate_router)
-app.include_router(posts_router)
-app.include_router(topics_router)
 
 
 def _fmt_date(d) -> str:
@@ -84,6 +96,12 @@ templates.env.filters["markdown"] = mistune.html
 _commit_file = Path("/app/BUILD_COMMIT")
 templates.env.globals["build_commit"] = _commit_file.read_text().strip() if _commit_file.exists() else "dev"
 templates.env.globals["deploy_time"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+app.include_router(comments_router)
+app.include_router(drafts_router)
+app.include_router(generate_router)
+app.include_router(posts_router)
+app.include_router(topics_router)
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -114,6 +132,10 @@ async def admin_login_page(request: Request, next: str = "/admin/posts"):
     return templates.TemplateResponse(request, "admin_login.html", {"next": next})
 
 
+# Safe redirect destinations for login
+SAFE_REDIRECTS = {"/admin", "/admin/posts", "/admin/drafts", "/admin/comments", "/admin/topics", "/admin/stats"}
+
+
 @app.post("/admin/login")
 async def admin_login(
     request: Request,
@@ -123,7 +145,9 @@ async def admin_login(
     admin_password = read_secret("admin_password", "ADMIN_PASSWORD")
     if admin_password and secrets.compare_digest(password.encode(), admin_password.encode()):
         request.session["admin"] = True
-        return RedirectResponse(next if next.startswith("/admin") else "/admin/posts", status_code=303)
+        # Validate next URL is in safe list
+        next_url = next if next in SAFE_REDIRECTS else "/admin/posts"
+        return RedirectResponse(next_url, status_code=303)
     return templates.TemplateResponse(
         request, "admin_login.html", {"next": next, "error": "Wrong password."},
         status_code=401,
@@ -210,11 +234,20 @@ async def submit_comment(request: Request, slug: str, author: str = Form(...), b
     article = get_post_by_slug(slug)
     if article is None:
         return templates.TemplateResponse(request, "404.html", status_code=404)
-    if author.strip() and body.strip():
+    
+    # Validate input lengths
+    author = author.strip()
+    body = body.strip()
+    if not (1 <= len(author) <= 80):
+        raise HTTPException(status_code=400, detail="Author must be 1-80 characters")
+    if not (1 <= len(body) <= 2000):
+        raise HTTPException(status_code=400, detail="Body must be 1-2000 characters")
+    
+    if author and body:
         with get_conn() as conn:
             conn.execute(
                 "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated) VALUES (?, ?, ?, ?, ?, 0)",
-                (str(uuid.uuid4()), slug, author.strip()[:80], body.strip()[:2000], datetime.now(timezone.utc).isoformat()),
+                (str(uuid.uuid4()), slug, author[:80], body[:2000], datetime.now(timezone.utc).isoformat()),
             )
     with get_conn() as conn:
         rows = conn.execute(
@@ -470,13 +503,14 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     week_ago = (datetime.now(timezone.utc) - timedelta(days=6)).strftime("%Y-%m-%d")
 
+    # Use GraphQL variables instead of f-string interpolation
     query = """
-    {
+    query($zoneTag: String!, $dateGt: String!, $dateLe: String!) {
       viewer {
-        zones(filter: {zoneTag: "%s"}) {
+        zones(filter: {zoneTag: $zoneTag}) {
           daily: httpRequests1dGroups(
             limit: 7
-            filter: {date_geq: "%s", date_leq: "%s"}
+            filter: {date_geq: $dateGt, date_leq: $dateLe}
           ) {
             dimensions { date }
             sum { requests pageViews }
@@ -484,7 +518,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
           }
           topPaths: httpRequestsAdaptiveGroups(
             limit: 10
-            filter: {date_geq: "%s", date_leq: "%s", requestSource: "eyeball"}
+            filter: {date_geq: $dateGt, date_leq: $dateLe, requestSource: "eyeball"}
             orderBy: [count_DESC]
           ) {
             dimensions { clientRequestPath }
@@ -492,7 +526,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
           }
           topCountries: httpRequestsAdaptiveGroups(
             limit: 10
-            filter: {date_geq: "%s", date_leq: "%s", requestSource: "eyeball"}
+            filter: {date_geq: $dateGt, date_leq: $dateLe, requestSource: "eyeball"}
             orderBy: [count_DESC]
           ) {
             dimensions { clientCountryName }
@@ -500,7 +534,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
           }
           topBrowsers: httpRequestsAdaptiveGroups(
             limit: 5
-            filter: {date_geq: "%s", date_leq: "%s", requestSource: "eyeball"}
+            filter: {date_geq: $dateGt, date_leq: $dateLe, requestSource: "eyeball"}
             orderBy: [count_DESC]
           ) {
             dimensions { userAgent }
@@ -509,18 +543,29 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)):
         }
       }
     }
-    """ % (zone_id, week_ago, today, today, today, today, today, today, today)
+    """
 
     req = urllib.request.Request(
         "https://api.cloudflare.com/client/v4/graphql",
-        data=json.dumps({"query": query}).encode(),
+        data=json.dumps({
+            "query": query,
+            "variables": {
+                "zoneTag": zone_id,
+                "dateGt": week_ago,
+                "dateLe": today,
+            }
+        }).encode(),
         headers={"Authorization": f"Bearer {cf_token}", "Content-Type": "application/json"},
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
-    except Exception:
-        return templates.TemplateResponse(request, "admin_stats.html", {"error": "Failed to fetch analytics from Cloudflare."})
+    except Exception as exc:
+        log.error("Cloudflare API request failed: %s", exc, exc_info=True)
+        return templates.TemplateResponse(
+            request, "admin_stats.html",
+            {"error": "Failed to fetch analytics from Cloudflare."}
+        )
 
     if data.get("errors") or not data.get("data"):
         msg = data.get("errors", [{}])[0].get("message", "Unknown error") if data.get("errors") else "Empty response"
