@@ -14,7 +14,7 @@ DAILY_TOPICS_PATH = Path(__file__).resolve().parent.parent / "data" / "daily_top
 
 # Import require_admin at usage time to avoid circular imports
 def _get_require_admin():
-    from main import require_admin
+    from routers.auth import require_admin
     return require_admin
 
 

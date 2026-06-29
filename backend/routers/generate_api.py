@@ -25,7 +25,7 @@ PROMPTS_DIR = Path(__file__).parent.parent / "data" / "prompts"
 
 # Import require_admin at usage time to avoid circular imports
 def _get_require_admin():
-    from main import require_admin
+    from routers.auth import require_admin
     return require_admin
 MAX_GENERATION_ATTEMPTS = 3
 

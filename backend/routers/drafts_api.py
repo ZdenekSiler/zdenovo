@@ -27,7 +27,7 @@ DAILY_COUNT = 1
 
 # Import require_admin at usage time to avoid circular imports
 def _get_require_admin():
-    from main import require_admin
+    from routers.auth import require_admin
     return require_admin
 
 

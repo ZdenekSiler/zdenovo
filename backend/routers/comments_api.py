@@ -1,3 +1,5 @@
+"""REST API for blog comments and AI comment generation."""
+
 import hashlib
 import json
 import logging
@@ -5,6 +7,7 @@ import random
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Callable
 
 import anthropic
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,21 +23,23 @@ log = logging.getLogger(__name__)
 PROMPTS_DIR = Path(__file__).parent.parent / "data" / "prompts"
 
 
-# Import require_admin at usage time to avoid circular imports
-def _get_require_admin():
-    from main import require_admin
+def _get_require_admin() -> Callable:
+    """Lazy-load require_admin to avoid circular imports."""
+    from routers.auth import require_admin
     return require_admin
 
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
 
 class CommentIn(BaseModel):
+    """Request body for creating a comment."""
     post_slug: str
     author: str = Field(..., min_length=1, max_length=80)
     body: str = Field(..., min_length=1, max_length=2000)
 
 
 class CommentOut(BaseModel):
+    """Response body for a comment."""
     id: str
     post_slug: str
     author: str
@@ -56,6 +61,7 @@ class CommentGenerator:
         self._comment_tool: dict = {}
 
     def _ensure_prompts(self) -> None:
+        """Load prompt templates from disk (cached after first call)."""
         if self._prompts_loaded:
             return
         self._system_prompt = (PROMPTS_DIR / "comment_system.md").read_text(encoding="utf-8")
@@ -63,6 +69,7 @@ class CommentGenerator:
         self._prompts_loaded = True
 
     def _get_client(self) -> anthropic.Anthropic:
+        """Get or create Anthropic client (lazy-loaded)."""
         if self._client is None:
             api_key = read_secret("anthropic_api_key", "ANTHROPIC_API_KEY")
             if not api_key:
@@ -183,6 +190,7 @@ def generate_pending_comments() -> int:
 
 @router.get("", response_model=list[CommentOut])
 def list_comments(post_slug: str) -> list[dict]:
+    """List all comments for a post (oldest first)."""
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM comments WHERE post_slug = ? ORDER BY created_at ASC",
@@ -193,6 +201,7 @@ def list_comments(post_slug: str) -> list[dict]:
 
 @router.post("", response_model=CommentOut, status_code=201)
 def create_comment(body: CommentIn, _: None = Depends(_get_require_admin)) -> dict:
+    """Create a comment on a post (admin only)."""
     with get_conn() as conn:
         post = conn.execute(
             "SELECT slug FROM posts WHERE slug = ?", (body.post_slug,)
@@ -213,7 +222,7 @@ def create_comment(body: CommentIn, _: None = Depends(_get_require_admin)) -> di
 
 @router.post("/generate", status_code=201)
 def generate_fake_comments(post_slug: str, _: None = Depends(_get_require_admin)) -> list[dict]:
-    """Generate 1-2 AI comments for a post."""
+    """Generate 1-2 AI comments for a post (admin only)."""
     with get_conn() as conn:
         post = conn.execute(
             "SELECT slug, title, content, date FROM posts WHERE slug = ?", (post_slug,)
@@ -227,6 +236,7 @@ def generate_fake_comments(post_slug: str, _: None = Depends(_get_require_admin)
 
 @router.delete("/{comment_id}", status_code=204)
 def delete_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> None:
+    """Delete a comment (admin only)."""
     with get_conn() as conn:
         result = conn.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
     if result.rowcount == 0:
@@ -235,6 +245,7 @@ def delete_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> No
 
 @router.patch("/{comment_id}/approve", response_model=CommentOut)
 def approve_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> dict:
+    """Approve a generated comment (admin only)."""
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
         if row is None:
@@ -248,6 +259,7 @@ def approve_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> d
 
 @router.patch("/{comment_id}/publish", response_model=CommentOut)
 def publish_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> dict:
+    """Publish an approved comment (admin only)."""
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
         if row is None:
