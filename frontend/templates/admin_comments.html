@@ -15,6 +15,16 @@
       <span class="text-zinc-700">({{ real_count }} real, {{ generated_count }} AI)</span>
     {% endif %}
   </span>
+  {% if pending_count %}
+  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-violet-900/60 text-violet-400 border border-violet-800/50">
+    {{ pending_count }} awaiting review
+  </span>
+  {% endif %}
+  {% if approved_count %}
+  <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-900/60 text-amber-400 border border-amber-800/50">
+    {{ approved_count }} ready to publish
+  </span>
+  {% endif %}
 </div>
 
 <!-- Generate comments form -->
@@ -43,6 +53,13 @@
         <span class="text-sm font-semibold text-zinc-200">{{ c.author }}</span>
         {% if c.is_generated %}
         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-violet-900/60 text-violet-400 border border-violet-800/50 uppercase tracking-wide">AI</span>
+        {% if c.status == 'generated' %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-violet-900/60 text-violet-400 border border-violet-800/50 uppercase tracking-wide">Generated</span>
+        {% elif c.status == 'approved' %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-900/60 text-amber-400 border border-amber-800/50 uppercase tracking-wide">Approved</span>
+        {% elif c.status == 'published' %}
+        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-900/60 text-emerald-400 border border-emerald-800/50 uppercase tracking-wide">Published</span>
+        {% endif %}
         {% endif %}
         <span class="text-zinc-800">·</span>
         <a href="/blog/{{ c.post_slug }}" class="text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors">{{ c.post_slug }}</a>
@@ -51,6 +68,23 @@
       </div>
       <p class="text-xs text-zinc-500 leading-relaxed">{{ c.body[:120] }}{% if c.body | length > 120 %}…{% endif %}</p>
     </div>
+    {% if c.is_generated %}
+    {% if c.status == 'generated' %}
+    <button hx-patch="/api/comments/{{ c.id }}/approve"
+            hx-swap="none"
+            hx-on::after-request="if(event.detail.successful) location.reload()"
+            class="shrink-0 text-xs text-violet-400 hover:text-violet-300 transition-colors px-2 py-1 border border-violet-500/30 rounded">
+      Approve
+    </button>
+    {% elif c.status == 'approved' %}
+    <button hx-patch="/api/comments/{{ c.id }}/publish"
+            hx-swap="none"
+            hx-on::after-request="if(event.detail.successful) location.reload()"
+            class="shrink-0 text-xs text-amber-400 hover:text-amber-300 transition-colors px-2 py-1 border border-amber-500/30 rounded">
+      Publish
+    </button>
+    {% endif %}
+    {% endif %}
     <button
       hx-delete="/api/comments/{{ c.id }}"
       hx-target="#comment-{{ c.id }}"

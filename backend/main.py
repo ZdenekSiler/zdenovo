@@ -194,7 +194,9 @@ async def post(request: Request, slug: str):
         return templates.TemplateResponse(request, "404.html", status_code=404)
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT * FROM comments WHERE post_slug = ? ORDER BY created_at ASC", (slug,)
+            "SELECT * FROM comments WHERE post_slug = ? AND (status = 'published' OR is_generated = 0)"
+            " ORDER BY created_at ASC",
+            (slug,),
         ).fetchall()
     comments = [comment_row_to_dict(r) for r in rows]
     related = get_related_posts(slug, article["tags"])
@@ -216,7 +218,9 @@ async def submit_comment(request: Request, slug: str, author: str = Form(...), b
             )
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT * FROM comments WHERE post_slug = ? ORDER BY created_at ASC", (slug,)
+            "SELECT * FROM comments WHERE post_slug = ? AND (status = 'published' OR is_generated = 0)"
+            " ORDER BY created_at ASC",
+            (slug,),
         ).fetchall()
     comments = [comment_row_to_dict(r) for r in rows]
     return templates.TemplateResponse(request, "comments_section.html", {"comments": comments, "slug": slug})
@@ -316,6 +320,9 @@ async def admin_root(request: Request, _: None = Depends(require_admin)):
         generated_comment_count = conn.execute(
             "SELECT COUNT(*) FROM comments WHERE is_generated = 1"
         ).fetchone()[0]
+        comment_pending_count = conn.execute(
+            "SELECT COUNT(*) FROM comments WHERE status IN ('generated', 'approved')"
+        ).fetchone()[0]
     real_comment_count = comment_count - generated_comment_count
     topic_count = len(_load_topics())
     return templates.TemplateResponse(request, "admin_hub.html", {
@@ -324,6 +331,7 @@ async def admin_root(request: Request, _: None = Depends(require_admin)):
         "comment_count": comment_count,
         "real_comment_count": real_comment_count,
         "generated_comment_count": generated_comment_count,
+        "comment_pending_count": comment_pending_count,
         "topic_count": topic_count,
     })
 
@@ -400,12 +408,20 @@ async def admin_comments(request: Request, _: None = Depends(require_admin)):
         generated_count = conn.execute(
             "SELECT COUNT(*) FROM comments WHERE is_generated = 1"
         ).fetchone()[0]
+        pending_count = conn.execute(
+            "SELECT COUNT(*) FROM comments WHERE status = 'generated'"
+        ).fetchone()[0]
+        approved_count = conn.execute(
+            "SELECT COUNT(*) FROM comments WHERE status = 'approved'"
+        ).fetchone()[0]
     comments = [comment_row_to_dict(r) for r in rows]
     real_count = len(comments) - generated_count
     return templates.TemplateResponse(request, "admin_comments.html", {
         "comments": comments,
         "real_count": real_count,
         "generated_count": generated_count,
+        "pending_count": pending_count,
+        "approved_count": approved_count,
     })
 
 

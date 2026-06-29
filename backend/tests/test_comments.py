@@ -309,3 +309,122 @@ def test_generate_skips_post_with_ai_comments_disabled(client, monkeypatch):
 
   comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
   assert not any(c["is_generated"] for c in comments)
+
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def _insert_generated_comment(slug: str = SEED_SLUG) -> str:
+  import uuid
+  from datetime import datetime, timezone
+  from db import get_conn
+  comment_id = str(uuid.uuid4())
+  now = datetime.now(timezone.utc).isoformat()
+  with get_conn() as conn:
+    conn.execute(
+      "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated, status) "
+      "VALUES (?, ?, ?, ?, ?, 1, 'generated')",
+      (comment_id, slug, "AI Bot", "Generated comment", now),
+    )
+  return comment_id
+
+
+# ─── Status field ────────────────────────────────────────────────────────────
+
+def test_real_comment_has_status_published(client):
+  resp = client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": "Nice!"})
+  assert resp.json()["status"] == "published"
+
+
+def test_comment_out_includes_status_field(client):
+  _insert_comment(client)
+  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+  assert "status" in comments[0]
+
+
+# ─── Approve endpoint ───────────────────────────────────────────────────────
+
+def test_approve_comment_returns_200(client):
+  comment_id = _insert_generated_comment()
+  resp = client.patch(f"/api/comments/{comment_id}/approve")
+  assert resp.status_code == 200
+
+
+def test_approve_comment_sets_status_approved(client):
+  comment_id = _insert_generated_comment()
+  resp = client.patch(f"/api/comments/{comment_id}/approve")
+  assert resp.json()["status"] == "approved"
+
+
+def test_approve_non_generated_returns_409(client):
+  comment_id = _insert_comment(client)
+  resp = client.patch(f"/api/comments/{comment_id}/approve")
+  assert resp.status_code == 409
+
+
+def test_approve_nonexistent_returns_404(client):
+  resp = client.patch("/api/comments/nonexistent-id/approve")
+  assert resp.status_code == 404
+
+
+# ─── Publish endpoint ───────────────────────────────────────────────────────
+
+def test_publish_comment_returns_200(client):
+  comment_id = _insert_generated_comment()
+  client.patch(f"/api/comments/{comment_id}/approve")
+  resp = client.patch(f"/api/comments/{comment_id}/publish")
+  assert resp.status_code == 200
+
+
+def test_publish_comment_sets_status_published(client):
+  comment_id = _insert_generated_comment()
+  client.patch(f"/api/comments/{comment_id}/approve")
+  resp = client.patch(f"/api/comments/{comment_id}/publish")
+  assert resp.json()["status"] == "published"
+
+
+def test_publish_non_approved_returns_409(client):
+  comment_id = _insert_generated_comment()
+  resp = client.patch(f"/api/comments/{comment_id}/publish")
+  assert resp.status_code == 409
+
+
+def test_publish_nonexistent_returns_404(client):
+  resp = client.patch("/api/comments/nonexistent-id/publish")
+  assert resp.status_code == 404
+
+
+# ─── Public visibility ───────────────────────────────────────────────────────
+
+def test_public_post_hides_generated_comments(client):
+  _insert_generated_comment()
+  resp = client.get(f"/blog/{SEED_SLUG}")
+  assert b"Generated comment" not in resp.content
+
+
+def test_public_post_hides_approved_comments(client):
+  import uuid
+  from datetime import datetime, timezone
+  from db import get_conn
+  comment_id = str(uuid.uuid4())
+  with get_conn() as conn:
+    conn.execute(
+      "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated, status) "
+      "VALUES (?, ?, ?, ?, ?, 1, 'approved')",
+      (comment_id, SEED_SLUG, "AI Bot", "Approved but not published", datetime.now(timezone.utc).isoformat()),
+    )
+  resp = client.get(f"/blog/{SEED_SLUG}")
+  assert b"Approved but not published" not in resp.content
+
+
+def test_public_post_shows_published_ai_comments(client):
+  comment_id = _insert_generated_comment()
+  client.patch(f"/api/comments/{comment_id}/approve")
+  client.patch(f"/api/comments/{comment_id}/publish")
+  resp = client.get(f"/blog/{SEED_SLUG}")
+  assert b"Generated comment" in resp.content
+
+
+def test_public_post_always_shows_real_comments(client):
+  _insert_comment(client, body="Real human comment here")
+  resp = client.get(f"/blog/{SEED_SLUG}")
+  assert b"Real human comment here" in resp.content

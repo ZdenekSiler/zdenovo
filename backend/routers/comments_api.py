@@ -34,6 +34,7 @@ class CommentOut(BaseModel):
     body: str
     created_at: datetime
     is_generated: bool = False
+    status: str = "published"
 
 
 # ─── CommentGenerator ────────────────────────────────────────────────────────
@@ -115,8 +116,8 @@ class CommentGenerator:
                 created_at = base_date + offset
                 comment_id = str(uuid.uuid4())
                 conn.execute(
-                    "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated) "
-                    "VALUES (?, ?, ?, ?, ?, 1)",
+                    "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated, status) "
+                    "VALUES (?, ?, ?, ?, ?, 1, 'generated')",
                     (comment_id, post_slug, item["author"], item["body"], created_at.isoformat()),
                 )
                 inserted.append({
@@ -194,8 +195,8 @@ def create_comment(body: CommentIn) -> dict:
         comment_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
         conn.execute(
-            "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated) "
-            "VALUES (?, ?, ?, ?, ?, 0)",
+            "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated, status) "
+            "VALUES (?, ?, ?, ?, ?, 0, 'published')",
             (comment_id, body.post_slug, body.author, body.body, now),
         )
     with get_conn() as conn:
@@ -223,3 +224,29 @@ def delete_comment(comment_id: str) -> None:
         result = conn.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail=f"Comment '{comment_id}' not found")
+
+
+@router.patch("/{comment_id}/approve", response_model=CommentOut)
+def approve_comment(comment_id: str) -> dict:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail=f"Comment '{comment_id}' not found")
+        if row["status"] != "generated":
+            raise HTTPException(status_code=409, detail="Comment is not in 'generated' state")
+        conn.execute("UPDATE comments SET status = 'approved' WHERE id = ?", (comment_id,))
+        updated = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
+    return comment_row_to_dict(updated)
+
+
+@router.patch("/{comment_id}/publish", response_model=CommentOut)
+def publish_comment(comment_id: str) -> dict:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail=f"Comment '{comment_id}' not found")
+        if row["status"] != "approved":
+            raise HTTPException(status_code=409, detail="Comment is not in 'approved' state")
+        conn.execute("UPDATE comments SET status = 'published' WHERE id = ?", (comment_id,))
+        updated = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
+    return comment_row_to_dict(updated)

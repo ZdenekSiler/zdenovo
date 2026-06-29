@@ -82,6 +82,8 @@ def init_db() -> None:
         comment_cols = {row[1] for row in conn.execute("PRAGMA table_info(comments)")}
         if "is_generated" not in comment_cols:
             conn.execute("ALTER TABLE comments ADD COLUMN is_generated INTEGER NOT NULL DEFAULT 0")
+        if "status" not in comment_cols:
+            conn.execute("ALTER TABLE comments ADD COLUMN status TEXT NOT NULL DEFAULT 'published'")
         conn.execute(
             "UPDATE posts SET image = 'https://picsum.photos/seed/' || slug || '/800/400' WHERE image IS NULL"
         )
@@ -128,4 +130,5 @@ def comment_row_to_dict(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["created_at"] = datetime.fromisoformat(d["created_at"])
     d["is_generated"] = bool(d.get("is_generated", 0))
+    d["status"] = d.get("status", "published")
     return d

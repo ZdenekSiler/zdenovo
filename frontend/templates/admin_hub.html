@@ -33,6 +33,9 @@
         {% if generated_comment_count %}
         <p class="text-[10px] text-zinc-600">{{ real_comment_count }} real + {{ generated_comment_count }} AI</p>
         {% endif %}
+        {% if comment_pending_count %}
+        <p class="text-[10px] text-violet-400">{{ comment_pending_count }} pending review</p>
+        {% endif %}
       </div>
     </div>
     <p class="text-xs text-zinc-500">Moderate reader comments.</p>
