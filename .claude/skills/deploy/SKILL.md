@@ -64,6 +64,10 @@ Deploy the current branch to https://zdenovo.com on the Hetzner VPS.
 - SSH alias `zdenovo` must be configured in `~/.ssh/config`
 - `.env` must have `DOMAIN` set
 - Must be on `main` branch (prod deploys main only)
+- **Dev must have been tested this session.** If `/deploy dev` was not run and the key
+  pages verified (home, a blog post, reactions, admin) in this conversation, ask the user
+  to confirm before proceeding: "Have you tested this on dev (localhost:8080) first?"
+  Do NOT deploy to prod if the answer is no or unclear.
 
 ### Steps
 
