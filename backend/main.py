@@ -292,6 +292,7 @@ async def post(request: Request, slug: str) -> str:
         "series_posts": series_posts,
         "series_position": series_position,
         "series_title": series_title,
+        "is_admin": False,
     })
 
 
@@ -351,7 +352,7 @@ async def submit_comment(
             replies_by_parent.setdefault(c["parent_id"], []).append(c)
     return templates.TemplateResponse(
         request, "comments_section.html",
-        {"comments": top_level, "replies_by_parent": replies_by_parent, "slug": slug},
+        {"comments": top_level, "replies_by_parent": replies_by_parent, "slug": slug, "is_admin": False},
     )
 
 
