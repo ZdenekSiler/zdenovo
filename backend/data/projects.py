@@ -5,6 +5,7 @@ PROJECTS = [
         "tags": ["python", "ai", "claude-code"],
         "url": "https://github.com/ZdenekSiler/zdenovo",
         "featured": True,
+        "icon": "github",
     },
     {
         "name": "Fakturant",
@@ -13,6 +14,7 @@ PROJECTS = [
         "url": "/projects/fakturant",
         "featured": True,
         "internal": True,
+        "icon": "receipt",
     },
 ]
 
