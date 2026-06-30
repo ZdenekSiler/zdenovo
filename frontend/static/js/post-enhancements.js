@@ -102,9 +102,6 @@
           langBadge.className = "code-lang-badge";
           langBadge.textContent = languageDisplayName(lang);
           wrapper.appendChild(langBadge);
-
-          btn.style.right = "3.5rem";
-          toggle.style.right = "6.5rem";
         }
       }
 
@@ -153,10 +150,24 @@
     });
     var targets = document.querySelectorAll(".mermaid:not([data-processed])");
     if (!targets.length) return;
+    var isLight = document.documentElement.classList.contains("light");
     mermaid.initialize({
       startOnLoad: false,
-      theme: "dark",
-      themeVariables: {
+      theme: isLight ? "default" : "dark",
+      themeVariables: isLight ? {
+        primaryColor: "#6366f1",
+        primaryTextColor: "#18181b",
+        primaryBorderColor: "#4f46e5",
+        lineColor: "#6366f1",
+        secondaryColor: "#e0e7ff",
+        tertiaryColor: "#f4f4f5",
+        background: "#ffffff",
+        mainBkg: "#e0e7ff",
+        nodeBorder: "#6366f1",
+        clusterBkg: "#f4f4f5",
+        titleColor: "#4338ca",
+        edgeLabelBackground: "#ffffff"
+      } : {
         primaryColor: "#4338ca",
         primaryTextColor: "#e4e4e7",
         primaryBorderColor: "#6366f1",

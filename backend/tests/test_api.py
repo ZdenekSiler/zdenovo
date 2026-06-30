@@ -168,3 +168,41 @@ def test_unpublish_removes_comments(client):
 def test_unpublish_not_found_returns_404(client):
     r = client.post("/api/posts/no-such-post/unpublish")
     assert r.status_code == 404
+
+
+# ── Reactions ─────────────────────────────────────────────────────────────────
+
+def test_react_up_increments_count(client):
+    r = client.post("/api/posts/htmx-is-enough/react")
+    assert r.status_code == 200
+    assert r.text == "1"
+
+def test_react_up_returns_plain_text_not_json(client):
+    r = client.post("/api/posts/htmx-is-enough/react")
+    assert r.headers["content-type"].startswith("text/html")
+    assert r.text.strip().isdigit()
+
+def test_react_up_missing_post_returns_404(client):
+    r = client.post("/api/posts/no-such/react")
+    assert r.status_code == 404
+
+def test_react_down_increments_count(client):
+    r = client.post("/api/posts/htmx-is-enough/react-down")
+    assert r.status_code == 200
+    assert r.text == "1"
+
+def test_react_down_returns_plain_text_not_json(client):
+    r = client.post("/api/posts/htmx-is-enough/react-down")
+    assert r.headers["content-type"].startswith("text/html")
+    assert r.text.strip().isdigit()
+
+def test_react_down_missing_post_returns_404(client):
+    r = client.post("/api/posts/no-such/react-down")
+    assert r.status_code == 404
+
+def test_react_up_and_down_are_independent(client):
+    # Up and down counters must not affect each other
+    up = int(client.post("/api/posts/htmx-is-enough/react").text)
+    down = int(client.post("/api/posts/htmx-is-enough/react-down").text)
+    assert up == 1
+    assert down == 1

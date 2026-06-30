@@ -8,6 +8,7 @@ from datetime import date as Date, datetime, timezone
 from typing import Callable
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from db import get_conn, row_to_dict
@@ -51,6 +52,7 @@ class PostOut(BaseModel):
     reading_time: int | None = None
     sources: list[Source] = Field(default_factory=list)
     reactions: int = 0
+    reactions_down: int = 0
     views: int = 0
     series_id: str | None = None
     series_order: int | None = None
@@ -194,19 +196,34 @@ def unpublish_post(slug: str, _: None = Depends(_get_require_admin)) -> None:
         conn.execute("DELETE FROM posts WHERE slug = ?", (slug,))
 
 
-@router.post("/{slug}/react")
+@router.post("/{slug}/react", response_class=HTMLResponse)
 @limiter.limit("3/minute")
-def react_to_post(slug: str, request: Request) -> dict:
-    """Add a reaction to a post (rate limited, public)."""
+def react_to_post(slug: str, request: Request) -> HTMLResponse:
+    """Thumbs-up reaction (rate limited, public). Returns updated count for HTMX swap."""
     with get_conn() as conn:
         row = conn.execute("SELECT slug FROM posts WHERE slug = ?", (slug,)).fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="Post not found")
         conn.execute("UPDATE posts SET reactions = reactions + 1 WHERE slug = ?", (slug,))
-        reactions = conn.execute(
+        count = conn.execute(
             "SELECT reactions FROM posts WHERE slug = ?", (slug,)
         ).fetchone()["reactions"]
-    return {"reactions": reactions}
+    return HTMLResponse(content=str(count))
+
+
+@router.post("/{slug}/react-down", response_class=HTMLResponse)
+@limiter.limit("3/minute")
+def react_down_to_post(slug: str, request: Request) -> HTMLResponse:
+    """Thumbs-down reaction (rate limited, public). Returns updated count for HTMX swap."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT slug FROM posts WHERE slug = ?", (slug,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Post not found")
+        conn.execute("UPDATE posts SET reactions_down = reactions_down + 1 WHERE slug = ?", (slug,))
+        count = conn.execute(
+            "SELECT reactions_down FROM posts WHERE slug = ?", (slug,)
+        ).fetchone()["reactions_down"]
+    return HTMLResponse(content=str(count))
 
 
 @router.patch("/{slug}/series", status_code=204)

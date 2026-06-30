@@ -590,8 +590,10 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     week_ago = (datetime.now(timezone.utc) - timedelta(days=6)).strftime("%Y-%m-%d")
 
+    # httpRequests1dGroups supports up to 30 days.
+    # httpRequestsAdaptiveGroups is limited to a 1-day range — use today only.
     query = """
-    query($zoneTag: String!, $dateGt: String!, $dateLe: String!) {
+    query($zoneTag: String!, $dateGt: String!, $dateLe: String!, $dateToday: String!) {
       viewer {
         zones(filter: {zoneTag: $zoneTag}) {
           daily: httpRequests1dGroups(
@@ -604,7 +606,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str
           }
           topPaths: httpRequestsAdaptiveGroups(
             limit: 10
-            filter: {date_geq: $dateGt, date_leq: $dateLe, requestSource: "eyeball"}
+            filter: {date_geq: $dateToday, date_leq: $dateToday, requestSource: "eyeball"}
             orderBy: [count_DESC]
           ) {
             dimensions { clientRequestPath }
@@ -612,7 +614,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str
           }
           topCountries: httpRequestsAdaptiveGroups(
             limit: 10
-            filter: {date_geq: $dateGt, date_leq: $dateLe, requestSource: "eyeball"}
+            filter: {date_geq: $dateToday, date_leq: $dateToday, requestSource: "eyeball"}
             orderBy: [count_DESC]
           ) {
             dimensions { clientCountryName }
@@ -620,7 +622,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str
           }
           topBrowsers: httpRequestsAdaptiveGroups(
             limit: 5
-            filter: {date_geq: $dateGt, date_leq: $dateLe, requestSource: "eyeball"}
+            filter: {date_geq: $dateToday, date_leq: $dateToday, requestSource: "eyeball"}
             orderBy: [count_DESC]
           ) {
             dimensions { userAgent }
@@ -639,6 +641,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str
                 "zoneTag": zone_id,
                 "dateGt": week_ago,
                 "dateLe": today,
+                "dateToday": today,
             }
         }).encode(),
         headers={"Authorization": f"Bearer {cf_token}", "Content-Type": "application/json"},

@@ -1,6 +1,7 @@
 """HTML sanitization for user-generated content (Markdown posts)."""
 import bleach
 import mistune
+from markupsafe import Markup
 
 # Allowed HTML tags for blog posts (generated from Markdown)
 ALLOWED_TAGS = [
@@ -42,4 +43,4 @@ def safe_markdown(content: str) -> str:
         strip=True  # Strip disallowed tags instead of escaping
     )
     
-    return safe_html
+    return Markup(safe_html)

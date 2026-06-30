@@ -90,6 +90,19 @@ def test_post_contains_reading_time(client):
     assert b"min read" in r.content
 
 
+def test_post_markdown_renders_html_not_escaped(client):
+    # Markdown content must render as real HTML tags, not escaped entities like &lt;p&gt;
+    r = client.get("/blog/htmx-is-enough")
+    assert b"&lt;p&gt;" not in r.content
+    assert b'class="prose-custom"' in r.content
+
+
+def test_post_sidebar_has_avatar(client):
+    # post.html overrides the sidebar block — must still include the avatar image
+    r = client.get("/blog/htmx-is-enough")
+    assert b"codinghard.png" in r.content
+
+
 def test_post_missing_returns_404(client):
     r = client.get("/blog/no-such-post")
     assert r.status_code == 404

@@ -41,6 +41,9 @@
 {% block sidebar %}
 <div id="toc-container" class="mb-4"></div>
 <div class="border border-zinc-800/60 rounded-xl bg-zinc-900/40 p-5 text-center">
+  <div class="w-32 h-32 rounded-2xl border border-indigo-500/40 overflow-hidden bg-indigo-500/20 mx-auto mb-3">
+    <img src="/static/img/codinghard.png" alt="Zdenovo" class="w-full h-full object-cover" onerror="this.style.display='none';this.parentElement.innerHTML='<span class=\'text-sm font-bold text-indigo-400 flex items-center justify-center w-full h-full\'>Z</span>'" />
+  </div>
   <p class="font-semibold text-zinc-100 text-sm">Zdenovo</p>
   <p class="text-xs text-zinc-500 mt-0.5">Software Engineer</p>
   <div class="flex items-center justify-center gap-1.5 mt-3 pt-3 border-t border-zinc-800/60">
@@ -151,20 +154,41 @@
 </section>
 {% endif %}
 
-<section class="mt-8 flex items-center gap-4">
+<section class="mt-8 flex items-center gap-3">
   <button
-    id="react-btn"
+    id="react-up-btn"
     hx-post="/api/posts/{{ post.slug }}/react"
-    hx-target="#reaction-count"
+    hx-target="#reaction-up-count"
     hx-swap="innerHTML"
-    hx-on:htmx:after-request="document.getElementById('react-btn').classList.add('reacted');localStorage.setItem('reacted_{{ post.slug }}', '1')"
-    class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-zinc-700 rounded-lg hover:border-indigo-500/60 hover:text-indigo-400 transition-colors">
-    👍 <span id="reaction-count">{{ post.reactions }}</span>
+    hx-on:htmx:after-request="window._vote('{{ post.slug }}','up')"
+    class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-zinc-700 rounded-lg hover:border-emerald-500/60 hover:text-emerald-400 transition-colors">
+    👍 <span id="reaction-up-count">{{ post.reactions }}</span>
   </button>
-  <span class="text-xs text-zinc-600">Found this helpful?</span>
+  <button
+    id="react-down-btn"
+    hx-post="/api/posts/{{ post.slug }}/react-down"
+    hx-target="#reaction-down-count"
+    hx-swap="innerHTML"
+    hx-on:htmx:after-request="window._vote('{{ post.slug }}','down')"
+    class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-zinc-700 rounded-lg hover:border-red-500/60 hover:text-red-400 transition-colors">
+    👎 <span id="reaction-down-count">{{ post.reactions_down }}</span>
+  </button>
+  <span class="text-xs text-zinc-600">Was this helpful?</span>
 </section>
 <script>
-(function(){if(localStorage.getItem('reacted_{{ post.slug }}')){var b=document.getElementById('react-btn');if(b)b.classList.add('reacted');}})();
+(function(){
+  var slug = '{{ post.slug }}';
+  var vote = localStorage.getItem('vote_' + slug);
+  if (vote === 'up') { var b = document.getElementById('react-up-btn'); if (b) b.classList.add('reacted'); }
+  if (vote === 'down') { var b = document.getElementById('react-down-btn'); if (b) b.classList.add('reacted'); }
+  window._vote = function(s, dir) {
+    localStorage.setItem('vote_' + s, dir);
+    var up = document.getElementById('react-up-btn');
+    var down = document.getElementById('react-down-btn');
+    if (up) up.classList.toggle('reacted', dir === 'up');
+    if (down) down.classList.toggle('reacted', dir === 'down');
+  };
+})();
 </script>
 
 {% if related_posts %}

@@ -43,6 +43,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE posts ADD COLUMN ai_comments INTEGER NOT NULL DEFAULT 1")
         if "reactions" not in cols:
             conn.execute("ALTER TABLE posts ADD COLUMN reactions INTEGER NOT NULL DEFAULT 0")
+        if "reactions_down" not in cols:
+            conn.execute("ALTER TABLE posts ADD COLUMN reactions_down INTEGER NOT NULL DEFAULT 0")
         if "series_id" not in cols:
             conn.execute("ALTER TABLE posts ADD COLUMN series_id TEXT REFERENCES series(id)")
         if "series_order" not in cols:
