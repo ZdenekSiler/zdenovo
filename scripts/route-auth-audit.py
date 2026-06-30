@@ -45,6 +45,11 @@ PUBLIC_WHITELIST: dict[tuple[str, str], str] = {
     ("posts_api.py", "react_down_to_post"): (
         "POST /{slug}/react-down — public thumbs-down reaction, rate-limited via slowapi."
     ),
+    ("deploys_api.py", "create_deploy"): (
+        "POST /api/deploys — machine-to-machine endpoint protected by X-Deploy-Token "
+        "shared secret (_verify_deploy_token), not admin session. Called by Makefile "
+        "via scripts/record-deploy.sh after each prod deploy."
+    ),
 }
 
 

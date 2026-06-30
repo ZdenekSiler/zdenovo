@@ -10,6 +10,7 @@ export
 
 COMPOSE_PROD := docker compose -f docker-compose.prod.yml
 SSH_CMD := ssh $(SERVER_USER)@$(SERVER_HOST)
+DEPLOY_TOKEN ?= $(shell cat secrets/deploy_token 2>/dev/null)
 
 .DEFAULT_GOAL := help
 
@@ -82,12 +83,16 @@ prod: _require-env _gen-nginx-conf _check-certs
 	@bash scripts/pre-deploy-check.sh || (echo "ERROR: pre-deploy check failed — aborting" && exit 1)
 	@echo "→ Backing up database before deploy..."
 	@/opt/zdenovo/backup-db.sh || (echo "ERROR: backup failed — aborting deploy" && exit 1)
-	BUILD_COMMIT=$$(git rev-parse --short HEAD) $(COMPOSE_PROD) up --build -d
+	$(eval DEPLOY_START := $(shell date +%s))
+	$(eval DEPLOY_COMMIT := $(shell git rev-parse --short HEAD))
+	BUILD_COMMIT=$(DEPLOY_COMMIT) $(COMPOSE_PROD) up --build -d
 	@echo "→ Reloading nginx to pick up new web container IP..."
 	@docker exec zdenovo-nginx-1 nginx -s reload 2>/dev/null || true
 	@echo "→ Waiting for containers to stabilize..."
 	@sleep 5
-	@$(MAKE) --no-print-directory _post-deploy-check
+	@$(MAKE) --no-print-directory _post-deploy-check \
+	    && bash scripts/record-deploy.sh $(DEPLOY_COMMIT) success $$(($$(date +%s) - $(DEPLOY_START))) \
+	    || { bash scripts/record-deploy.sh $(DEPLOY_COMMIT) failed $$(($$(date +%s) - $(DEPLOY_START))); exit 1; }
 
 prod-logs:
 	$(COMPOSE_PROD) logs -f
@@ -165,6 +170,7 @@ deploy-first: _require-env _require-secrets
 	@echo "$(UNSPLASH_ACCESS_KEY)" | $(SSH_CMD) "cat > $(DEPLOY_DIR)/secrets/unsplash_access_key && chmod 600 $(DEPLOY_DIR)/secrets/unsplash_access_key"
 	@echo "$(ADMIN_PASSWORD)" | $(SSH_CMD) "cat > $(DEPLOY_DIR)/secrets/admin_password && chmod 600 $(DEPLOY_DIR)/secrets/admin_password"
 	@echo "$(SECRET_KEY)" | $(SSH_CMD) "cat > $(DEPLOY_DIR)/secrets/secret_key && chmod 600 $(DEPLOY_DIR)/secrets/secret_key"
+	@echo "$(DEPLOY_TOKEN)" | $(SSH_CMD) "cat > $(DEPLOY_DIR)/secrets/deploy_token && chmod 600 $(DEPLOY_DIR)/secrets/deploy_token"
 	@echo "→ Pushing non-secret config (.env with DOMAIN + CERTBOT_EMAIL only)..."
 	@printf "DOMAIN=$(DOMAIN)\nCERTBOT_EMAIL=$(CERTBOT_EMAIL)\n" | $(SSH_CMD) "cat > $(DEPLOY_DIR)/.env"
 	$(SSH_CMD) \

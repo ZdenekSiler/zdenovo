@@ -35,7 +35,7 @@ def require_admin(request: Request) -> None:
 
 # ─── Session & Redirect Validation ────────────────────────────────────────────
 
-SAFE_REDIRECTS = {"/admin", "/admin/posts", "/admin/drafts", "/admin/comments", "/admin/topics", "/admin/stats"}
+SAFE_REDIRECTS = {"/admin", "/admin/posts", "/admin/drafts", "/admin/comments", "/admin/topics", "/admin/stats", "/admin/deploys"}
 
 
 def validate_redirect_url(url: str) -> str:

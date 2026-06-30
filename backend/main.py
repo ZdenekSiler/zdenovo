@@ -31,7 +31,7 @@ from config import read_secret
 from data.analytics import refresh_popular_posts
 from data.posts import get_all_posts, get_all_tags, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, get_series_siblings, search_posts, total_pages
 from data.projects import get_all_projects
-from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
+from db import comment_row_to_dict, deploy_row_to_dict, draft_row_to_dict, get_conn, init_db
 from middleware.csrf import CSRFMiddleware
 from routers.comments_api import generate_pending_comments, router as comments_router
 from routers.drafts_api import _regenerate_draft, generate_daily_drafts, generate_single_topic, router as drafts_router
@@ -40,6 +40,7 @@ from routers.posts_api import router as posts_router
 from routers.series_api import router as series_router
 from routers.topics_api import _enrich_topics, _load_topics, _save_topics, _slugify, router as topics_router
 from routers.auth import AdminRequired, _is_admin, require_admin, validate_redirect_url, verify_admin_password
+from routers.deploys_api import router as deploys_router
 from routers.seo import router as seo_router
 
 BASE_DIR = Path(__file__).parent.parent  # zdenovo/
@@ -131,6 +132,7 @@ templates.env.globals["deploy_time"] = datetime.now(timezone.utc).strftime("%Y-%
 
 # Include API routers
 app.include_router(comments_router)
+app.include_router(deploys_router)
 app.include_router(drafts_router)
 app.include_router(generate_router)
 app.include_router(posts_router)
@@ -387,6 +389,9 @@ async def admin_root(request: Request, _: None = Depends(require_admin)) -> str:
         comment_pending_count = conn.execute(
             "SELECT COUNT(*) FROM comments WHERE status IN ('generated', 'approved')"
         ).fetchone()[0]
+        last_deploy_row = conn.execute(
+            "SELECT commit_hash, status FROM deploys ORDER BY deployed_at DESC LIMIT 1"
+        ).fetchone()
     real_comment_count = comment_count - generated_comment_count
     topic_count = len(_load_topics())
     return templates.TemplateResponse(request, "admin_hub.html", {
@@ -397,7 +402,19 @@ async def admin_root(request: Request, _: None = Depends(require_admin)) -> str:
         "generated_comment_count": generated_comment_count,
         "comment_pending_count": comment_pending_count,
         "topic_count": topic_count,
+        "last_deploy_commit": last_deploy_row["commit_hash"] if last_deploy_row else None,
+        "last_deploy_status": last_deploy_row["status"] if last_deploy_row else None,
     })
+
+
+@app.get("/admin/deploys", response_class=HTMLResponse)
+async def admin_deploys(request: Request, _: None = Depends(require_admin)) -> str:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM deploys ORDER BY deployed_at DESC LIMIT 50"
+        ).fetchall()
+    deploys = [deploy_row_to_dict(r) for r in rows]
+    return templates.TemplateResponse(request, "admin_deploys.html", {"deploys": deploys})
 
 
 @app.get("/admin/posts", response_class=HTMLResponse)

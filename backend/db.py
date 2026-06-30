@@ -107,6 +107,20 @@ def init_db() -> None:
             )
         """)
 
+        # ── deploys table ──────────────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS deploys (
+                id           TEXT PRIMARY KEY,
+                commit_hash  TEXT NOT NULL,
+                branch       TEXT NOT NULL DEFAULT 'main',
+                deployed_at  TEXT NOT NULL,
+                status       TEXT NOT NULL,
+                duration_s   INTEGER,
+                triggered_by TEXT NOT NULL DEFAULT 'manual',
+                notes        TEXT
+            )
+        """)
+
         # ── FTS5 full-text search ──────────────────────────────────────────────
         conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
@@ -197,4 +211,10 @@ def comment_row_to_dict(row: sqlite3.Row) -> dict:
     d["is_generated"] = bool(d.get("is_generated", 0))
     d["status"] = d.get("status", "published")
     d["parent_id"] = d.get("parent_id")
+    return d
+
+
+def deploy_row_to_dict(row: sqlite3.Row) -> dict:
+    d = dict(row)
+    d["deployed_at"] = datetime.fromisoformat(d["deployed_at"])
     return d

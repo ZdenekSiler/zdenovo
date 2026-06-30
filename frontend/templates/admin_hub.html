@@ -56,5 +56,18 @@
     </div>
     <p class="text-xs text-zinc-500">Cloudflare Web Analytics — traffic, pages, visitors.</p>
   </a>
+
+  <a href="/admin/deploys" class="card group hover:border-zinc-700 transition-colors">
+    <div class="flex items-center justify-between mb-3">
+      <p class="text-sm font-semibold text-zinc-200 group-hover:text-sky-400 transition-colors">Deploys</p>
+      {% if last_deploy_status == "success" %}
+      <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400">success</span>
+      {% elif last_deploy_status == "failed" %}
+      <span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-500/10 text-red-400">failed</span>
+      {% endif %}
+    </div>
+    <p class="text-2xl font-bold text-sky-400 font-mono mb-0.5">{{ last_deploy_commit or "—" }}</p>
+    <p class="text-xs text-zinc-600">{{ "no deploys yet" if not last_deploy_commit else "last deployed commit" }}</p>
+  </a>
 </div>
 {% endblock %}
