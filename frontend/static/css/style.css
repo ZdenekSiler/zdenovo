@@ -697,6 +697,9 @@ html.light .skill-card {
   background-color: #ffffff;
   border-color: #e4e4e7;
 }
+html.light .card:hover,
+html.light .skill-card:hover { border-color: #a5b4fc; }
+html.light .skill-card h3 { color: #6366f1 !important; }
 html.light .nav-link { color: #52525b; }
 html.light .nav-link:hover { color: #18181b; background-color: #f4f4f5; }
 
