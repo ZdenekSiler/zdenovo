@@ -16,19 +16,24 @@
   <meta property="og:url" content="{% block og_url %}https://zdenovo.com{{ request.url.path }}{% endblock %}">
   <meta property="og:image" content="{% block og_image %}https://zdenovo.com/static/img/codinghard.png{% endblock %}">
   {% block extra_meta %}{% endblock %}
-  <link rel="preconnect" href="https://cdn.tailwindcss.com">
-  <link rel="preconnect" href="https://unpkg.com">
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
-  <link rel="dns-prefetch" href="https://unpkg.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.tailwindcss.com">
+  <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="dns-prefetch" href="https://unpkg.com">
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" />
+  <link rel="stylesheet" href="/static/css/style.css?v=6" />
   <script data-cfasync="false">
   (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.classList.add(t==='light'?'light':'dark');})();
   </script>
-  <script data-cfasync="false" src="https://cdn.tailwindcss.com"></script>
+  <script data-cfasync="false" src="https://cdn.tailwindcss.com" fetchpriority="high"></script>
   <script data-cfasync="false">
   tailwind.config = {
     darkMode: 'class',
@@ -42,8 +47,6 @@
   }
   </script>
   <script data-cfasync="false" src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" />
-  <link rel="stylesheet" href="/static/css/style.css?v=6" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js" defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js" defer></script>

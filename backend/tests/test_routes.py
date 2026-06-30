@@ -309,6 +309,78 @@ def test_post_without_sources_hides_section(client):
     assert b"Further Reading" not in r.content
 
 
+# ── SEO: tag pages ───────────────────────────────────────────────────────────
+
+def test_tag_page_has_unique_title(client):
+    r = client.get("/blog?tag=python")
+    assert b"Python posts" in r.content
+
+def test_tag_page_has_unique_meta_description(client):
+    r = client.get("/blog?tag=python")
+    assert b"tagged with python" in r.content
+
+def test_tag_page_has_unique_canonical_url(client):
+    r = client.get("/blog?tag=python")
+    assert b'canonical" href="https://zdenovo.com/blog?tag=python"' in r.content
+
+def test_tag_page_og_title_reflects_tag(client):
+    r = client.get("/blog?tag=python")
+    assert b'og:title" content="Python posts' in r.content
+
+def test_tag_page_og_url_matches_canonical(client):
+    r = client.get("/blog?tag=python")
+    assert b'og:url" content="https://zdenovo.com/blog?tag=python"' in r.content
+
+def test_tag_page_blog_jsonld_reflects_tag(client):
+    r = client.get("/blog?tag=python")
+    assert b'"Python posts"' in r.content
+    assert b'"https://zdenovo.com/blog?tag=python"' in r.content
+
+def test_untagged_blog_page_title_unchanged(client):
+    r = client.get("/blog")
+    assert b"<title>Blog" in r.content
+
+def test_untagged_blog_page_canonical_unchanged(client):
+    r = client.get("/blog")
+    assert b'canonical" href="https://zdenovo.com/blog"' in r.content
+
+def test_sitemap_contains_tag_urls(client):
+    r = client.get("/sitemap.xml")
+    assert b"/blog?tag=" in r.content
+
+def test_sitemap_tag_url_uses_weekly_changefreq(client):
+    r = client.get("/sitemap.xml")
+    xml = r.content.decode()
+    tag_block = xml[xml.find("/blog?tag="):]
+    assert "weekly" in tag_block[:200]
+
+
+# ── SEO: CDN performance hints ───────────────────────────────────────────────
+
+def test_base_html_has_dns_prefetch_for_cdnjs(client):
+    r = client.get("/")
+    assert b'dns-prefetch" href="https://cdnjs.cloudflare.com"' in r.content
+
+def test_base_html_has_dns_prefetch_for_jsdelivr(client):
+    r = client.get("/")
+    assert b'dns-prefetch" href="https://cdn.jsdelivr.net"' in r.content
+
+def test_tailwind_script_has_fetchpriority_high(client):
+    r = client.get("/")
+    assert b'cdn.tailwindcss.com" fetchpriority="high"' in r.content
+
+def test_prism_css_precedes_tailwind_script_in_head(client):
+    r = client.get("/")
+    html = r.content.decode()
+    prism_pos = html.find("prism-tomorrow.min.css")
+    tailwind_pos = html.find('src="https://cdn.tailwindcss.com"')
+    assert prism_pos < tailwind_pos, "Prism CSS should load before Tailwind script"
+
+def test_inter_font_stylesheet_has_preload_hint(client):
+    r = client.get("/")
+    assert b'rel="preload" as="style" href="https://fonts.googleapis.com' in r.content
+
+
 # ── Public pages have no inline validation data ─────────────────────────────
 
 def test_public_post_has_no_validation_data(client):

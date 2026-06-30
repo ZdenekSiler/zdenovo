@@ -229,18 +229,24 @@ async def blog(request: Request, tag: str | None = None, page: int = 1) -> str:
     """Blog listing page with pagination and tag filtering."""
     posts, total = get_posts_page(page, tag=tag)
     n_pages = total_pages(total)
-    ctx: dict = {
+    if tag:
+        page_title = f"{tag.capitalize()} posts"
+        meta_description = f"Posts tagged with {tag} on Zdenovo."
+        canonical_url = f"https://zdenovo.com/blog?tag={tag}"
+    else:
+        page_title = "Blog"
+        meta_description = "Notes on software engineering, AI development, tooling, and lessons learned the hard way."
+        canonical_url = "https://zdenovo.com/blog"
+    return templates.TemplateResponse(request, "blog.html", {
         "posts": posts,
         "current_tag": tag,
         "page": page,
         "total_pages": n_pages,
         "popular_posts": get_popular_posts(),
-    }
-    if tag:
-        ctx["page_title"] = f"{tag.capitalize()} posts"
-        ctx["meta_description"] = f"Posts tagged with {tag} on Zdenovo."
-        ctx["canonical_url"] = f"https://zdenovo.com/blog?tag={tag}"
-    return templates.TemplateResponse(request, "blog.html", ctx)
+        "page_title": page_title,
+        "meta_description": meta_description,
+        "canonical_url": canonical_url,
+    })
 
 
 @app.get("/blog/{slug}", response_class=HTMLResponse)
