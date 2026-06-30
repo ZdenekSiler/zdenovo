@@ -91,8 +91,8 @@ echo ""
 
 # ── Route auth audit ──────────────────────────────────────────────────────────
 ts "--- [5/5] Security: route auth audit ---"
-cd "$REPO_ROOT"
-uv run --directory backend python scripts/route-auth-audit.py || {
+cd "$BACKEND"
+uv run python "$REPO_ROOT/scripts/route-auth-audit.py" || {
   ts "FAILED: Route auth audit found unprotected endpoints."
   ts "Full log: $LOG_FILE"
   exit 1
