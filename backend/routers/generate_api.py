@@ -34,12 +34,12 @@ MAX_GENERATION_ATTEMPTS = 3
 
 class PostBrief(BaseModel):
   id: str
-  title_hint: str
-  description: str
-  audience: str
-  tone: str
-  tags: list[str] = Field(default_factory=list)
-  outline: list[str] = Field(default_factory=list)
+  title_hint: str = Field(..., max_length=300)
+  description: str = Field(..., max_length=1500)
+  audience: str = Field(..., max_length=300)
+  tone: str = Field(..., max_length=300)
+  tags: list[str] = Field(default_factory=list, max_length=10)
+  outline: list[str] = Field(default_factory=list, max_length=20)
 
 
 class GenerateIn(BaseModel):
@@ -169,9 +169,11 @@ class BlogGenerator:
     self._ensure_prompts()
     review_prompt = (
       f"Review this blog post for AI slop.\n\n"
-      f"Title: {post.title}\n"
-      f"Summary: {post.summary}\n\n"
-      f"Content:\n{post.content}"
+      f"<post>\n"
+      f"<title>{post.title}</title>\n"
+      f"<summary>{post.summary}</summary>\n\n"
+      f"<content>\n{post.content}\n</content>\n"
+      f"</post>"
     )
     try:
       message = self._get_client().messages.create(
@@ -205,9 +207,11 @@ class BlogGenerator:
     self._ensure_prompts()
     prompt = (
       f"Find sources for this blog post:\n\n"
-      f"Title: {post.title}\n"
-      f"Tags: {', '.join(post.tags)}\n"
-      f"Summary: {post.summary}"
+      f"<post>\n"
+      f"<title>{post.title}</title>\n"
+      f"<tags>{', '.join(post.tags)}</tags>\n"
+      f"<summary>{post.summary}</summary>\n"
+      f"</post>"
     )
     try:
       message = self._get_client().messages.create(
@@ -271,6 +275,7 @@ def _load_briefs() -> list[PostBrief]:
 
 def _build_brief_message(brief: PostBrief) -> str:
   parts = [
+    "<brief>",
     f"Title hint: {brief.title_hint}",
     f"Description: {brief.description}",
     f"Target audience: {brief.audience}",
@@ -281,6 +286,7 @@ def _build_brief_message(brief: PostBrief) -> str:
   if brief.outline:
     sections = "\n".join(f"  - {point}" for point in brief.outline)
     parts.append(f"Required sections to cover:\n{sections}")
+  parts.append("</brief>")
   return "\n".join(parts)
 
 

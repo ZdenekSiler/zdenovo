@@ -92,8 +92,10 @@ class CommentGenerator:
         user_message = (
             f"Write {count} comment{'s' if count > 1 else ''} for this blog post.\n"
             f"Use these names for the commenters: {', '.join(suggested)}.\n\n"
-            f"Title: {post_title}\n\n"
-            f"Content (first 1500 chars):\n{post_content[:1500]}"
+            f"<post>\n"
+            f"<title>{post_title}</title>\n\n"
+            f"<content>\n{post_content[:1500]}\n</content>\n"
+            f"</post>"
         )
 
         try:
