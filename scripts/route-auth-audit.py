@@ -39,6 +39,12 @@ PUBLIC_WHITELIST: dict[tuple[str, str], str] = {
     ),
     # POST /blog/{slug}/comments (the HTML form equivalent) lives in main.py,
     # not in routers/, so it is outside this script's scan scope by design.
+    ("posts_api.py", "react_to_post"): (
+        "POST /{slug}/react — public thumbs-up reaction, rate-limited via slowapi."
+    ),
+    ("posts_api.py", "react_down_to_post"): (
+        "POST /{slug}/react-down — public thumbs-down reaction, rate-limited via slowapi."
+    ),
 }
 
 
