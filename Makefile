@@ -78,6 +78,8 @@ test:
 .PHONY: prod prod-logs prod-stop prod-down
 
 prod: _require-env _gen-nginx-conf _check-certs
+	@echo "→ Pre-deploy security check..."
+	@bash scripts/pre-deploy-check.sh || (echo "ERROR: pre-deploy check failed — aborting" && exit 1)
 	@echo "→ Backing up database before deploy..."
 	@/opt/zdenovo/backup-db.sh || (echo "ERROR: backup failed — aborting deploy" && exit 1)
 	BUILD_COMMIT=$$(git rev-parse --short HEAD) $(COMPOSE_PROD) up --build -d

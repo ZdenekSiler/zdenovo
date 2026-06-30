@@ -292,7 +292,7 @@ def regenerate_draft(draft_id: str, body: RegenerateIn, _: None = Depends(_get_r
 
 
 @router.post("/{draft_id}/validate", response_model=ValidationSummary)
-def validate_draft_code(draft_id: str):
+def validate_draft_code(draft_id: str, _: None = Depends(_get_require_admin)):
   with get_conn() as conn:
     row = conn.execute("SELECT content FROM drafts WHERE id = ?", (draft_id,)).fetchone()
   if row is None:

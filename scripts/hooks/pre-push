@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Only run the full test suite when pushing to main.
+# Other branches push without tests.
+PUSHING_TO_MAIN=false
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [[ "$remote_ref" == "refs/heads/main" ]]; then
+    PUSHING_TO_MAIN=true
+  fi
+done
+
+if [[ "$PUSHING_TO_MAIN" != "true" ]]; then
+  exit 0
+fi
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+BACKEND="$REPO_ROOT/backend"
+
+# Load .env so Playwright tests can read ADMIN_PASSWORD
+if [[ -f "$REPO_ROOT/.env" ]]; then
+  set -a
+  source "$REPO_ROOT/.env"
+  set +a
+fi
+
+echo "=== Pre-push to main: running full test suite ==="
+
+if ! curl -s -o /dev/null -w '' --connect-timeout 2 http://localhost:8080/ 2>/dev/null; then
+  echo "ERROR: App not running on localhost:8080. Start it with 'docker compose up -d' first."
+  exit 1
+fi
+
+# Unit tests
+echo "--- Unit tests ---"
+cd "$BACKEND"
+uv run pytest tests/test_db.py tests/test_data.py tests/test_api.py tests/test_routes.py tests/test_auth.py tests/test_comments.py tests/test_drafts.py tests/test_topics.py -v --tb=short || {
+  echo "FAILED: Unit tests did not pass. Push aborted."
+  exit 1
+}
+
+# Playwright frontend tests
+echo "--- Frontend tests (Playwright) ---"
+uv run pytest tests/test_frontend.py -v --tb=short -k "not regenerate" || {
+  echo "FAILED: Frontend tests did not pass. Push aborted."
+  exit 1
+}
+
+echo "--- Security: bandit ---"
+cd "$BACKEND"
+uv run bandit -r . -x tests/,.venv/ --severity-level medium -q || {
+  echo "FAILED: bandit found security issues. Push aborted."
+  exit 1
+}
+
+echo "--- Security: pip-audit ---"
+cd "$BACKEND"
+uv run pip-audit -l && echo "  ✓ No known vulnerabilities" || {
+  echo "FAILED: pip-audit found vulnerable dependencies."
+  exit 1
+}
+
+echo "--- Security: route auth audit ---"
+cd "$REPO_ROOT"
+uv run --directory backend python scripts/route-auth-audit.py || {
+  echo "FAILED: Route auth audit found unprotected endpoints."
+  exit 1
+}
+
+echo "=== All tests passed. Pushing to main. ==="

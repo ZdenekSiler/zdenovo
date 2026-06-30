@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Pre-commit hook: scan staged files for secrets with detect-secrets.
+#
+# This is the version-controlled source of truth for the hook. It is
+# installed into .git/hooks/pre-commit via scripts/install-hooks.sh
+# (symlinked, so updates here take effect immediately without
+# reinstalling).
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+BASELINE=".secrets.baseline"
+DETECT_SECRETS_HOOK="$REPO_ROOT/backend/.venv/bin/detect-secrets-hook"
+
+# Only scan files that are actually staged for commit.
+mapfile -t STAGED_FILES < <(git diff --cached --name-only --diff-filter=ACM)
+
+if [ "${#STAGED_FILES[@]}" -eq 0 ]; then
+    # Nothing staged (e.g. empty commit) -- nothing to scan.
+    exit 0
+fi
+
+if [ ! -x "$DETECT_SECRETS_HOOK" ]; then
+    echo "pre-commit: detect-secrets-hook not found or not executable at:" >&2
+    echo "  $DETECT_SECRETS_HOOK" >&2
+    echo "Run 'uv sync' in backend/ to install dev dependencies." >&2
+    exit 1
+fi
+
+if [ ! -f "$BASELINE" ]; then
+    echo "pre-commit: secrets baseline not found at $REPO_ROOT/$BASELINE" >&2
+    exit 1
+fi
+
+set +e
+"$DETECT_SECRETS_HOOK" --baseline "$BASELINE" "${STAGED_FILES[@]}"
+STATUS=$?
+set -e
+
+if [ "$STATUS" -ne 0 ]; then
+    cat >&2 <<'EOF'
+
+============================================================
+  COMMIT BLOCKED: possible secret(s) detected in staged files
+============================================================
+
+detect-secrets found content that looks like a credential
+(API key, token, password, etc.) in your staged changes.
+
+What to do:
+  1. If this is a REAL secret: remove it from the file, rotate
+     the credential, and use an environment variable / secrets
+     manager instead.
+  2. If this is a FALSE POSITIVE: update the baseline so this
+     exact finding is recorded as reviewed/ignored, then re-stage
+     and commit:
+
+       backend/.venv/bin/detect-secrets scan --baseline .secrets.baseline
+       git add .secrets.baseline
+
+  3. To audit/triage findings interactively:
+
+       backend/.venv/bin/detect-secrets audit .secrets.baseline
+
+If you are certain there is no secret and need to bypass this
+check just once, you can use 'git commit --no-verify', but please
+only do this after manual review.
+============================================================
+EOF
+    exit 1
+fi
+
+exit 0

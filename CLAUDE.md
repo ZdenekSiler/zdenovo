@@ -76,6 +76,7 @@ See `docs/deployment.md` for full deployment guide.
 | `/implement <feature>` | After `/design` — implements the spec using parallel subagents |
 | `/simplify` | After implementing — reviews code quality and removes redundancy |
 | `/recap deploy` or `/recap debug` | End of a deploy or debug session — prints structured summary of commands and outcomes |
+| `/security-review` | Before merging — AI-powered review of changed files for auth gaps, XSS, SQL injection, CSRF, secrets |
 
 ## Key Principles
 
