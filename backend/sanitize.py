@@ -43,4 +43,4 @@ def safe_markdown(content: str) -> str:
         strip=True  # Strip disallowed tags instead of escaping
     )
     
-    return Markup(safe_html)
+    return Markup(safe_html)  # nosec B704 — safe_html is bleach-sanitized above
