@@ -2,7 +2,6 @@
 set -euo pipefail
 
 # Only run the full test suite when pushing to main.
-# Other branches push without tests.
 PUSHING_TO_MAIN=false
 while read -r local_ref local_sha remote_ref remote_sha; do
   if [[ "$remote_ref" == "refs/heads/main" ]]; then
@@ -16,6 +15,16 @@ fi
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 BACKEND="$REPO_ROOT/backend"
+LOG_FILE="$REPO_ROOT/.pre-push.log"
+
+# Tee all output to log file AND stdout so progress is always visible
+exec > >(tee "$LOG_FILE") 2>&1
+
+ts() { echo "[$(date '+%H:%M:%S')] $*"; }
+
+ts "=== Pre-push to main: running full security gate ==="
+ts "Log: $LOG_FILE"
+echo ""
 
 # Load .env so Playwright tests can read ADMIN_PASSWORD
 if [[ -f "$REPO_ROOT/.env" ]]; then
@@ -24,47 +33,60 @@ if [[ -f "$REPO_ROOT/.env" ]]; then
   set +a
 fi
 
-echo "=== Pre-push to main: running full test suite ==="
-
 if ! curl -s -o /dev/null -w '' --connect-timeout 2 http://localhost:8080/ 2>/dev/null; then
-  echo "ERROR: App not running on localhost:8080. Start it with 'docker compose up -d' first."
+  ts "ERROR: App not running on localhost:8080. Start it with 'docker compose up -d' first."
   exit 1
 fi
 
-# Unit tests
-echo "--- Unit tests ---"
+# ── Unit tests ────────────────────────────────────────────────────────────────
+ts "--- [1/5] Unit tests ---"
 cd "$BACKEND"
 uv run pytest tests/test_db.py tests/test_data.py tests/test_api.py tests/test_routes.py tests/test_auth.py tests/test_comments.py tests/test_drafts.py tests/test_topics.py -v --tb=short || {
-  echo "FAILED: Unit tests did not pass. Push aborted."
+  ts "FAILED: Unit tests did not pass. Push aborted."
+  ts "Full log: $LOG_FILE"
   exit 1
 }
+ts "✓ Unit tests passed"
+echo ""
 
-# Playwright frontend tests
-echo "--- Frontend tests (Playwright) ---"
+# ── Playwright frontend tests ─────────────────────────────────────────────────
+ts "--- [2/5] Frontend tests (Playwright) ---"
 uv run pytest tests/test_frontend.py -v --tb=short -k "not regenerate" || {
-  echo "FAILED: Frontend tests did not pass. Push aborted."
+  ts "FAILED: Frontend tests did not pass. Push aborted."
+  ts "Full log: $LOG_FILE"
   exit 1
 }
+ts "✓ Frontend tests passed"
+echo ""
 
-echo "--- Security: bandit ---"
-cd "$BACKEND"
+# ── bandit ────────────────────────────────────────────────────────────────────
+ts "--- [3/5] Security: bandit ---"
 uv run bandit -r . -x tests/,.venv/ --severity-level medium -q || {
-  echo "FAILED: bandit found security issues. Push aborted."
+  ts "FAILED: bandit found security issues. Push aborted."
+  ts "Full log: $LOG_FILE"
   exit 1
 }
+ts "✓ bandit clean"
+echo ""
 
-echo "--- Security: pip-audit ---"
-cd "$BACKEND"
-uv run pip-audit -l && echo "  ✓ No known vulnerabilities" || {
-  echo "FAILED: pip-audit found vulnerable dependencies."
+# ── pip-audit ─────────────────────────────────────────────────────────────────
+ts "--- [4/5] Security: pip-audit ---"
+uv run pip-audit -l && ts "✓ No known vulnerabilities" || {
+  ts "FAILED: pip-audit found vulnerable dependencies."
+  ts "Full log: $LOG_FILE"
   exit 1
 }
+echo ""
 
-echo "--- Security: route auth audit ---"
+# ── Route auth audit ──────────────────────────────────────────────────────────
+ts "--- [5/5] Security: route auth audit ---"
 cd "$REPO_ROOT"
 uv run --directory backend python scripts/route-auth-audit.py || {
-  echo "FAILED: Route auth audit found unprotected endpoints."
+  ts "FAILED: Route auth audit found unprotected endpoints."
+  ts "Full log: $LOG_FILE"
   exit 1
 }
+ts "✓ All routes protected"
+echo ""
 
-echo "=== All tests passed. Pushing to main. ==="
+ts "=== All checks passed. Pushing to main. ==="
