@@ -761,6 +761,15 @@ html.light .mermaid {
 }
 
 html.light .prose-custom blockquote { border-left-color: #6366f1; color: #52525b; }
+/* Table: neutral header in light mode */
+html.light .prose-custom table { border-color: #e4e4e7; }
+html.light .prose-custom thead { background-color: #f4f4f5; }
+html.light .prose-custom th {
+  color: #374151;
+  border-bottom-color: #d4d4d8;
+}
+html.light .prose-custom td { color: #52525b; border-bottom-color: #e4e4e7; }
+html.light .prose-custom tbody tr:hover { background-color: #f4f4f580; }
 html.light .tldr-card {
   background: #f8faff !important;  /* override the dark gradient */
   border-color: #c7d2fe;
