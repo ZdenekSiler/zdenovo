@@ -429,6 +429,7 @@
 }
 .code-block-wrapper pre {
   margin-bottom: 0;
+  padding-top: 2rem;  /* room for lang badge + copy/hide buttons */
 }
 .copy-btn {
   position: absolute;
@@ -721,20 +722,36 @@ html.light .prose-custom { color: #27272a; }
 html.light .prose-custom h2,
 html.light .prose-custom h3 { color: #18181b !important; }
 html.light .prose-custom a { color: #4f46e5; }
-/* Code blocks: use a readable dark-on-light theme instead of white-on-white */
+/* Code blocks: light gray background in light mode, Prism token colors override */
 html.light .prose-custom pre[class*="language-"] {
-  background-color: #1e1e2e;
-  border-color: #3f3f5a;
-  color: #cdd6f4;
+  background-color: #f6f8fa !important;
+  border: 1px solid #e4e4e7;
+  color: #27272a;
 }
-html.light .prose-custom code[class*="language-"] { color: #cdd6f4; }
+html.light .prose-custom code[class*="language-"] { color: #27272a; }
+/* Override Prism-tomorrow's dark token colors for light mode */
+html.light .token.comment,
+html.light .token.prolog,
+html.light .token.doctype,
+html.light .token.cdata   { color: #6b7280; }
+html.light .token.keyword { color: #7c3aed; }
+html.light .token.string,
+html.light .token.attr-value { color: #0f766e; }
+html.light .token.number,
+html.light .token.boolean { color: #b45309; }
+html.light .token.function { color: #1d4ed8; }
+html.light .token.class-name { color: #0369a1; }
+html.light .token.operator,
+html.light .token.punctuation { color: #52525b; }
+html.light .token.builtin,
+html.light .token.attr-name { color: #9333ea; }
 html.light .prose-custom :not(pre) > code {
-  background-color: #e8e8f0;
-  color: #4f4f7a;
+  background-color: #f4f4f5;
+  color: #7c3aed;
   border-radius: 0.25rem;
   padding: 0.1em 0.35em;
 }
-html.light .code-lang-badge { background: #2a2a3e; color: #a6adc8; }
+html.light .code-lang-badge { background: #e4e4e7; color: #52525b; }
 
 /* Mermaid diagrams: switch to light theme in light mode */
 html.light .mermaid {
@@ -743,7 +760,11 @@ html.light .mermaid {
 }
 
 html.light .prose-custom blockquote { border-left-color: #6366f1; color: #52525b; }
-html.light .tldr-card { background-color: #f0f0ff; border-color: #c7d2fe; }
+html.light .tldr-card {
+  background: #f8faff !important;  /* override the dark gradient */
+  border-color: #c7d2fe;
+}
+html.light .tldr-card p { color: #374151 !important; }
 html.light .tldr-label { color: #4f46e5; }
 
 /* ── Sidebar ── */
@@ -760,15 +781,18 @@ html.light .tag, html.light .tag-btn {
   border-color: #e4e4e7;
 }
 
-/* ── Terminal widget: intentionally stays dark (like VS Code terminal) ── */
+/* ── Terminal widget: light theme in light mode ── */
 html.light #terminal-widget {
-  background-color: #1e1e2e;
-  border-color: #3f3f5a;
+  background-color: #f6f8fa;
+  border-color: #d4d4d8;
+  color: #18181b;
 }
 html.light #terminal-widget > div:first-child {
-  background-color: #16162a;
-  border-bottom-color: #3f3f5a;
+  background-color: #ebebf0;
+  border-bottom-color: #d4d4d8;
 }
+html.light #terminal-widget span[style*="color"] { color: #374151 !important; }
+html.light #terminal-title { color: #6b7280 !important; }
 
 /* ── Sidebar cards: light background in light mode ── */
 html.light aside > div > div.border {
