@@ -692,7 +692,8 @@ html.light header {
   background-color: rgba(255,255,255,0.9);
   border-bottom-color: #e4e4e7;
 }
-html.light .card {
+html.light .card,
+html.light .skill-card {
   background-color: #ffffff;
   border-color: #e4e4e7;
 }
