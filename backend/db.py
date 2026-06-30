@@ -31,10 +31,23 @@ def init_db() -> None:
                 image   TEXT
             )
         """)
-        # Migrate: add image column to existing databases that predate this field
+        # ── posts column migrations ────────────────────────────────────────────
         cols = {row[1] for row in conn.execute("PRAGMA table_info(posts)")}
         if "image" not in cols:
             conn.execute("ALTER TABLE posts ADD COLUMN image TEXT")
+        if "sources" not in cols:
+            conn.execute("ALTER TABLE posts ADD COLUMN sources TEXT NOT NULL DEFAULT '[]'")
+        if "views" not in cols:
+            conn.execute("ALTER TABLE posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0")
+        if "ai_comments" not in cols:
+            conn.execute("ALTER TABLE posts ADD COLUMN ai_comments INTEGER NOT NULL DEFAULT 1")
+        if "reactions" not in cols:
+            conn.execute("ALTER TABLE posts ADD COLUMN reactions INTEGER NOT NULL DEFAULT 0")
+        if "series_id" not in cols:
+            conn.execute("ALTER TABLE posts ADD COLUMN series_id TEXT REFERENCES series(id)")
+        if "series_order" not in cols:
+            conn.execute("ALTER TABLE posts ADD COLUMN series_order INTEGER")
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS drafts (
                 id                TEXT PRIMARY KEY,
@@ -63,12 +76,7 @@ def init_db() -> None:
             conn.execute("ALTER TABLE drafts ADD COLUMN admin_remarks TEXT")
         if "sources" not in draft_cols:
             conn.execute("ALTER TABLE drafts ADD COLUMN sources TEXT NOT NULL DEFAULT '[]'")
-        if "sources" not in cols:
-            conn.execute("ALTER TABLE posts ADD COLUMN sources TEXT NOT NULL DEFAULT '[]'")
-        if "views" not in cols:
-            conn.execute("ALTER TABLE posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0")
-        if "ai_comments" not in cols:
-            conn.execute("ALTER TABLE posts ADD COLUMN ai_comments INTEGER NOT NULL DEFAULT 1")
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS comments (
                 id           TEXT PRIMARY KEY,
@@ -84,6 +92,61 @@ def init_db() -> None:
             conn.execute("ALTER TABLE comments ADD COLUMN is_generated INTEGER NOT NULL DEFAULT 0")
         if "status" not in comment_cols:
             conn.execute("ALTER TABLE comments ADD COLUMN status TEXT NOT NULL DEFAULT 'published'")
+        if "parent_id" not in comment_cols:
+            conn.execute("ALTER TABLE comments ADD COLUMN parent_id TEXT REFERENCES comments(id)")
+
+        # ── series table ───────────────────────────────────────────────────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS series (
+                id          TEXT PRIMARY KEY,
+                title       TEXT NOT NULL,
+                description TEXT,
+                created_at  TEXT NOT NULL
+            )
+        """)
+
+        # ── FTS5 full-text search ──────────────────────────────────────────────
+        conn.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
+                slug UNINDEXED,
+                title,
+                summary,
+                tags,
+                content,
+                content='posts',
+                content_rowid='rowid'
+            )
+        """)
+        # Triggers to keep posts_fts in sync with posts
+        conn.execute("""
+            CREATE TRIGGER IF NOT EXISTS posts_fts_insert
+            AFTER INSERT ON posts BEGIN
+                INSERT INTO posts_fts(rowid, slug, title, summary, tags, content)
+                VALUES (new.rowid, new.slug, new.title, new.summary, new.tags, new.content);
+            END
+        """)
+        conn.execute("""
+            CREATE TRIGGER IF NOT EXISTS posts_fts_update
+            AFTER UPDATE ON posts BEGIN
+                INSERT INTO posts_fts(posts_fts, rowid, slug, title, summary, tags, content)
+                VALUES ('delete', old.rowid, old.slug, old.title, old.summary, old.tags, old.content);
+                INSERT INTO posts_fts(rowid, slug, title, summary, tags, content)
+                VALUES (new.rowid, new.slug, new.title, new.summary, new.tags, new.content);
+            END
+        """)
+        conn.execute("""
+            CREATE TRIGGER IF NOT EXISTS posts_fts_delete
+            AFTER DELETE ON posts BEGIN
+                INSERT INTO posts_fts(posts_fts, rowid, slug, title, summary, tags, content)
+                VALUES ('delete', old.rowid, old.slug, old.title, old.summary, old.tags, old.content);
+            END
+        """)
+        # Backfill FTS5 table for existing posts (idempotent — INSERT OR IGNORE)
+        conn.execute("""
+            INSERT OR IGNORE INTO posts_fts(rowid, slug, title, summary, tags, content)
+            SELECT rowid, slug, title, summary, tags, content FROM posts
+        """)
+
         conn.execute(
             "UPDATE posts SET image = 'https://picsum.photos/seed/' || slug || '/800/400' WHERE image IS NULL"
         )
@@ -131,4 +194,5 @@ def comment_row_to_dict(row: sqlite3.Row) -> dict:
     d["created_at"] = datetime.fromisoformat(d["created_at"])
     d["is_generated"] = bool(d.get("is_generated", 0))
     d["status"] = d.get("status", "published")
+    d["parent_id"] = d.get("parent_id")
     return d

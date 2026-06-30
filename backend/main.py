@@ -21,16 +21,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from slowapi.errors import RateLimitExceeded
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sanitize import safe_markdown
+from rate_limit import limiter
 
 load_dotenv()  # no-op if .env absent; prod uses file secrets
 
 from code_validator import validate_content
 from config import read_secret
 from data.analytics import refresh_popular_posts
-from data.posts import get_all_posts, get_all_tags, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, total_pages
+from data.posts import get_all_posts, get_all_tags, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, get_series_siblings, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
 from middleware.csrf import CSRFMiddleware
@@ -38,6 +37,7 @@ from routers.comments_api import generate_pending_comments, router as comments_r
 from routers.drafts_api import _regenerate_draft, generate_daily_drafts, generate_single_topic, router as drafts_router
 from routers.generate_api import router as generate_router
 from routers.posts_api import router as posts_router
+from routers.series_api import router as series_router
 from routers.topics_api import _enrich_topics, _load_topics, _save_topics, _slugify, router as topics_router
 from routers.auth import AdminRequired, _is_admin, require_admin, validate_redirect_url, verify_admin_password
 from routers.seo import router as seo_router
@@ -75,8 +75,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Rate limiter
-limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 
 @app.exception_handler(RateLimitExceeded)
@@ -117,7 +115,14 @@ def _fmt_date(d) -> str:
     return f"{d.strftime('%b')} {d.day}, {d.year}"
 
 
+def _fmt_views(n: int) -> str:
+    if n >= 1000:
+        return f"{n / 1000:.1f}k"
+    return str(n)
+
+
 templates.env.filters["dateformat"] = _fmt_date
+templates.env.filters["format_views"] = _fmt_views
 templates.env.filters["markdown"] = safe_markdown
 
 _commit_file = Path("/app/BUILD_COMMIT")
@@ -129,6 +134,7 @@ app.include_router(comments_router)
 app.include_router(drafts_router)
 app.include_router(generate_router)
 app.include_router(posts_router)
+app.include_router(series_router)
 app.include_router(topics_router)
 app.include_router(seo_router)
 
@@ -215,20 +221,26 @@ async def project_fakturant(request: Request) -> str:
     return templates.TemplateResponse(request, "fakturant.html", {})
 
 
+_BOT_UA_PATTERNS = ("bot", "crawler", "spider", "googlebot", "bingbot", "slurp", "duckduckbot", "curl", "wget", "python-")
+
+
 @app.get("/blog", response_class=HTMLResponse)
 async def blog(request: Request, tag: str | None = None, page: int = 1) -> str:
     """Blog listing page with pagination and tag filtering."""
     posts, total = get_posts_page(page, tag=tag)
     n_pages = total_pages(total)
-    return templates.TemplateResponse(
-        request, "blog.html", {
-            "posts": posts,
-            "current_tag": tag,
-            "page": page,
-            "total_pages": n_pages,
-            "popular_posts": get_popular_posts(),
-        }
-    )
+    ctx: dict = {
+        "posts": posts,
+        "current_tag": tag,
+        "page": page,
+        "total_pages": n_pages,
+        "popular_posts": get_popular_posts(),
+    }
+    if tag:
+        ctx["page_title"] = f"{tag.capitalize()} posts"
+        ctx["meta_description"] = f"Posts tagged with {tag} on Zdenovo."
+        ctx["canonical_url"] = f"https://zdenovo.com/blog?tag={tag}"
+    return templates.TemplateResponse(request, "blog.html", ctx)
 
 
 @app.get("/blog/{slug}", response_class=HTMLResponse)
@@ -237,40 +249,93 @@ async def post(request: Request, slug: str) -> str:
     article = get_post_by_slug(slug)
     if article is None:
         return templates.TemplateResponse(request, "404.html", status_code=404)
+
+    ua = (request.headers.get("user-agent") or "").lower()
+    if not any(p in ua for p in _BOT_UA_PATTERNS):
+        with get_conn() as conn:
+            conn.execute("UPDATE posts SET views = views + 1 WHERE slug = ?", (slug,))
+        article["views"] = article.get("views", 0) + 1
+
     with get_conn() as conn:
         rows = conn.execute(
             "SELECT * FROM comments WHERE post_slug = ? AND (status = 'published' OR is_generated = 0)"
             " ORDER BY created_at ASC",
             (slug,),
         ).fetchall()
-    comments = [comment_row_to_dict(r) for r in rows]
+    all_comments = [comment_row_to_dict(r) for r in rows]
+    top_level = [c for c in all_comments if c["parent_id"] is None]
+    replies_by_parent: dict[str, list] = {}
+    for c in all_comments:
+        if c["parent_id"]:
+            replies_by_parent.setdefault(c["parent_id"], []).append(c)
+
+    series_posts: list[dict] = []
+    series_position: int | None = None
+    series_title: str | None = None
+    if article.get("series_id"):
+        series_posts = get_series_siblings(article["series_id"])
+        with get_conn() as conn:
+            s_row = conn.execute("SELECT title FROM series WHERE id = ?", (article["series_id"],)).fetchone()
+            series_title = s_row["title"] if s_row else None
+        for i, sp in enumerate(series_posts):
+            if sp["slug"] == slug:
+                series_position = i + 1
+                break
+
     related = get_related_posts(slug, article["tags"])
     return templates.TemplateResponse(request, "post.html", {
-        "post": article, "comments": comments, "slug": slug, "related_posts": related,
+        "post": article,
+        "comments": top_level,
+        "replies_by_parent": replies_by_parent,
+        "slug": slug,
+        "related_posts": related,
+        "series_posts": series_posts,
+        "series_position": series_position,
+        "series_title": series_title,
     })
+
+
+@app.get("/blog/{slug}/comments/{comment_id}/reply-form", response_class=HTMLResponse)
+async def comment_reply_form(request: Request, slug: str, comment_id: str) -> str:
+    """Return inline reply form partial for HTMX."""
+    return templates.TemplateResponse(request, "reply_form.html", {"slug": slug, "parent_id": comment_id})
 
 
 @app.post("/blog/{slug}/comments", response_class=HTMLResponse)
 @limiter.limit("5/minute")
-async def submit_comment(request: Request, slug: str, author: str = Form(...), body: str = Form(...)) -> str:
+async def submit_comment(
+    request: Request,
+    slug: str,
+    author: str = Form(...),
+    body: str = Form(...),
+    parent_id: str = Form(""),
+) -> str:
     """Submit a comment on a blog post (rate limited)."""
     article = get_post_by_slug(slug)
     if article is None:
         return templates.TemplateResponse(request, "404.html", status_code=404)
-    
-    # Validate input lengths
+
     author = author.strip()
     body = body.strip()
     if not (1 <= len(author) <= 80):
         raise HTTPException(status_code=400, detail="Author must be 1-80 characters")
     if not (1 <= len(body) <= 2000):
         raise HTTPException(status_code=400, detail="Body must be 1-2000 characters")
-    
+
+    pid = parent_id.strip() or None
+    if pid:
+        with get_conn() as conn:
+            parent_row = conn.execute("SELECT parent_id FROM comments WHERE id = ?", (pid,)).fetchone()
+        if parent_row is None:
+            raise HTTPException(status_code=404, detail="Parent comment not found")
+        if parent_row["parent_id"] is not None:
+            raise HTTPException(status_code=422, detail="Cannot reply to a reply (max 1 level of threading)")
+
     if author and body:
         with get_conn() as conn:
             conn.execute(
-                "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated) VALUES (?, ?, ?, ?, ?, 0)",
-                (str(uuid.uuid4()), slug, author[:80], body[:2000], datetime.now(timezone.utc).isoformat()),
+                "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated, parent_id) VALUES (?, ?, ?, ?, ?, 0, ?)",
+                (str(uuid.uuid4()), slug, author[:80], body[:2000], datetime.now(timezone.utc).isoformat(), pid),
             )
     with get_conn() as conn:
         rows = conn.execute(
@@ -278,8 +343,16 @@ async def submit_comment(request: Request, slug: str, author: str = Form(...), b
             " ORDER BY created_at ASC",
             (slug,),
         ).fetchall()
-    comments = [comment_row_to_dict(r) for r in rows]
-    return templates.TemplateResponse(request, "comments_section.html", {"comments": comments, "slug": slug})
+    all_comments = [comment_row_to_dict(r) for r in rows]
+    top_level = [c for c in all_comments if c["parent_id"] is None]
+    replies_by_parent: dict[str, list] = {}
+    for c in all_comments:
+        if c["parent_id"]:
+            replies_by_parent.setdefault(c["parent_id"], []).append(c)
+    return templates.TemplateResponse(
+        request, "comments_section.html",
+        {"comments": top_level, "replies_by_parent": replies_by_parent, "slug": slug},
+    )
 
 
 # ─── Admin Dashboard & Posts ──────────────────────────────────────────────────
@@ -351,6 +424,57 @@ def _ai_toggle_btn(slug: str, enabled: bool) -> str:
         f'class="btn-ghost text-xs {cls}">'
         f'{label}</button>'
     )
+
+
+# ─── Admin Series ─────────────────────────────────────────────────────────────
+
+@app.get("/admin/series", response_class=HTMLResponse)
+async def admin_series(request: Request, _: None = Depends(require_admin)) -> str:
+    """List all post series."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT s.*, COUNT(p.slug) as post_count FROM series s"
+            " LEFT JOIN posts p ON p.series_id = s.id"
+            " GROUP BY s.id ORDER BY s.created_at DESC"
+        ).fetchall()
+    series = [dict(r) for r in rows]
+    return templates.TemplateResponse(request, "admin_series.html", {"series": series})
+
+
+@app.post("/admin/series", response_class=HTMLResponse)
+async def admin_series_create(
+    request: Request,
+    title: str = Form(...),
+    description: str = Form(""),
+    _: None = Depends(require_admin),
+) -> RedirectResponse:
+    """Create a new series."""
+    import re
+    series_id = re.sub(r"[^\w\s-]", "", title.lower().strip())
+    series_id = re.sub(r"[\s_]+", "-", series_id)[:80]
+    now = datetime.now(timezone.utc).isoformat()
+    with get_conn() as conn:
+        existing = conn.execute("SELECT id FROM series WHERE id = ?", (series_id,)).fetchone()
+        if existing:
+            series_id = f"{series_id}-{int(now[-6:].replace(':', ''))}"
+        conn.execute(
+            "INSERT INTO series (id, title, description, created_at) VALUES (?, ?, ?, ?)",
+            (series_id, title.strip(), description.strip() or None, now),
+        )
+    return RedirectResponse("/admin/series", status_code=303)
+
+
+@app.post("/admin/series/{series_id}/delete", response_class=HTMLResponse)
+async def admin_series_delete(
+    request: Request,
+    series_id: str,
+    _: None = Depends(require_admin),
+) -> RedirectResponse:
+    """Delete a series (clears assignment on posts)."""
+    with get_conn() as conn:
+        conn.execute("UPDATE posts SET series_id = NULL, series_order = NULL WHERE series_id = ?", (series_id,))
+        conn.execute("DELETE FROM series WHERE id = ?", (series_id,))
+    return RedirectResponse("/admin/series", status_code=303)
 
 
 # ─── Admin Drafts ─────────────────────────────────────────────────────────────

@@ -4,6 +4,22 @@
 {% block og_title %}Zdenovo — Deploy. Fail. Fix. Repeat.{% endblock %}
 {% block og_description %}A developer blog about Python, AI agents, FastAPI, and building software the hard way.{% endblock %}
 
+{% block extra_meta %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "url": "https://zdenovo.com",
+  "name": "Zdenovo",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "https://zdenovo.com/blog?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+{% endblock %}
+
 {% block content %}
 
 <!-- Hero -->

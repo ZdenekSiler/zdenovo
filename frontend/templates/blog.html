@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Blog{% endblock %}
-{% block meta_description %}Notes on software engineering, AI development, tooling, and lessons learned the hard way.{% endblock %}
+{% block title %}{% if page_title %}{{ page_title }}{% else %}Blog{% endif %}{% endblock %}
+{% block meta_description %}{% if meta_description %}{{ meta_description }}{% else %}Notes on software engineering, AI development, tooling, and lessons learned the hard way.{% endif %}{% endblock %}
 {% block og_title %}Blog — Zdenovo{% endblock %}
 {% block og_description %}Notes on software engineering, AI development, tooling, and lessons learned the hard way.{% endblock %}
 {% block extra_meta %}
+{% if canonical_url %}<link rel="canonical" href="{{ canonical_url }}">{% endif %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -12,6 +13,16 @@
   "description": "Notes on software engineering, AI development, and tooling.",
   "url": "https://zdenovo.com/blog",
   "author": {"@type": "Person", "name": "Zdenovo", "url": "https://zdenovo.com/about"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://zdenovo.com"},
+    {"@type": "ListItem", "position": 2, "name": "{% if page_title %}{{ page_title }}{% else %}Blog{% endif %}", "item": "{% if canonical_url %}{{ canonical_url }}{% else %}https://zdenovo.com/blog{% endif %}"}
+  ]
 }
 </script>
 {% endblock %}
@@ -58,8 +69,21 @@
 {% block content %}
 <div class="mb-10">
   <p class="section-heading">Writing</p>
-  <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">Blog</h1>
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">{% if current_tag %}#{{ current_tag }}{% else %}Blog{% endif %}</h1>
   <p class="text-sm text-zinc-500">Notes on software engineering, tooling, and things I've learned the hard way.</p>
+</div>
+
+<div class="mb-6">
+  <input
+    type="search"
+    placeholder="Search posts..."
+    hx-get="/api/posts/search"
+    hx-trigger="input changed delay:300ms"
+    hx-target="#search-results"
+    hx-include="this"
+    name="q"
+    class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
+  <div id="search-results" class="mt-2 space-y-1"></div>
 </div>
 
 <div id="posts-list" class="space-y-6">
@@ -88,14 +112,27 @@
               {{ post.title }}
             </h2>
             <p class="text-xs text-zinc-500 leading-relaxed mb-3">{{ post.summary }}</p>
-            <div class="flex flex-wrap gap-1.5">
-              {% for t in post.tags %}
-              <span class="tag">{{ t }}</span>
-              {% endfor %}
-            </div>
           </div>
         </div>
       </a>
+      <div class="flex flex-wrap items-center gap-1.5 mt-2 ml-[calc(48px+1rem)]">
+        {% if post.series_id %}
+        <span class="text-[10px] text-indigo-400 bg-indigo-400/10 border border-indigo-400/20 rounded-full px-2 py-0.5">Part {{ post.series_order }}</span>
+        {% endif %}
+        {% for t in post.tags %}
+        <a href="/blog?tag={{ t }}"
+           hx-get="/blog?tag={{ t }}"
+           hx-target="#main-content"
+           hx-select="#main-content"
+           hx-push-url="true"
+           hx-swap="innerHTML"
+           hx-indicator="#htmx-indicator"
+           class="tag-btn">{{ t }}</a>
+        {% endfor %}
+        {% if post.views > 0 %}
+        <span class="text-xs text-zinc-600 ml-auto">{{ post.views | format_views }} views</span>
+        {% endif %}
+      </div>
       {% if not loop.last %}<hr class="border-zinc-800/60 mt-6" />{% endif %}
     </article>
     {% endfor %}

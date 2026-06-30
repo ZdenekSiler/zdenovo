@@ -36,6 +36,7 @@ class CommentIn(BaseModel):
     post_slug: str
     author: str = Field(..., min_length=1, max_length=80)
     body: str = Field(..., min_length=1, max_length=2000)
+    parent_id: str | None = None
 
 
 class CommentOut(BaseModel):
@@ -47,6 +48,7 @@ class CommentOut(BaseModel):
     created_at: datetime
     is_generated: bool = False
     status: str = "published"
+    parent_id: str | None = None
 
 
 # ─── CommentGenerator ────────────────────────────────────────────────────────
@@ -208,12 +210,22 @@ def create_comment(body: CommentIn, _: None = Depends(_get_require_admin)) -> di
         ).fetchone()
         if post is None:
             raise HTTPException(status_code=404, detail=f"Post '{body.post_slug}' not found")
+        if body.parent_id is not None:
+            parent = conn.execute(
+                "SELECT parent_id FROM comments WHERE id = ?", (body.parent_id,)
+            ).fetchone()
+            if parent is None:
+                raise HTTPException(status_code=404, detail=f"Comment '{body.parent_id}' not found")
+            if parent["parent_id"] is not None:
+                raise HTTPException(
+                    status_code=422, detail="Cannot reply to a reply (max 1 level of threading)"
+                )
         comment_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
         conn.execute(
-            "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated, status) "
-            "VALUES (?, ?, ?, ?, ?, 0, 'published')",
-            (comment_id, body.post_slug, body.author, body.body, now),
+            "INSERT INTO comments (id, post_slug, author, body, created_at, is_generated, status, parent_id) "
+            "VALUES (?, ?, ?, ?, ?, 0, 'published', ?)",
+            (comment_id, body.post_slug, body.author, body.body, now, body.parent_id),
         )
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()

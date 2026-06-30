@@ -1,15 +1,19 @@
 """REST API for blog posts CRUD operations."""
 
 import json
+import logging
 import re
 import uuid
 from datetime import date as Date, datetime, timezone
 from typing import Callable
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from db import get_conn, row_to_dict
+from rate_limit import limiter
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/api/posts", tags=["posts"])
@@ -46,6 +50,16 @@ class PostOut(BaseModel):
     image: str | None = None
     reading_time: int | None = None
     sources: list[Source] = Field(default_factory=list)
+    reactions: int = 0
+    views: int = 0
+    series_id: str | None = None
+    series_order: int | None = None
+
+
+class SeriesAssignIn(BaseModel):
+    """Request body for assigning a post to a series."""
+    series_id: str | None = None
+    series_order: int | None = None
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -74,6 +88,30 @@ def list_posts() -> list[PostOut]:
             "SELECT * FROM posts ORDER BY date DESC"
         ).fetchall()
     return [row_to_dict(r) for r in rows]
+
+
+@router.get("/search", response_model=list[PostOut])
+def search_posts(q: str) -> list[PostOut]:
+    """Full-text search over posts (title, summary, tags, content)."""
+    if not q.strip():
+        return []
+    sanitized = re.sub(r'["*^():-]', "", q).strip()
+    if not sanitized:
+        return []
+    try:
+        with get_conn() as conn:
+            rows = conn.execute(
+                """SELECT p.* FROM posts p
+                   JOIN posts_fts f ON p.rowid = f.rowid
+                   WHERE posts_fts MATCH ?
+                   ORDER BY rank
+                   LIMIT 10""",
+                (sanitized,),
+            ).fetchall()
+        return [row_to_dict(r) for r in rows]
+    except Exception:
+        logger.warning("Post search failed for query %r", q, exc_info=True)
+        return []
 
 
 @router.get("/{slug}", response_model=PostOut)
@@ -154,3 +192,39 @@ def unpublish_post(slug: str, _: None = Depends(_get_require_admin)) -> None:
         )
         conn.execute("DELETE FROM comments WHERE post_slug = ?", (slug,))
         conn.execute("DELETE FROM posts WHERE slug = ?", (slug,))
+
+
+@router.post("/{slug}/react")
+@limiter.limit("3/minute")
+def react_to_post(slug: str, request: Request) -> dict:
+    """Add a reaction to a post (rate limited, public)."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT slug FROM posts WHERE slug = ?", (slug,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Post not found")
+        conn.execute("UPDATE posts SET reactions = reactions + 1 WHERE slug = ?", (slug,))
+        reactions = conn.execute(
+            "SELECT reactions FROM posts WHERE slug = ?", (slug,)
+        ).fetchone()["reactions"]
+    return {"reactions": reactions}
+
+
+@router.patch("/{slug}/series", status_code=204)
+def assign_post_series(
+    slug: str, body: SeriesAssignIn, _: None = Depends(_get_require_admin)
+) -> None:
+    """Assign or unassign a post's series (admin only)."""
+    with get_conn() as conn:
+        post = conn.execute("SELECT slug FROM posts WHERE slug = ?", (slug,)).fetchone()
+        if post is None:
+            raise HTTPException(status_code=404, detail="Post not found")
+        if body.series_id is not None:
+            series = conn.execute(
+                "SELECT id FROM series WHERE id = ?", (body.series_id,)
+            ).fetchone()
+            if series is None:
+                raise HTTPException(status_code=404, detail="Series not found")
+        conn.execute(
+            "UPDATE posts SET series_id = ?, series_order = ? WHERE slug = ?",
+            (body.series_id, body.series_order, slug),
+        )

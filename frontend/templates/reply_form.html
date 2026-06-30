@@ -1,0 +1,25 @@
+<form
+  hx-post="/blog/{{ slug }}/comments"
+  hx-target="#comments-section"
+  hx-swap="innerHTML"
+  class="mt-3 space-y-2">
+  <input type="hidden" name="parent_id" value="{{ parent_id }}">
+  <input
+    type="text"
+    name="author"
+    placeholder="Your name"
+    maxlength="80"
+    required
+    class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
+  <textarea
+    name="body"
+    placeholder="Write a reply..."
+    maxlength="2000"
+    required
+    rows="3"
+    class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60 resize-none"></textarea>
+  <div class="flex justify-end gap-2">
+    <button type="button" onclick="document.getElementById('reply-form-{{ parent_id }}').innerHTML=''" class="btn-ghost text-xs">Cancel</button>
+    <button type="submit" class="btn-primary text-xs">Post reply</button>
+  </div>
+</form>

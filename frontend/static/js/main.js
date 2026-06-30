@@ -1,20 +1,28 @@
 // Highlight the active nav link based on current path
 (function () {
-  const links = document.querySelectorAll("header nav a");
-  const path = window.location.pathname;
-
-  links.forEach((link) => {
-    const href = link.getAttribute("href");
-    const isActive =
-      href === "/"
-        ? path === "/"
-        : path === href || path.startsWith(href + "/");
-
-    if (isActive) {
-      link.classList.add("text-zinc-100");
-      link.classList.remove("text-zinc-400");
-    }
-  });
+  function highlightNav() {
+    const links = document.querySelectorAll("header nav a");
+    const path = window.location.pathname;
+    links.forEach((link) => {
+      const href = link.getAttribute("href");
+      const isActive = href === "/" ? path === "/" : path === href || path.startsWith(href + "/");
+      if (isActive) {
+        link.classList.add("text-zinc-100");
+        link.classList.remove("text-zinc-400");
+      } else {
+        link.classList.remove("text-zinc-100");
+        link.classList.add("text-zinc-400");
+      }
+    });
+    // Also update mobile bottom nav active state
+    document.querySelectorAll(".bottom-nav-tab").forEach((tab) => {
+      const tabPath = tab.getAttribute("data-path");
+      const isActive = tabPath === "/" ? path === "/" : path === tabPath || path.startsWith(tabPath + "/");
+      tab.classList.toggle("active", isActive);
+    });
+  }
+  highlightNav();
+  document.addEventListener("htmx:afterSwap", highlightNav);
 })();
 
 // Rotating terminal widget — cycles every 10 seconds
@@ -189,4 +197,16 @@
 
   initReveal();
   document.body.addEventListener("htmx:afterSwap", initReveal);
+})();
+
+// Set initial theme toggle icon based on current theme
+(function () {
+  function syncThemeIcon() {
+    var btn = document.getElementById("theme-toggle");
+    if (!btn) return;
+    var isDark = document.documentElement.classList.contains("dark");
+    btn.innerHTML = isDark ? "&#9728;" : "&#9790;";
+  }
+  syncThemeIcon();
+  document.addEventListener("htmx:afterSwap", syncThemeIcon);
 })();

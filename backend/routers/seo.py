@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse, Response
 
-from data.posts import get_all_posts
+from data.posts import get_all_posts, get_all_tags
 
 
 router = APIRouter(tags=["seo"])
@@ -39,6 +39,11 @@ async def sitemap() -> Response:
             f"  <url><loc>{DOMAIN}/blog/{p['slug']}</loc>"
             f"<lastmod>{date}</lastmod><changefreq>monthly</changefreq>"
             f"<priority>0.8</priority></url>"
+        )
+    for tag in get_all_tags():
+        lines.append(
+            f"  <url><loc>{DOMAIN}/blog?tag={tag}</loc>"
+            f"<changefreq>weekly</changefreq><priority>0.6</priority></url>"
         )
     lines.append("</urlset>")
     return Response(content="\n".join(lines), media_type="application/xml")

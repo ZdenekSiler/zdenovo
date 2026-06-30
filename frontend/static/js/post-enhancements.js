@@ -21,30 +21,35 @@
     }, { passive: true });
   }
 
-  // ─── Table of contents from h2s ───
-  function buildToc(prose) {
-    var toc = document.getElementById("toc");
-    if (!toc) return;
-    var headings = prose.querySelectorAll("h2");
-    if (headings.length < 2) { toc.style.display = "none"; return; }
+  // ─── Language display-name map for code block badges ───
+  var LANG_DISPLAY_NAMES = {
+    python: "Python",
+    js: "JavaScript",
+    javascript: "JavaScript",
+    ts: "TypeScript",
+    typescript: "TypeScript",
+    bash: "Bash",
+    sh: "Bash",
+    shell: "Bash",
+    yaml: "YAML",
+    yml: "YAML",
+    json: "JSON",
+    toml: "TOML",
+    html: "HTML",
+    css: "CSS",
+    sql: "SQL",
+    dockerfile: "Dockerfile",
+    go: "Go",
+    rust: "Rust",
+    cpp: "C++",
+    c: "C",
+    java: "Java",
+    ruby: "Ruby"
+  };
 
-    var title = document.createElement("div");
-    title.className = "toc-title";
-    title.textContent = "In this post";
-    toc.appendChild(title);
-
-    var ol = document.createElement("ol");
-    headings.forEach(function (h, i) {
-      var id = "section-" + i;
-      h.id = id;
-      var li = document.createElement("li");
-      var a = document.createElement("a");
-      a.href = "#" + id;
-      a.textContent = h.textContent;
-      li.appendChild(a);
-      ol.appendChild(li);
-    });
-    toc.appendChild(ol);
+  function languageDisplayName(lang) {
+    if (LANG_DISPLAY_NAMES.hasOwnProperty(lang)) return LANG_DISPLAY_NAMES[lang];
+    return lang.charAt(0).toUpperCase() + lang.slice(1);
   }
 
   // ─── Copy button on code blocks ───
@@ -86,6 +91,22 @@
         toggle.textContent = collapsed ? "Show (" + lines + " lines)" : "Hide";
       });
       wrapper.appendChild(toggle);
+
+      var langClass = code && Array.prototype.find.call(code.classList, function (c) {
+        return c.indexOf("language-") === 0;
+      });
+      if (langClass) {
+        var lang = langClass.slice("language-".length);
+        if (lang && lang !== "none" && lang !== "plain") {
+          var langBadge = document.createElement("span");
+          langBadge.className = "code-lang-badge";
+          langBadge.textContent = languageDisplayName(lang);
+          wrapper.appendChild(langBadge);
+
+          btn.style.right = "3.5rem";
+          toggle.style.right = "6.5rem";
+        }
+      }
 
       if (validationData && validationData[i]) {
         var v = validationData[i];

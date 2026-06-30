@@ -25,9 +25,33 @@
   "mainEntityOfPage": "https://zdenovo.com/blog/{{ post.slug }}"
 }
 </script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://zdenovo.com"},
+    {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://zdenovo.com/blog"},
+    {"@type": "ListItem", "position": 3, "name": "{{ post.title }}", "item": "https://zdenovo.com/blog/{{ post.slug }}"}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block sidebar %}
+<div id="toc-container" class="mb-4"></div>
+<div class="border border-zinc-800/60 rounded-xl bg-zinc-900/40 p-5 text-center">
+  <p class="font-semibold text-zinc-100 text-sm">Zdenovo</p>
+  <p class="text-xs text-zinc-500 mt-0.5">Software Engineer</p>
+  <div class="flex items-center justify-center gap-1.5 mt-3 pt-3 border-t border-zinc-800/60">
+    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+    <span class="text-[11px] text-zinc-500">Open to opportunities</span>
+  </div>
+</div>
 {% endblock %}
 
 {% block content %}
+<div id="toc-mobile" class="mb-6 lg:hidden"></div>
 <article>
   <header class="mb-10">
     <a href="/blog"
@@ -68,8 +92,28 @@
       <time>{{ post.date | dateformat }}</time>
       <span class="text-zinc-800">·</span>
       <span>{{ post.reading_time }} min read</span>
+      {% if post.views > 0 %}
+      <span class="text-zinc-800">·</span>
+      <span>{{ post.views | format_views }} reads</span>
+      {% endif %}
     </div>
   </header>
+
+  {% if series_posts and series_position %}
+  <div class="series-nav mb-6 p-4 border border-indigo-500/20 bg-indigo-500/5 rounded-xl">
+    <p class="text-xs text-indigo-400 font-medium mb-3">Part {{ series_position }} of {{ series_posts | length }}{% if series_title %} — {{ series_title }}{% endif %}</p>
+    <div class="flex gap-3">
+      {% if series_position > 1 %}
+      {% set prev_post = series_posts[series_position - 2] %}
+      <a href="/blog/{{ prev_post.slug }}" hx-get="/blog/{{ prev_post.slug }}" hx-target="#main-content" hx-select="#main-content" hx-push-url="true" hx-swap="innerHTML" hx-indicator="#htmx-indicator" class="text-xs text-zinc-400 hover:text-indigo-400 transition-colors">← {{ prev_post.title }}</a>
+      {% endif %}
+      {% if series_position < series_posts | length %}
+      {% set next_post = series_posts[series_position] %}
+      <a href="/blog/{{ next_post.slug }}" hx-get="/blog/{{ next_post.slug }}" hx-target="#main-content" hx-select="#main-content" hx-push-url="true" hx-swap="innerHTML" hx-indicator="#htmx-indicator" class="text-xs text-zinc-400 hover:text-indigo-400 transition-colors ml-auto">{{ next_post.title }} →</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
 
   {% if post.image %}
   <img src="{{ post.image }}" alt="{{ post.title }}" class="post-hero" loading="lazy">
@@ -107,6 +151,22 @@
 </section>
 {% endif %}
 
+<section class="mt-8 flex items-center gap-4">
+  <button
+    id="react-btn"
+    hx-post="/api/posts/{{ post.slug }}/react"
+    hx-target="#reaction-count"
+    hx-swap="innerHTML"
+    hx-on:htmx:after-request="document.getElementById('react-btn').classList.add('reacted');localStorage.setItem('reacted_{{ post.slug }}', '1')"
+    class="inline-flex items-center gap-2 px-4 py-2 text-sm border border-zinc-700 rounded-lg hover:border-indigo-500/60 hover:text-indigo-400 transition-colors">
+    👍 <span id="reaction-count">{{ post.reactions }}</span>
+  </button>
+  <span class="text-xs text-zinc-600">Found this helpful?</span>
+</section>
+<script>
+(function(){if(localStorage.getItem('reacted_{{ post.slug }}')){var b=document.getElementById('react-btn');if(b)b.classList.add('reacted');}})();
+</script>
+
 {% if related_posts %}
 <section class="mt-16 pt-8 border-t border-zinc-800/60">
   <p class="section-heading">Related Posts</p>
@@ -138,4 +198,6 @@
 <section id="comments-section" class="mt-16 pt-8 border-t border-zinc-800/60">
   {% include "comments_section.html" %}
 </section>
+
+<script src="/static/js/toc.js?v=1"></script>
 {% endblock %}

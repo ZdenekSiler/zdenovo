@@ -61,6 +61,16 @@ def get_popular_posts(limit: int = 5) -> list[dict]:
     return [row_to_dict(r) for r in rows]
 
 
+def get_series_siblings(series_id: str) -> list[dict]:
+    """Return all posts in a series ordered by series_order."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM posts WHERE series_id = ? ORDER BY series_order ASC",
+            (series_id,),
+        ).fetchall()
+    return [row_to_dict(r) for r in rows]
+
+
 def get_related_posts(slug: str, tags: list[str], limit: int = 3) -> list[dict]:
     all_posts = get_all_posts()
     scored = []
