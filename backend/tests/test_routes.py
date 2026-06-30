@@ -315,3 +315,62 @@ def test_public_post_has_no_validation_data(client):
     r = client.get("/blog/htmx-is-enough")
     assert r.status_code == 200
     assert b"__codeValidation" not in r.content
+
+
+# ── AI badge hidden from public ──────────────────────────────────────────────
+
+def test_public_post_hides_ai_badge_on_generated_comments(client):
+    # Insert a published AI-generated comment directly — it should appear in the
+    # public comments section but WITHOUT the "AI" badge label.
+    import uuid
+    from db import get_conn
+    cid = str(uuid.uuid4())
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO comments (id, post_slug, author, body, status, is_generated, created_at)"
+            " VALUES (?, 'htmx-is-enough', 'Bot', 'AI comment', 'published', 1, datetime('now'))",
+            (cid,),
+        )
+    r = client.get("/blog/htmx-is-enough")
+    assert b"AI comment" in r.content  # comment body is visible
+    assert b">AI<" not in r.content    # but the AI badge label is not
+
+
+def test_htmx_comment_post_response_hides_ai_badge(client):
+    # Posting a comment returns the comments_section.html partial via HTMX.
+    # That partial also must not show the AI badge for generated comments.
+    import uuid
+    from db import get_conn
+    cid = str(uuid.uuid4())
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO comments (id, post_slug, author, body, status, is_generated, created_at)"
+            " VALUES (?, 'htmx-is-enough', 'Bot', 'AI via htmx', 'published', 1, datetime('now'))",
+            (cid,),
+        )
+    r = client.post("/blog/htmx-is-enough/comments", data={"author": "Alice", "body": "Real comment"})
+    assert b"AI via htmx" in r.content
+    assert b">AI<" not in r.content
+
+
+# ── Base template Cloudflare safety ─────────────────────────────────────────
+
+def test_theme_init_script_has_cfasync_false(client):
+    # The inline theme-init script must be marked data-cfasync="false" so
+    # Cloudflare Rocket Loader cannot defer it — deferral breaks light mode.
+    r = client.get("/")
+    html = r.content.decode()
+    # Find the script that sets the theme class on <html>
+    assert 'data-cfasync="false"' in html
+    # Specifically the theme-init script (localStorage.getItem) must have it
+    idx = html.find("localStorage.getItem('theme')")
+    assert idx != -1, "theme-init script not found"
+    surrounding = html[max(0, idx - 200):idx]
+    assert 'data-cfasync="false"' in surrounding
+
+
+def test_css_has_cache_busting_version(client):
+    # style.css must carry a ?v= query param so Cloudflare serves fresh CSS
+    # after deploys that change light-mode or other styles.
+    r = client.get("/")
+    assert b"style.css?v=" in r.content
