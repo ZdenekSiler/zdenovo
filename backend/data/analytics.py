@@ -53,7 +53,7 @@ def refresh_popular_posts() -> int:
         headers={"Authorization": f"Bearer {cf_token}", "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:  # nosec B310 — URL is Cloudflare API endpoint, not user input
             data = json.loads(resp.read())
     except Exception:
         log.warning("Failed to fetch Cloudflare analytics for view counts")

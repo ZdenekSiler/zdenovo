@@ -37,6 +37,10 @@ testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-v --tb=short"
 
+[tool.bandit]
+exclude_dirs = [".venv", "tests"]
+skips = []
+
 [tool.coverage.run]
 source = ["."]
 omit = ["tests/*", ".venv/*", "**/__pycache__/*"]

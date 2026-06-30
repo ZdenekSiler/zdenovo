@@ -520,7 +520,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str
         headers={"Authorization": f"Bearer {cf_token}", "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310 — URL is Cloudflare API endpoint, not user input
             data = json.loads(resp.read())
     except Exception as exc:
         log.error("Cloudflare API request failed: %s", exc, exc_info=True)

@@ -61,7 +61,8 @@ echo ""
 
 # ── bandit ────────────────────────────────────────────────────────────────────
 ts "--- [3/5] Security: bandit ---"
-uv run bandit -r . -x tests/,.venv/ --severity-level medium -q || {
+cd "$BACKEND"
+uv run bandit -r . -c pyproject.toml --severity-level medium -q || {
   ts "FAILED: bandit found security issues. Push aborted."
   ts "Full log: $LOG_FILE"
   exit 1
