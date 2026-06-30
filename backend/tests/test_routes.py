@@ -381,6 +381,40 @@ def test_inter_font_stylesheet_has_preload_hint(client):
     assert b'rel="preload" as="style" href="https://fonts.googleapis.com' in r.content
 
 
+# ── Blog search HTML route ───────────────────────────────────────────────────
+
+def test_blog_search_route_returns_html_fragment(client):
+    r = client.get("/blog/search?q=HTMX")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+    assert b"htmx-is-enough" in r.content
+
+def test_blog_search_empty_query_returns_empty_fragment(client):
+    r = client.get("/blog/search?q=")
+    assert r.status_code == 200
+    assert b"<a " not in r.content  # no result links
+
+def test_blog_search_does_not_clash_with_slug_route(client):
+    # /blog/search must not be handled by the /{slug} route
+    r = client.get("/blog/search?q=test")
+    assert r.status_code == 200
+
+def test_sidebar_search_widget_present_on_blog_page(client):
+    r = client.get("/blog")
+    assert b'hx-get="/blog/search"' in r.content
+    assert b'sidebar-search-results' in r.content
+
+def test_sidebar_search_widget_present_on_post_page(client):
+    r = client.get("/blog/htmx-is-enough")
+    assert b'hx-get="/blog/search"' in r.content
+    assert b'sidebar-search-results' in r.content
+
+def test_above_list_search_bar_targets_blog_search(client):
+    r = client.get("/blog")
+    assert b'hx-get="/blog/search"' in r.content
+    assert b'hx-get="/api/posts/search"' not in r.content
+
+
 # ── Public pages have no inline validation data ─────────────────────────────
 
 def test_public_post_has_no_validation_data(client):

@@ -206,3 +206,61 @@ def test_react_up_and_down_are_independent(client):
     down = int(client.post("/api/posts/htmx-is-enough/react-down").text)
     assert up == 1
     assert down == 1
+
+
+# ── GET /api/posts/search ─────────────────────────────────────────────────────
+
+def test_search_returns_matching_posts_by_title(client):
+    r = client.get("/api/posts/search?q=HTMX")
+    assert r.status_code == 200
+    slugs = [p["slug"] for p in r.json()]
+    assert "htmx-is-enough" in slugs
+
+def test_search_returns_matching_posts_by_content(client):
+    r = client.get("/api/posts/search?q=python")
+    assert r.status_code == 200
+    assert len(r.json()) > 0
+
+def test_search_returns_matching_posts_by_tag(client):
+    r = client.get("/api/posts/search?q=tooling")
+    assert r.status_code == 200
+    # "tooling" is a tag on the type-hints seed post
+    assert any(p["slug"] == "why-i-switched-to-type-hints" for p in r.json())
+
+def test_search_empty_query_returns_empty_list(client):
+    r = client.get("/api/posts/search?q=")
+    assert r.status_code == 200
+    assert r.json() == []
+
+def test_search_whitespace_query_returns_empty_list(client):
+    r = client.get("/api/posts/search?q=   ")
+    assert r.status_code == 200
+    assert r.json() == []
+
+def test_search_sanitizes_fts5_special_characters(client):
+    # A query with FTS5 operator chars should not crash the endpoint
+    r = client.get('/api/posts/search?q=python"*^()')
+    assert r.status_code == 200
+
+def test_search_respects_limit_of_10(client):
+    import json
+    from db import get_conn
+    # Insert 15 posts all matching "uniqueterm"
+    with get_conn() as conn:
+        for i in range(15):
+            conn.execute(
+                "INSERT INTO posts (slug, title, date, summary, tags, content) VALUES (?,?,?,?,?,?)",
+                (f"limit-test-{i}", f"Title {i}", "2026-01-01", "Sum", json.dumps([]), "uniqueterm content"),
+            )
+    r = client.get("/api/posts/search?q=uniqueterm")
+    assert r.status_code == 200
+    assert len(r.json()) <= 10
+
+def test_search_results_are_json_post_objects(client):
+    r = client.get("/api/posts/search?q=HTMX")
+    assert r.status_code == 200
+    results = r.json()
+    assert len(results) > 0
+    assert "slug" in results[0]
+    assert "title" in results[0]
+    assert "date" in results[0]

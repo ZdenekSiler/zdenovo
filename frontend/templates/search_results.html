@@ -1,0 +1,17 @@
+{% if results %}
+<div class="space-y-0.5">
+  {% for post in results %}
+  <a href="/blog/{{ post.slug }}"
+     hx-get="/blog/{{ post.slug }}"
+     hx-target="#main-content"
+     hx-select="#main-content"
+     hx-push-url="true"
+     hx-swap="innerHTML"
+     hx-indicator="#htmx-indicator"
+     class="flex flex-col px-3 py-2 rounded-lg hover:bg-zinc-800/60 transition-colors group">
+    <span class="text-xs font-medium text-zinc-300 group-hover:text-indigo-400 transition-colors line-clamp-1">{{ post.title }}</span>
+    <time class="text-[10px] text-zinc-600">{{ post.date | dateformat }}</time>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}

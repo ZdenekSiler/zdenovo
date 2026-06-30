@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from data.posts import search_posts as _search_posts
 from db import get_conn, row_to_dict
 from rate_limit import limiter
 
@@ -95,25 +96,7 @@ def list_posts() -> list[PostOut]:
 @router.get("/search", response_model=list[PostOut])
 def search_posts(q: str) -> list[PostOut]:
     """Full-text search over posts (title, summary, tags, content)."""
-    if not q.strip():
-        return []
-    sanitized = re.sub(r'["*^():-]', "", q).strip()
-    if not sanitized:
-        return []
-    try:
-        with get_conn() as conn:
-            rows = conn.execute(
-                """SELECT p.* FROM posts p
-                   JOIN posts_fts f ON p.rowid = f.rowid
-                   WHERE posts_fts MATCH ?
-                   ORDER BY rank
-                   LIMIT 10""",
-                (sanitized,),
-            ).fetchall()
-        return [row_to_dict(r) for r in rows]
-    except Exception:
-        logger.warning("Post search failed for query %r", q, exc_info=True)
-        return []
+    return _search_posts(q)
 
 
 @router.get("/{slug}", response_model=PostOut)

@@ -29,7 +29,7 @@ load_dotenv()  # no-op if .env absent; prod uses file secrets
 from code_validator import validate_content
 from config import read_secret
 from data.analytics import refresh_popular_posts
-from data.posts import get_all_posts, get_all_tags, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, get_series_siblings, total_pages
+from data.posts import get_all_posts, get_all_tags, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, get_series_siblings, search_posts, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, draft_row_to_dict, get_conn, init_db
 from middleware.csrf import CSRFMiddleware
@@ -247,6 +247,13 @@ async def blog(request: Request, tag: str | None = None, page: int = 1) -> str:
         "meta_description": meta_description,
         "canonical_url": canonical_url,
     })
+
+
+@app.get("/blog/search", response_class=HTMLResponse)
+async def blog_search(request: Request, q: str = "") -> str:
+    """HTMX HTML fragment for inline search results dropdown."""
+    results = search_posts(q)
+    return templates.TemplateResponse(request, "search_results.html", {"results": results})
 
 
 @app.get("/blog/{slug}", response_class=HTMLResponse)

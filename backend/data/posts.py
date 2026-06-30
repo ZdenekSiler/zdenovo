@@ -1,6 +1,10 @@
+import logging
 import math
+import re
 
 from db import get_conn, row_to_dict
+
+log = logging.getLogger(__name__)
 
 PAGE_SIZE = 5
 
@@ -69,6 +73,29 @@ def get_series_siblings(series_id: str) -> list[dict]:
             (series_id,),
         ).fetchall()
     return [row_to_dict(r) for r in rows]
+
+
+def search_posts(q: str) -> list[dict]:
+    """Full-text search over posts using FTS5. Returns up to 10 results ranked by relevance."""
+    if not q.strip():
+        return []
+    sanitized = re.sub(r'["*^():-]', "", q).strip()
+    if not sanitized:
+        return []
+    try:
+        with get_conn() as conn:
+            rows = conn.execute(
+                """SELECT p.* FROM posts p
+                   JOIN posts_fts f ON p.rowid = f.rowid
+                   WHERE posts_fts MATCH ?
+                   ORDER BY rank
+                   LIMIT 10""",
+                (sanitized,),
+            ).fetchall()
+        return [row_to_dict(r) for r in rows]
+    except Exception:
+        log.warning("FTS search failed for query %r", q, exc_info=True)
+        return []
 
 
 def get_related_posts(slug: str, tags: list[str], limit: int = 3) -> list[dict]:

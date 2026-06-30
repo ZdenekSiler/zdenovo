@@ -39,6 +39,16 @@
 {% endblock %}
 
 {% block sidebar %}
+<!-- Search widget (duplicated here since this block overrides the base sidebar entirely) -->
+<div class="border border-zinc-800/60 rounded-xl bg-zinc-900/40 p-4">
+  <input type="search" name="q" placeholder="Search posts..."
+         hx-get="/blog/search"
+         hx-trigger="input changed delay:300ms"
+         hx-target="#sidebar-search-results"
+         hx-swap="innerHTML"
+         class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
+  <div id="sidebar-search-results" class="mt-2"></div>
+</div>
 <div id="toc-container" class="mb-4"></div>
 <div class="border border-zinc-800/60 rounded-xl bg-zinc-900/40 p-5 text-center">
   <div class="w-32 h-32 rounded-2xl border border-indigo-500/40 overflow-hidden bg-indigo-500/20 mx-auto mb-3">

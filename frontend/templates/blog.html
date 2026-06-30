@@ -30,6 +30,17 @@
 
 
 {% block sidebar %}
+<!-- Search widget (duplicated here since this block overrides the base sidebar entirely) -->
+<div class="border border-zinc-800/60 rounded-xl bg-zinc-900/40 p-4">
+  <input type="search" name="q" placeholder="Search posts..."
+         hx-get="/blog/search"
+         hx-trigger="input changed delay:300ms"
+         hx-target="#sidebar-search-results"
+         hx-swap="innerHTML"
+         class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
+  <div id="sidebar-search-results" class="mt-2"></div>
+</div>
+
 <div class="border border-zinc-800/60 rounded-xl bg-zinc-900/40 p-4">
   <h3 class="text-xs font-semibold tracking-widest uppercase text-zinc-500 mb-4">Most Popular</h3>
   {% if popular_posts %}
@@ -78,10 +89,10 @@
   <input
     type="search"
     placeholder="Search posts..."
-    hx-get="/api/posts/search"
+    hx-get="/blog/search"
     hx-trigger="input changed delay:300ms"
     hx-target="#search-results"
-    hx-include="this"
+    hx-swap="innerHTML"
     name="q"
     class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
   <div id="search-results" class="mt-2 space-y-1"></div>
