@@ -22,7 +22,13 @@ exec > >(tee "$LOG_FILE") 2>&1
 
 ts() { echo "[$(date '+%H:%M:%S')] $*"; }
 
-ts "=== Pre-push to main: running full security gate ==="
+FULL="${FULL:-0}"
+
+if [[ "$FULL" == "1" ]]; then
+  ts "=== Pre-push to main: full gate (unit + Playwright + security) ==="
+else
+  ts "=== Pre-push to main: fast gate (unit + security, no Playwright) ==="
+fi
 ts "Log: $LOG_FILE"
 echo ""
 
@@ -50,13 +56,17 @@ ts "✓ Unit tests passed"
 echo ""
 
 # ── Playwright frontend tests ─────────────────────────────────────────────────
-ts "--- [2/5] Frontend tests (Playwright) ---"
-uv run pytest tests/test_frontend.py -v --tb=short -k "not regenerate" || {
-  ts "FAILED: Frontend tests did not pass. Push aborted."
-  ts "Full log: $LOG_FILE"
-  exit 1
-}
-ts "✓ Frontend tests passed"
+if [[ "$FULL" == "1" ]]; then
+  ts "--- [2/5] Frontend tests (Playwright) ---"
+  uv run pytest tests/test_frontend.py -v --tb=short -k "not regenerate" || {
+    ts "FAILED: Frontend tests did not pass. Push aborted."
+    ts "Full log: $LOG_FILE"
+    exit 1
+  }
+  ts "✓ Frontend tests passed"
+else
+  ts "--- [2/5] Frontend tests (Playwright) --- SKIPPED (run with FULL=1 to include)"
+fi
 echo ""
 
 # ── bandit ────────────────────────────────────────────────────────────────────

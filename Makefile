@@ -182,6 +182,17 @@ deploy: _require-env
 		&& echo "  ✓ Site is live: https://$(DOMAIN)" \
 		|| (echo "  ✗ SITE IS DOWN — check: ssh zdenovo 'cd /opt/zdenovo && docker compose -f docker-compose.prod.yml logs --tail 20'" && exit 1)
 
+deploy-full: _require-env
+	@echo "→ Full deploy: unit + Playwright + security (slow, ~6 min)"
+	@FULL=1 git push origin main
+	$(SSH_CMD) \
+		"cd $(DEPLOY_DIR) && git pull --ff-only && make prod"
+	@echo "→ Verifying..."
+	@sleep 3
+	@curl -sf -o /dev/null --max-time 10 https://$(DOMAIN)/ \
+		&& echo "  ✓ Site is live: https://$(DOMAIN)" \
+		|| (echo "  ✗ SITE IS DOWN" && exit 1)
+
 deploy-restart: _require-env
 	@echo "→ Restarting production on $(SERVER_USER)@$(SERVER_HOST)..."
 	$(SSH_CMD) \
