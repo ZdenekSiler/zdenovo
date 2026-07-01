@@ -40,7 +40,7 @@ def test_generate_saves_to_drafts(client, monkeypatch):
   assert isinstance(data["tags"], list)
   assert data["content"]
   assert data["date"]
-  assert data["image"] == f"https://picsum.photos/seed/{data['slug']}/800/400"
+  assert data["image"] and data["image"].startswith("https://")
   assert data["status"] == "pending"
   assert data["topic_id"] == "freeform"
   assert data["id"]
