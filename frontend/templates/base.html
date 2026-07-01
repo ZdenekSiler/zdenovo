@@ -137,16 +137,7 @@
       <div class="sticky top-16 space-y-4">
       {% block sidebar %}
 
-        <!-- Search widget -->
-        <div class="border border-zinc-800/60 rounded-xl bg-zinc-900/40 p-4">
-          <input type="search" name="q" placeholder="Search posts..."
-                 hx-get="/blog/search"
-                 hx-trigger="input changed delay:300ms"
-                 hx-target="#sidebar-search-results"
-                 hx-swap="innerHTML"
-                 class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
-          <div id="sidebar-search-results" class="mt-2"></div>
-        </div>
+        {% block sidebar_search %}{% endblock %}
 
         <!-- Profile card -->
         <div class="border border-zinc-800/60 rounded-xl bg-zinc-900/40 p-5 text-center">
