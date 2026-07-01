@@ -267,7 +267,7 @@ def approve_draft(draft_id: str, _: None = Depends(_get_require_admin)):
       (
         draft["slug"],
         draft["title"],
-        draft["date"].isoformat(),
+        datetime.now(timezone.utc).date().isoformat(),
         draft["summary"],
         json.dumps(draft["tags"]),
         draft["content"],

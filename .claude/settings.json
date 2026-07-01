@@ -30,6 +30,10 @@
       "Bash(chmod *)",
       "Bash(cp *)",
       "Bash(mv *)",
+      "Bash(./scripts/dev-deploy.sh)",
+      "Bash(pkill *)",
+      "Bash(fuser *)",
+      "Bash(xdg-open *)",
       "Read(**)",
       "Edit(**)",
       "Write(**)"
