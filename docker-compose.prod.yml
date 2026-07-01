@@ -16,6 +16,7 @@ services:
       - admin_password
       - secret_key
       - cloudflare_api_token
+      - deploy_token
     networks:
       - internal
     healthcheck:
@@ -69,6 +70,8 @@ secrets:
     file: ./secrets/secret_key
   cloudflare_api_token:
     file: ./secrets/cloudflare_api_token
+  deploy_token:
+    file: ./secrets/deploy_token
 
 networks:
   internal:

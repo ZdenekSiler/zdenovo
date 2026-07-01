@@ -19,6 +19,7 @@ if [ -z "$DEPLOY_TOKEN" ]; then
 fi
 
 if curl -sfk -X POST https://localhost/api/deploys \
+    -H "Host: zdenovo.com" \
     -H "Content-Type: application/json" \
     -H "X-Deploy-Token: $DEPLOY_TOKEN" \
     --max-time 10 \
