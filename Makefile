@@ -85,14 +85,15 @@ prod: _require-env _gen-nginx-conf _check-certs
 	@/opt/zdenovo/backup-db.sh || (echo "ERROR: backup failed — aborting deploy" && exit 1)
 	$(eval DEPLOY_START := $(shell date +%s))
 	$(eval DEPLOY_COMMIT := $(shell git rev-parse --short HEAD))
+	$(eval DEPLOY_MSG := $(shell git log -1 --format="%s" HEAD))
 	BUILD_COMMIT=$(DEPLOY_COMMIT) $(COMPOSE_PROD) up --build -d
 	@echo "→ Reloading nginx to pick up new web container IP..."
 	@docker exec zdenovo-nginx-1 nginx -s reload 2>/dev/null || true
 	@echo "→ Waiting for containers to stabilize..."
 	@sleep 5
 	@$(MAKE) --no-print-directory _post-deploy-check \
-	    && bash scripts/record-deploy.sh $(DEPLOY_COMMIT) success $$(($$(date +%s) - $(DEPLOY_START))) \
-	    || { bash scripts/record-deploy.sh $(DEPLOY_COMMIT) failed $$(($$(date +%s) - $(DEPLOY_START))); exit 1; }
+	    && bash scripts/record-deploy.sh $(DEPLOY_COMMIT) success $$(($$(date +%s) - $(DEPLOY_START))) "$(DEPLOY_MSG)" \
+	    || { bash scripts/record-deploy.sh $(DEPLOY_COMMIT) failed $$(($$(date +%s) - $(DEPLOY_START))) "$(DEPLOY_MSG)"; exit 1; }
 
 prod-logs:
 	$(COMPOSE_PROD) logs -f
