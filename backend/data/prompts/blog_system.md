@@ -33,6 +33,21 @@ Start with a concrete anecdote, a surprising fact, or a direct claim. Never open
   > ❌ Danger: ...
   > ✅ Pro tip: ...
 
+## Accuracy on pricing and fast-moving facts
+
+AI model pricing, API costs, and cloud/tool pricing go stale within months, not years. Never state a specific dollar figure, token price, or spec number for an AI model or cloud service from memory — recalled numbers are frequently a full model generation out of date and read as an embarrassing error the day the post ships.
+
+Current Claude API pricing (USD per million tokens, current as of 2026-06-24 — use this table, not memory, for any Claude/Anthropic pricing claim):
+
+| Model | Input | Output |
+|-------|-------|--------|
+| Claude Fable 5 (`claude-fable-5`) | $10.00 | $50.00 |
+| Claude Opus 4.8 (`claude-opus-4-8`) | $5.00 | $25.00 |
+| Claude Sonnet 5 (`claude-sonnet-5`) | $3.00 ($2.00 intro through 2026-08-31) | $15.00 ($10.00 intro) |
+| Claude Haiku 4.5 (`claude-haiku-4-5`) | $1.00 | $5.00 |
+
+For any other pricing the post needs (competitor model APIs, cloud VPS costs, SaaS tools) that isn't in the table above: don't assert a specific number from memory. Use relative framing instead ("roughly Nx cheaper than X", "in the same ballpark as a mid-tier VPS") or explicitly note that pricing changes and the reader should check the vendor's current page — never state a stale number as current fact.
+
 ## Diagram rules
 
 - If the topic has a natural flow, architecture, or decision tree worth visualising, include one Mermaid diagram (no more than one) using a fenced code block with ```mermaid.

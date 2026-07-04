@@ -275,6 +275,7 @@ def _load_briefs() -> list[PostBrief]:
 
 def _build_brief_message(brief: PostBrief) -> str:
   parts = [
+    f"Today's date: {Date.today().isoformat()}",
     "<brief>",
     f"Title hint: {brief.title_hint}",
     f"Description: {brief.description}",
@@ -403,7 +404,7 @@ def list_briefs():
 
 @router.post("/generate", response_model=DraftOut, status_code=201)
 def generate_post_route(body: GenerateIn, _: None = Depends(_get_require_admin)):
-  user_message = f"Description: {body.description}"
+  user_message = f"Today's date: {Date.today().isoformat()}\nDescription: {body.description}"
   if body.tags:
     user_message += f"\nSuggested tags: {', '.join(body.tags)}"
   post, review = _generate_with_review(user_message)
