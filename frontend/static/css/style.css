@@ -429,7 +429,10 @@
 }
 .code-block-wrapper pre {
   margin-bottom: 0;
-  padding-top: 2rem;  /* room for lang badge + copy/hide buttons */
+  /* !important: .prose-custom pre[class*="language-"]'s `padding: 1.25rem` shorthand
+     below has higher specificity and would otherwise clobber this back down,
+     letting the lang badge/copy/hide buttons overlap the first line of code. */
+  padding-top: 2rem !important;
 }
 .copy-btn {
   position: absolute;
