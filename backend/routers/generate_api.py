@@ -126,6 +126,13 @@ class BlogGenerator:
 
   def generate_post(self, user_message: str) -> PostOut:
     self._ensure_prompts()
+    corpus = _project_corpus_for_prompt()
+    if corpus:
+      corpus_xml = "\n".join(
+        f'<post slug="{p["slug"]}"><title>{p["title"]}</title><summary>{p["summary"]}</summary></post>'
+        for p in corpus
+      )
+      user_message = f"{user_message}\n\n<existing_posts>\n{corpus_xml}\n</existing_posts>"
     try:
       message = self._get_client().messages.create(
         model="claude-sonnet-4-6",
@@ -267,6 +274,15 @@ blog_generator = BlogGenerator()
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _project_corpus_for_prompt() -> list[dict]:
+  """Slug/title/summary/tags only — never full content — to keep the prompt small and cache-friendly."""
+  from data.posts import get_all_posts
+  return [
+    {"slug": p["slug"], "title": p["title"], "summary": p["summary"], "tags": p["tags"]}
+    for p in get_all_posts()
+  ]
+
 
 def _load_briefs() -> list[PostBrief]:
   raw = json.loads(BRIEFS_PATH.read_text())

@@ -201,3 +201,40 @@ def test_generate_from_brief_not_found(client, monkeypatch):
 
   assert resp.status_code == 404
   assert "nonexistent-brief-id" in resp.json()["detail"]
+
+
+# ─── Existing-posts corpus (inline cross-post linking) ─────────────────────────
+
+def test_generate_prompt_includes_existing_posts_corpus(client, monkeypatch):
+  """The seeded posts should be listed in the prompt so Claude can link to them inline."""
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+  mock_client = _make_mock_client()
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+    client.post(
+      "/api/posts/generate",
+      json={"description": "A practical intro to Python type hints and why they matter"},
+    )
+
+  generation_call = mock_client.messages.create.call_args_list[0]
+  user_content = generation_call.kwargs["messages"][0]["content"]
+  assert "<existing_posts>" in user_content
+  assert "htmx-is-enough" in user_content
+
+
+def test_generate_prompt_omits_existing_posts_tag_when_no_posts(client, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  import db
+  with db.get_conn() as conn:
+    conn.execute("DELETE FROM posts")
+
+  mock_client = _make_mock_client()
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+    client.post(
+      "/api/posts/generate",
+      json={"description": "A practical intro to Python type hints and why they matter"},
+    )
+
+  generation_call = mock_client.messages.create.call_args_list[0]
+  user_content = generation_call.kwargs["messages"][0]["content"]
+  assert "<existing_posts>" not in user_content
