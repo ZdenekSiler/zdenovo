@@ -122,3 +122,27 @@ def test_admin_hub_shows_last_deploy_commit(admin_client, monkeypatch):
     resp = admin_client.get("/admin")
     assert resp.status_code == 200
     assert b"hub12345" in resp.content
+
+
+def test_admin_deploys_page_shows_notes(admin_client, monkeypatch):
+    monkeypatch.setenv("DEPLOY_TOKEN", _TOKEN)
+    admin_client.post(
+        "/api/deploys",
+        json={
+            "commit_hash": "notes123",
+            "status": "success",
+            "duration_s": 15,
+            "notes": "feat(generate): let Claude link inline to relevant existing posts",
+        },
+        headers={"X-Deploy-Token": _TOKEN},
+    )
+    resp = admin_client.get("/admin/deploys")
+    assert resp.status_code == 200
+    assert b"let Claude link inline to relevant existing posts" in resp.content
+
+
+def test_admin_deploys_page_shows_dash_when_notes_missing(admin_client, monkeypatch):
+    _post_deploy(admin_client, monkeypatch, commit_hash="nonotes1")
+    resp = admin_client.get("/admin/deploys")
+    assert resp.status_code == 200
+    assert b"What changed" in resp.content

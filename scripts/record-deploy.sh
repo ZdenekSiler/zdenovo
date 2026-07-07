@@ -19,12 +19,24 @@ if [ -z "$DEPLOY_TOKEN" ]; then
     exit 0
 fi
 
+BODY=$(python3 -c '
+import json, sys
+commit_hash, status, duration_s, notes = sys.argv[1:5]
+print(json.dumps({
+    "commit_hash": commit_hash,
+    "status": status,
+    "duration_s": int(duration_s),
+    "triggered_by": "makefile",
+    "notes": notes or None,
+}))
+' "$COMMIT_HASH" "$STATUS" "$DURATION_S" "$NOTES")
+
 if curl -sfk -X POST https://localhost/api/deploys \
     -H "Host: zdenovo.com" \
     -H "Content-Type: application/json" \
     -H "X-Deploy-Token: $DEPLOY_TOKEN" \
     --max-time 10 \
-    -d "{\"commit_hash\":\"${COMMIT_HASH}\",\"status\":\"${STATUS}\",\"duration_s\":${DURATION_S},\"triggered_by\":\"makefile\",\"notes\":$([ -n "$NOTES" ] && echo "\"${NOTES}\"" || echo "null")}"; then
+    -d "$BODY"; then
     echo "  ✓ Deploy event recorded (${STATUS})"
 else
     echo "  ⚠ Deploy event recording failed (non-fatal)"

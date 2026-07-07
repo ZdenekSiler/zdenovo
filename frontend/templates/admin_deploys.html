@@ -31,6 +31,7 @@
       <tr>
         <th class="text-left text-xs font-semibold text-zinc-500 pb-3 pr-4">When</th>
         <th class="text-left text-xs font-semibold text-zinc-500 pb-3 pr-4">Commit</th>
+        <th class="text-left text-xs font-semibold text-zinc-500 pb-3 pr-4">What changed</th>
         <th class="text-left text-xs font-semibold text-zinc-500 pb-3 pr-4">Branch</th>
         <th class="text-left text-xs font-semibold text-zinc-500 pb-3 pr-4">Status</th>
         <th class="text-left text-xs font-semibold text-zinc-500 pb-3 pr-4">Duration</th>
@@ -45,6 +46,9 @@
           <a href="https://github.com/ZdenekSiler/zdenovo/commit/{{ d.commit_hash }}" target="_blank" rel="noopener noreferrer" class="hover:text-indigo-400 transition-colors">
             <code>{{ d.commit_hash }}</code>
           </a>
+        </td>
+        <td class="py-2 pr-4 text-zinc-300 max-w-xs truncate" title="{{ d.notes }}">
+          {{ d.notes if d.notes else "—" }}
         </td>
         <td class="py-2 pr-4 text-zinc-300">{{ d.branch }}</td>
         <td class="py-2 pr-4">
