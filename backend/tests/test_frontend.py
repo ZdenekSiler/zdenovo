@@ -200,7 +200,9 @@ def test_mermaid_blocks_not_wrapped_with_toggle(page: Page):
         "```mermaid\ngraph LR\n  A --> B\n```\n\n"
         "Done."
     )
-    resp = requests.post(f"{BASE}/api/posts", json={
+    session = requests.Session()
+    session.post(f"{BASE}/admin/login", data={"password": ADMIN_PW})
+    resp = session.post(f"{BASE}/api/posts", json={
         "title": "Mermaid Toggle Test Post",
         "summary": "Test post for mermaid toggle.",
         "tags": ["test"],
@@ -219,7 +221,7 @@ def test_mermaid_blocks_not_wrapped_with_toggle(page: Page):
         assert mermaid_in_wrapper.count() == 0, \
             "Mermaid diagram should not be inside a code-block-wrapper"
     finally:
-        requests.delete(f"{BASE}/api/posts/{slug}")
+        session.delete(f"{BASE}/api/posts/{slug}")
 
 
 def test_mermaid_diagrams_render_via_htmx(page: Page):

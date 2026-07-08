@@ -94,6 +94,8 @@ class BlogGenerator:
     self._review_tool: dict = {}
     self._sources_system_prompt = ""
     self._sources_tool: dict = {}
+    self._trending_topics_system_prompt = ""
+    self._trending_topics_tool: dict = {}
 
   def _ensure_prompts(self) -> None:
     if self._prompts_loaded:
@@ -104,6 +106,8 @@ class BlogGenerator:
     self._review_tool = json.loads((PROMPTS_DIR / "review_tool.json").read_text(encoding="utf-8"))
     self._sources_system_prompt = (PROMPTS_DIR / "sources_system.md").read_text(encoding="utf-8")
     self._sources_tool = json.loads((PROMPTS_DIR / "sources_tool.json").read_text(encoding="utf-8"))
+    self._trending_topics_system_prompt = (PROMPTS_DIR / "trending_topics_system.md").read_text(encoding="utf-8")
+    self._trending_topics_tool = json.loads((PROMPTS_DIR / "trending_topics_tool.json").read_text(encoding="utf-8"))
     self._prompts_loaded = True
 
   def _get_client(self) -> anthropic.Anthropic:
@@ -246,6 +250,51 @@ class BlogGenerator:
     raw_sources = tool_block.input.get("sources", [])
     return [Source(title=s["title"], url=s["url"], summary=s["summary"]) for s in raw_sources if s.get("url")]
 
+  def discover_trending_topics(self, category: dict, existing_topics: list[PostBrief]) -> list[dict]:
+    """Search the web for 3-5 fresh topic candidates in the given category. Fail-soft:
+    this is a pool-replenishment augmentation, never a blocking dependency."""
+    self._ensure_prompts()
+    corpus = _project_corpus_for_prompt()
+    topics_projection = _project_topics_for_prompt(existing_topics)
+    corpus_xml = "\n".join(
+      f'<post slug="{p["slug"]}"><title>{p["title"]}</title><summary>{p["summary"]}</summary></post>'
+      for p in corpus
+    )
+    topics_xml = "\n".join(
+      f'<topic><title_hint>{t["title_hint"]}</title_hint><tags>{", ".join(t["tags"])}</tags></topic>'
+      for t in topics_projection
+    )
+    prompt = (
+      f"Find fresh topic candidates in this category:\n\n"
+      f"<category>\n<label>{category['label']}</label>\n<search_hint>{category['search_hint']}</search_hint>\n</category>\n\n"
+      f"<existing_posts>\n{corpus_xml}\n</existing_posts>\n\n"
+      f"<existing_topics>\n{topics_xml}\n</existing_topics>"
+    )
+    try:
+      message = self._get_client().messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=2048,
+        system=[
+          {"type": "text", "text": self._trending_topics_system_prompt, "cache_control": {"type": "ephemeral"}},
+        ],
+        tools=[
+          {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
+          {**self._trending_topics_tool, "cache_control": {"type": "ephemeral"}},
+        ],
+        tool_choice={"type": "any"},
+        messages=[{"role": "user", "content": prompt}],
+      )
+    except anthropic.APIError as exc:
+      log.warning("Topic discovery failed: %s", exc)
+      return []
+
+    self._log_usage("discover_topics", message)
+
+    tool_block = next((b for b in message.content if b.type == "tool_use" and b.name == "suggest_topics"), None)
+    if tool_block is None:
+      return []
+    return tool_block.input.get("topics", [])
+
   def generate_with_review(self, user_message: str) -> tuple[PostOut, ReviewResult]:
     """Generate a post and review it. Retry up to MAX_GENERATION_ATTEMPTS, feeding review feedback into retries."""
     best_post = None
@@ -282,6 +331,11 @@ def _project_corpus_for_prompt() -> list[dict]:
     {"slug": p["slug"], "title": p["title"], "summary": p["summary"], "tags": p["tags"]}
     for p in get_all_posts()
   ]
+
+
+def _project_topics_for_prompt(topics: list[PostBrief]) -> list[dict]:
+  """title_hint/tags only, to keep the discovery prompt small and cache-friendly."""
+  return [{"title_hint": t.title_hint, "tags": t.tags} for t in topics]
 
 
 def _load_briefs() -> list[PostBrief]:
@@ -419,7 +473,7 @@ def list_briefs():
 
 
 @router.post("/generate", response_model=DraftOut, status_code=201)
-def generate_post_route(body: GenerateIn, _: None = Depends(_get_require_admin)):
+def generate_post_route(body: GenerateIn, _: None = Depends(_get_require_admin())):
   user_message = f"Today's date: {Date.today().isoformat()}\nDescription: {body.description}"
   if body.tags:
     user_message += f"\nSuggested tags: {', '.join(body.tags)}"
@@ -428,7 +482,7 @@ def generate_post_route(body: GenerateIn, _: None = Depends(_get_require_admin))
 
 
 @router.post("/generate/{brief_id}", response_model=DraftOut, status_code=201)
-def generate_from_brief(brief_id: str, _: None = Depends(_get_require_admin)):
+def generate_from_brief(brief_id: str, _: None = Depends(_get_require_admin())):
   briefs = _load_briefs()
   brief = next((b for b in briefs if b.id == brief_id), None)
   if brief is None:

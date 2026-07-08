@@ -88,15 +88,44 @@ def _decorator_route_info(decorator: ast.expr) -> tuple[str, str] | None:
 REQUIRE_ADMIN_NAMES = {"require_admin", "_get_require_admin"}
 
 
+def _call_target_name(call: ast.Call) -> str | None:
+    """Name of the function being called, e.g. `Depends` in `Depends(x)` or
+    `_get_require_admin` in `_get_require_admin()`."""
+    func = call.func
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return None
+
+
 def _calls_require_admin(node: ast.AST, verified_names: set[str]) -> bool:
-    """True if a verified `require_admin` reference appears anywhere in the
-    function's subtree — either as a Depends(...) default in the signature
-    or a direct call in the body."""
+    """True if the function is genuinely protected by a verified `require_admin`
+    reference, either:
+      - a direct call to a verified name anywhere (covers a manual
+        `require_admin(request)` check in the body, AND a lazy-loader wrapper
+        actually being invoked: `Depends(_get_require_admin())`), or
+      - `Depends(require_admin)` — a bare reference is only valid for the real
+        `require_admin` name itself, since FastAPI calls it directly.
+
+    A bare, uncalled reference to a *wrapper* name — `Depends(_get_require_admin)`
+    without the `()` — does NOT count. FastAPI would call the wrapper (which takes
+    no arguments) and use its return value as the dependency's resolved value;
+    `require_admin(request)` is never actually invoked, so the route ends up
+    completely unprotected despite the wrapper's name appearing right there in
+    the signature. This exact bug shipped silently in this codebase before.
+    """
     for sub in ast.walk(node):
-        if isinstance(sub, ast.Name) and sub.id in verified_names:
-            return True
-        if isinstance(sub, ast.Attribute) and sub.attr in verified_names:
-            return True
+        if isinstance(sub, ast.Call):
+            if _call_target_name(sub) in verified_names:
+                return True
+            if _call_target_name(sub) == "Depends" and sub.args:
+                arg = sub.args[0]
+                bare_name = arg.id if isinstance(arg, ast.Name) else (
+                    arg.attr if isinstance(arg, ast.Attribute) else None
+                )
+                if bare_name == "require_admin":
+                    return True
     return False
 
 

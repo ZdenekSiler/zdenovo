@@ -1,0 +1,26 @@
+[
+  {
+    "id": "ai-agents-llm",
+    "label": "AI, Agents & LLM Tooling",
+    "tags": ["ai", "agents", "llm", "claude", "automation", "protocols"],
+    "search_hint": "Recent, concrete developments in AI agent frameworks, LLM tooling, agentic coding workflows, or developer-facing AI products — not generic AI news."
+  },
+  {
+    "id": "python-backend",
+    "label": "Python & Backend Engineering",
+    "tags": ["python", "backend", "fastapi", "sqlite", "database", "async", "concurrency", "architecture", "testing", "quality", "uv", "packaging"],
+    "search_hint": "Notable Python ecosystem releases, backend engineering practices, or API/database design discussions from the last few weeks."
+  },
+  {
+    "id": "solo-consulting-startup",
+    "label": "Solo Consulting & Indie Business",
+    "tags": ["indie", "business", "startup", "productivity", "consulting", "freelance"],
+    "search_hint": "Current trends or debates in solo consulting, indie hacking, bootstrapped SaaS, or one-person business operations."
+  },
+  {
+    "id": "deploy-devops-war-stories",
+    "label": "Deploy & Production War Stories",
+    "tags": ["devops", "docker", "deployment", "production", "debugging", "monitoring", "incidents", "htmx", "web"],
+    "search_hint": "Recent DevOps incidents, deployment tooling changes, or production post-mortems worth turning into a deploy-fail-fix style post."
+  }
+]

@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
+from data.categories import categorize, load_categories
 from data.posts import search_posts as _search_posts
 from db import get_conn, row_to_dict
 from rate_limit import limiter
@@ -39,6 +40,7 @@ class PostIn(BaseModel):
     date: Date = Field(default_factory=Date.today)
     image: str | None = None
     sources: list[Source] = Field(default_factory=list)
+    category: str | None = None
 
 
 class PostOut(BaseModel):
@@ -57,12 +59,18 @@ class PostOut(BaseModel):
     views: int = 0
     series_id: str | None = None
     series_order: int | None = None
+    category: str | None = None
 
 
 class SeriesAssignIn(BaseModel):
     """Request body for assigning a post to a series."""
     series_id: str | None = None
     series_order: int | None = None
+
+
+class CategoryAssignIn(BaseModel):
+    """Request body for assigning a post to a category."""
+    category: str | None = None
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -112,7 +120,7 @@ def get_post(slug: str) -> PostOut:
 
 
 @router.post("", response_model=PostOut, status_code=201)
-def create_post(body: PostIn, _: None = Depends(_get_require_admin)) -> PostOut:
+def create_post(body: PostIn, _: None = Depends(_get_require_admin())) -> PostOut:
     """Create a new post (admin only)."""
     slug = _slugify(body.title)
     with get_conn() as conn:
@@ -122,15 +130,15 @@ def create_post(body: PostIn, _: None = Depends(_get_require_admin)) -> PostOut:
         if existing:
             raise HTTPException(status_code=409, detail=f"Slug '{slug}' already exists")
         conn.execute(
-            "INSERT INTO posts (slug, title, date, summary, tags, content, image, sources) VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO posts (slug, title, date, summary, tags, content, image, sources, category) VALUES (?,?,?,?,?,?,?,?,?)",
             (slug, body.title, body.date.isoformat(), body.summary, json.dumps(body.tags), body.content, body.image,
-             json.dumps([s.model_dump() for s in body.sources])),
+             json.dumps([s.model_dump() for s in body.sources]), body.category),
         )
     return {**body.model_dump(), "slug": slug}
 
 
 @router.put("/{slug}", response_model=PostOut)
-def update_post(slug: str, body: PostIn, _: None = Depends(_get_require_admin)) -> PostOut:
+def update_post(slug: str, body: PostIn, _: None = Depends(_get_require_admin())) -> PostOut:
     """Update a post (admin only)."""
     with get_conn() as conn:
         row = conn.execute(
@@ -140,16 +148,16 @@ def update_post(slug: str, body: PostIn, _: None = Depends(_get_require_admin)) 
             raise HTTPException(status_code=404, detail="Post not found")
         conn.execute(
             """UPDATE posts
-               SET title=?, date=?, summary=?, tags=?, content=?, image=?, sources=?
+               SET title=?, date=?, summary=?, tags=?, content=?, image=?, sources=?, category=?
                WHERE slug=?""",
             (body.title, body.date.isoformat(), body.summary, json.dumps(body.tags), body.content, body.image,
-             json.dumps([s.model_dump() for s in body.sources]), slug),
+             json.dumps([s.model_dump() for s in body.sources]), body.category, slug),
         )
     return {**body.model_dump(), "slug": slug}
 
 
 @router.delete("/{slug}", status_code=204)
-def delete_post(slug: str, _: None = Depends(_get_require_admin)) -> None:
+def delete_post(slug: str, _: None = Depends(_get_require_admin())) -> None:
     """Delete a post (admin only)."""
     with get_conn() as conn:
         conn.execute("DELETE FROM comments WHERE post_slug = ?", (slug,))
@@ -159,7 +167,7 @@ def delete_post(slug: str, _: None = Depends(_get_require_admin)) -> None:
 
 
 @router.post("/{slug}/unpublish", status_code=204)
-def unpublish_post(slug: str, _: None = Depends(_get_require_admin)) -> None:
+def unpublish_post(slug: str, _: None = Depends(_get_require_admin())) -> None:
     """Move a published post back to drafts (admin only)."""
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM posts WHERE slug = ?", (slug,)).fetchone()
@@ -211,7 +219,7 @@ def react_down_to_post(slug: str, request: Request) -> HTMLResponse:
 
 @router.patch("/{slug}/series", status_code=204)
 def assign_post_series(
-    slug: str, body: SeriesAssignIn, _: None = Depends(_get_require_admin)
+    slug: str, body: SeriesAssignIn, _: None = Depends(_get_require_admin())
 ) -> None:
     """Assign or unassign a post's series (admin only)."""
     with get_conn() as conn:
@@ -228,3 +236,43 @@ def assign_post_series(
             "UPDATE posts SET series_id = ?, series_order = ? WHERE slug = ?",
             (body.series_id, body.series_order, slug),
         )
+
+
+@router.patch("/{slug}/category", status_code=204)
+def assign_post_category(
+    slug: str, body: CategoryAssignIn, _: None = Depends(_get_require_admin())
+) -> None:
+    """Assign or unassign a post's category (admin only)."""
+    if body.category is not None:
+        valid_ids = {c["id"] for c in load_categories()}
+        if body.category not in valid_ids:
+            raise HTTPException(status_code=422, detail=f"Unknown category '{body.category}'")
+    with get_conn() as conn:
+        post = conn.execute("SELECT slug FROM posts WHERE slug = ?", (slug,)).fetchone()
+        if post is None:
+            raise HTTPException(status_code=404, detail="Post not found")
+        conn.execute("UPDATE posts SET category = ? WHERE slug = ?", (body.category, slug))
+
+
+@router.post("/categorize-all")
+def categorize_all_posts(_: None = Depends(_get_require_admin())) -> dict:
+    """Auto-assign a category to every post that doesn't have one yet, using the same
+    tag-overlap heuristic as topic discovery (admin only). Only ever touches posts with
+    category IS NULL, so it never clobbers a manual assignment made via PATCH — safe to
+    re-run any time to pick up newly-published, still-uncategorized posts."""
+    categories = load_categories()
+    with get_conn() as conn:
+        rows = conn.execute("SELECT slug, tags FROM posts WHERE category IS NULL").fetchall()
+        uncategorized_posts = [(row["slug"], json.loads(row["tags"])) for row in rows]
+        categorized = 0
+        for post_slug, tags in uncategorized_posts:
+            cat_id = categorize(tags, categories)
+            if cat_id:
+                conn.execute("UPDATE posts SET category = ? WHERE slug = ?", (cat_id, post_slug))
+                categorized += 1
+        total = conn.execute("SELECT COUNT(*) FROM posts").fetchone()[0]
+    return {
+        "total": total,
+        "categorized": categorized,
+        "uncategorized": len(uncategorized_posts) - categorized,
+    }

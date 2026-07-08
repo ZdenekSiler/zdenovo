@@ -63,8 +63,8 @@ Same response shape as Path 1. Saved as a draft with `topic_id: "freeform"`.
 
 ## Path 3 — Scheduled daily drafts
 
-Every day at 02:00 UTC, the scheduler picks random topics from `backend/data/daily_topics.json`
-and generates drafts automatically. No action needed.
+Every day at 02:00 UTC, the scheduler picks 1 random topic (`DAILY_COUNT`) from
+`backend/data/daily_topics.json` and generates a draft automatically. No action needed.
 
 **Topic deduplication:** Topics that already have a draft (pending or approved) are
 automatically skipped. This prevents the same topic from being generated twice. If a draft
@@ -76,12 +76,40 @@ To trigger manually (same logic as the scheduler):
 
 ```bash
 curl -X POST http://localhost:8000/api/drafts/generate
-# → {"generated": 1, "available": 15, "total": 25}
+# → {"generated": 1, "available": 9, "total": 10}
 ```
 
 Or click **"Generate today's drafts"** button at `/admin/drafts`.
 
 **Topics live in:** `backend/data/daily_topics.json` — same format as briefs.
+
+### Keeping the topic pool fresh: trending-topic discovery
+
+Manually writing every topic doesn't scale, and a static list gets stale and lopsided
+(e.g. skewing toward one subject area). To fix that, the pool can also refill itself:
+
+- **Automatic**: if the available (unused) pool drops below `POOL_MIN_THRESHOLD` (5)
+  when `generate_daily_drafts()` runs, it automatically calls
+  `discover_and_replenish_topics()` before picking today's topic.
+- **Manual**: click **"Discover trending topics"** on `/admin/topics`, or
+  `POST /api/topics/discover` directly, to top up the pool on demand at any time.
+
+Either way, discovery:
+
+1. Picks whichever of the 4 fixed categories (`backend/data/topic_categories.json`:
+   AI/agents/LLM, Python/backend, solo consulting/indie business, deploy/devops war
+   stories) is currently *least* represented in the available pool — actively
+   rebalancing instead of reinforcing whatever cluster already dominates.
+2. Calls Claude (`claude-haiku-4-5-20251001`) with `web_search` to find 3-5 concrete,
+   dated candidates in that category, giving it the existing posts and topic pool as
+   context so it can avoid proposing something already covered.
+3. Runs a free, local word/tag-overlap check on the results as a backstop (no second
+   paid LLM-judge call), discarding anything too similar to what's already there.
+4. Persists survivors into `daily_topics.json` via the same path manual topic
+   creation uses, so they show up in `/admin/topics` as ordinary "Available" topics.
+
+This call is fail-soft: a search/API failure or an all-filtered batch just logs a
+warning and leaves that day's generation to proceed with whatever's left in the pool.
 
 ---
 
@@ -171,9 +199,10 @@ Brief / description / scheduled topic
 | `GET` | `/api/posts/briefs` | List stored briefs |
 | `POST` | `/api/posts/generate` | Generate from free-form description → draft |
 | `POST` | `/api/posts/generate/{brief_id}` | Generate from brief → draft |
-| `POST` | `/api/drafts/generate` | Trigger daily batch (3 random topics) → drafts |
+| `POST` | `/api/drafts/generate` | Trigger daily batch (`DAILY_COUNT` random topic(s)) → drafts |
 | `GET` | `/api/drafts` | List all drafts |
 | `GET` | `/api/drafts/{id}` | Get single draft |
 | `PATCH` | `/api/drafts/{id}` | Edit draft fields |
 | `POST` | `/api/drafts/{id}/approve` | Publish draft to live blog |
 | `DELETE` | `/api/drafts/{id}` | Delete draft |
+| `POST` | `/api/topics/discover` | Manually trigger trending-topic discovery (also runs automatically when the pool is low) |

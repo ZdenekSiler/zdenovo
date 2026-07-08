@@ -24,6 +24,25 @@
   </a>
 </div>
 
+<div class="mb-6 flex flex-wrap items-center gap-3">
+  <div class="flex flex-wrap gap-1.5">
+    <a href="/admin/posts" class="tag-btn{% if not current_category %} active{% endif %}">All</a>
+    {% for c in category_counts %}
+    {% if c.id %}
+    <a href="/admin/posts?category={{ c.id }}" class="tag-btn{% if current_category == c.id %} active{% endif %}">{{ c.label }} ({{ c.count }})</a>
+    {% endif %}
+    {% endfor %}
+  </div>
+  <button
+    hx-post="/api/posts/categorize-all"
+    hx-swap="none"
+    hx-on::after-request="window.location.reload()"
+    onclick="return confirm('Auto-assign categories to all uncategorized posts based on tags? This never overwrites posts that already have a category.')"
+    class="btn-primary text-xs">
+    Categorize all
+  </button>
+</div>
+
 {% if posts %}
 <div class="space-y-3">
   {% for p in posts %}
@@ -46,6 +65,18 @@
     </div>
     <div class="flex items-center gap-2 sm:shrink-0">
       <a href="/blog/{{ p.slug }}" class="btn-ghost text-xs">View</a>
+      <select
+        name="category"
+        hx-post="/admin/posts/{{ p.slug }}/category"
+        hx-trigger="change"
+        hx-target="this"
+        hx-swap="outerHTML"
+        class="category-picker text-[11px] bg-zinc-950 border border-zinc-800 rounded px-1.5 py-1 text-zinc-400">
+        <option value=""{% if not p.category %} selected{% endif %}>Uncategorized</option>
+        {% for c in categories %}
+        <option value="{{ c.id }}"{% if p.category == c.id %} selected{% endif %}>{{ c.label }}</option>
+        {% endfor %}
+      </select>
       {% if p.ai_comments %}
       <button
         hx-post="/api/posts/{{ p.slug }}/toggle-ai-comments"

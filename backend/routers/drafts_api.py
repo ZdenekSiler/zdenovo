@@ -1,12 +1,15 @@
 import json
+import logging
 import random
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from code_validator import ValidationSummary, validate_content
+from data.categories import categorize, load_categories
 from db import draft_row_to_dict, get_conn, row_to_dict
 from routers.generate_api import (
   DraftOut,
@@ -17,12 +20,19 @@ from routers.generate_api import (
   _insert_draft,
   _load_briefs,
   _review_post,
+  blog_generator,
 )
+from routers.topics_api import TopicIn, create_topics, _load_topics
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
-DAILY_TOPICS_PATH = Path(__file__).parent.parent / "data" / "daily_topics.json"
 DAILY_COUNT = 1
+POOL_MIN_THRESHOLD = 5      # replenish once available topics drop below this
+DISCOVERY_BATCH_SIZE = 5    # candidates per call (tool schema already caps at 5)
+
+_STOPWORDS = {"the", "a", "an", "of", "to", "for", "and", "in", "on", "with", "your", "how", "why", "what", "is", "are"}
 
 
 # Import require_admin at usage time to avoid circular imports
@@ -47,8 +57,76 @@ class RegenerateIn(BaseModel):
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _load_daily_topics() -> list[PostBrief]:
-  raw = json.loads(DAILY_TOPICS_PATH.read_text())
-  return [PostBrief(**item) for item in raw]
+  return [PostBrief(**item) for item in _load_topics()]
+
+
+def _title_words(title: str) -> set[str]:
+  return {w for w in re.findall(r"[a-z0-9]+", title.lower()) if w not in _STOPWORDS and len(w) > 2}
+
+
+def _is_duplicate_candidate(
+  candidate: dict, existing: list[dict], title_overlap_threshold: float = 0.5, tag_overlap_min: int = 3
+) -> bool:
+  """Free, non-semantic safety net — the primary defense is the prompt-level
+  <existing_posts>/<existing_topics> context; this only catches what slips through."""
+  cand_words = _title_words(candidate["title_hint"])
+  cand_tags = set(candidate.get("tags", []))
+  for item in existing:
+    item_words = _title_words(item["title_hint"])
+    if not cand_words or not item_words:
+      continue
+    overlap_ratio = len(cand_words & item_words) / min(len(cand_words), len(item_words))
+    if overlap_ratio >= title_overlap_threshold or len(cand_tags & set(item.get("tags", []))) >= tag_overlap_min:
+      return True
+  return False
+
+
+def _validate_candidate(raw: dict) -> dict | None:
+  try:
+    return TopicIn(**raw).model_dump()
+  except ValidationError as exc:
+    log.warning("Discarding malformed topic candidate %r: %s", raw.get("title_hint", "?"), exc)
+    return None
+
+
+def _pick_understocked_category(available: list[PostBrief]) -> dict:
+  """Pick whichever category is least represented in the current available pool,
+  steering discovery toward filling gaps instead of reinforcing the existing cluster."""
+  categories = load_categories()
+  counts = {c["id"]: 0 for c in categories}
+  for topic in available:
+    cat_id = categorize(topic.tags, categories)
+    if cat_id:
+      counts[cat_id] += 1
+  return min(categories, key=lambda c: counts[c["id"]])
+
+
+def discover_and_replenish_topics(category_id: str | None = None) -> dict:
+  """Discover trending topics via web search, filter duplicates, and persist survivors
+  to the topic pool. Used by both the automatic threshold check and the manual endpoint."""
+  topics = _load_daily_topics()
+  categories = load_categories()
+  if category_id:
+    category = next((c for c in categories if c["id"] == category_id), None)
+    if category is None:
+      raise HTTPException(status_code=404, detail=f"Category '{category_id}' not found")
+  else:
+    category = _pick_understocked_category(topics)
+
+  raw_candidates = blog_generator.discover_trending_topics(category, existing_topics=topics)
+  validated = [v for c in raw_candidates if (v := _validate_candidate(c)) is not None]
+  existing_dicts = [t.model_dump() for t in topics]
+  accepted = [c for c in validated if not _is_duplicate_candidate(c, existing_dicts)]
+
+  created = create_topics(accepted) if accepted else []
+  filtered = len(raw_candidates) - len(created)
+  log.info(
+    "Topic discovery (category=%s): %d candidates, %d filtered, %d added",
+    category["id"], len(raw_candidates), filtered, len(created),
+  )
+  if not created:
+    log.warning("Topic discovery for category '%s' added 0 topics this cycle", category["id"])
+  return {"category": category["id"], "candidates": len(raw_candidates), "filtered": filtered, "added": len(created)}
 
 
 def _get_used_topic_ids() -> set[str]:
@@ -164,6 +242,17 @@ def generate_daily_drafts() -> dict:
   topics = _load_daily_topics()
   used = _get_used_topic_ids()
   available = [t for t in topics if t.id not in used]
+
+  if len(available) < POOL_MIN_THRESHOLD:
+    log.info("Topic pool low (%d available, threshold %d) — running automatic discovery", len(available), POOL_MIN_THRESHOLD)
+    result = discover_and_replenish_topics()
+    if result["added"] == 0:
+      log.warning("Automatic replenishment added 0 topics; proceeding with %d available", len(available))
+    topics = _load_daily_topics()
+    available = [t for t in topics if t.id not in used]
+    if not available:
+      log.error("Topic pool exhausted and replenishment failed — skipping today's generation")
+
   chosen = random.sample(available, min(DAILY_COUNT, len(available)))
   generated = 0
   for topic in chosen:
@@ -194,7 +283,7 @@ def get_draft(draft_id: str):
 
 
 @router.post("/generate", status_code=201)
-def trigger_daily_generation(_: None = Depends(_get_require_admin)):
+def trigger_daily_generation(_: None = Depends(_get_require_admin())):
   """Manually trigger daily draft generation (also called by the scheduler)."""
   return generate_daily_drafts()
 
@@ -215,13 +304,13 @@ def generate_single_topic(topic_id: str) -> DraftOut:
 
 
 @router.post("/generate/{topic_id}", status_code=201, response_model=DraftOut)
-def generate_from_topic(topic_id: str, _: None = Depends(_get_require_admin)):
+def generate_from_topic(topic_id: str, _: None = Depends(_get_require_admin())):
   """Generate a draft from a specific topic by ID."""
   return generate_single_topic(topic_id)
 
 
 @router.patch("/{draft_id}", response_model=DraftOut)
-def patch_draft(draft_id: str, body: DraftPatch, _: None = Depends(_get_require_admin)):
+def patch_draft(draft_id: str, body: DraftPatch, _: None = Depends(_get_require_admin())):
   """Edit a draft's title, summary, content, or tags before approving."""
   with get_conn() as conn:
     row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
@@ -245,7 +334,7 @@ def patch_draft(draft_id: str, body: DraftPatch, _: None = Depends(_get_require_
 
 
 @router.post("/{draft_id}/approve", status_code=201)
-def approve_draft(draft_id: str, _: None = Depends(_get_require_admin)):
+def approve_draft(draft_id: str, _: None = Depends(_get_require_admin())):
   """Publish a draft to the live blog. Returns the published post slug."""
   with get_conn() as conn:
     row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
@@ -287,12 +376,12 @@ def approve_draft(draft_id: str, _: None = Depends(_get_require_admin)):
 
 
 @router.post("/{draft_id}/regenerate", response_model=DraftOut)
-def regenerate_draft(draft_id: str, body: RegenerateIn, _: None = Depends(_get_require_admin)):
+def regenerate_draft(draft_id: str, body: RegenerateIn, _: None = Depends(_get_require_admin())):
   return _regenerate_draft(draft_id, body.remarks)
 
 
 @router.post("/{draft_id}/validate", response_model=ValidationSummary)
-def validate_draft_code(draft_id: str, _: None = Depends(_get_require_admin)):
+def validate_draft_code(draft_id: str, _: None = Depends(_get_require_admin())):
   with get_conn() as conn:
     row = conn.execute("SELECT content FROM drafts WHERE id = ?", (draft_id,)).fetchone()
   if row is None:
@@ -301,7 +390,7 @@ def validate_draft_code(draft_id: str, _: None = Depends(_get_require_admin)):
 
 
 @router.delete("/{draft_id}", status_code=204)
-def delete_draft(draft_id: str, _: None = Depends(_get_require_admin)):
+def delete_draft(draft_id: str, _: None = Depends(_get_require_admin())):
   with get_conn() as conn:
     result = conn.execute("DELETE FROM drafts WHERE id = ?", (draft_id,))
   if result.rowcount == 0:

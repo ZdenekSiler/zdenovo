@@ -22,12 +22,12 @@ def _make_mock_client(post_data: dict = None):
   return mock_client
 
 
-def test_generate_saves_to_drafts(client, monkeypatch):
+def test_generate_saves_to_drafts(admin_client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
   mock_client = _make_mock_client()
   with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
-    resp = client.post(
+    resp = admin_client.post(
       "/api/posts/generate",
       json={"description": "A practical intro to Python type hints and why they matter"},
     )
@@ -46,18 +46,18 @@ def test_generate_saves_to_drafts(client, monkeypatch):
   assert data["id"]
 
   # Saved to drafts, not posts
-  drafts = client.get("/api/drafts").json()
+  drafts = admin_client.get("/api/drafts").json()
   assert any(d["slug"] == "python-type-hints-explained" for d in drafts)
-  posts = client.get("/api/posts").json()
+  posts = admin_client.get("/api/posts").json()
   assert not any(p["slug"] == "python-type-hints-explained" for p in posts)
 
 
-def test_generate_with_tag_hints(client, monkeypatch):
+def test_generate_with_tag_hints(admin_client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
   mock_client = _make_mock_client()
   with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
-    resp = client.post(
+    resp = admin_client.post(
       "/api/posts/generate",
       json={
         "description": "A practical intro to Python type hints and why they matter",
@@ -72,10 +72,10 @@ def test_generate_with_tag_hints(client, monkeypatch):
   assert "mypy" in user_content
 
 
-def test_generate_missing_api_key(client, monkeypatch):
+def test_generate_missing_api_key(admin_client, monkeypatch):
   monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
-  resp = client.post(
+  resp = admin_client.post(
     "/api/posts/generate",
     json={"description": "A practical intro to Python type hints and why they matter"},
   )
@@ -84,7 +84,7 @@ def test_generate_missing_api_key(client, monkeypatch):
   assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
 
 
-def test_generate_claude_api_error(client, monkeypatch):
+def test_generate_claude_api_error(admin_client, monkeypatch):
   import anthropic as anthropic_lib
 
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
@@ -94,7 +94,7 @@ def test_generate_claude_api_error(client, monkeypatch):
     "rate limit", response=MagicMock(status_code=429), body={}
   )
   with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
-    resp = client.post(
+    resp = admin_client.post(
       "/api/posts/generate",
       json={"description": "A practical intro to Python type hints and why they matter"},
     )
@@ -102,7 +102,7 @@ def test_generate_claude_api_error(client, monkeypatch):
   assert resp.status_code == 502
 
 
-def test_generate_no_tool_block_returns_422(client, monkeypatch):
+def test_generate_no_tool_block_returns_422(admin_client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
   text_block = MagicMock()
@@ -113,7 +113,7 @@ def test_generate_no_tool_block_returns_422(client, monkeypatch):
   mock_client.messages.create.return_value = mock_message
 
   with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
-    resp = client.post(
+    resp = admin_client.post(
       "/api/posts/generate",
       json={"description": "A practical intro to Python type hints and why they matter"},
     )
@@ -121,12 +121,22 @@ def test_generate_no_tool_block_returns_422(client, monkeypatch):
   assert resp.status_code == 422
 
 
-def test_generate_description_too_short(client, monkeypatch):
+def test_generate_description_too_short(admin_client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
-  resp = client.post("/api/posts/generate", json={"description": "short"})
+  resp = admin_client.post("/api/posts/generate", json={"description": "short"})
 
   assert resp.status_code == 422
+
+
+def test_generate_post_requires_admin(client, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  resp = client.post(
+    "/api/posts/generate",
+    json={"description": "A practical intro to Python type hints and why they matter"},
+    follow_redirects=False,
+  )
+  assert resp.status_code == 303
 
 
 # ─── Brief routes ─────────────────────────────────────────────────────────────
@@ -156,12 +166,12 @@ def test_list_briefs_claude_code_entry_exists(client):
   assert "claude-code-repo-best-practices" in ids
 
 
-def test_generate_from_brief_saves_to_drafts(client, monkeypatch):
+def test_generate_from_brief_saves_to_drafts(admin_client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
   mock_client = _make_mock_client()
   with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
-    resp = client.post("/api/posts/generate/claude-code-repo-best-practices")
+    resp = admin_client.post("/api/posts/generate/claude-code-repo-best-practices")
 
   assert resp.status_code == 201
   data = resp.json()
@@ -173,18 +183,18 @@ def test_generate_from_brief_saves_to_drafts(client, monkeypatch):
   assert data["id"]
 
   # Saved to drafts, not posts
-  drafts = client.get("/api/drafts").json()
+  drafts = admin_client.get("/api/drafts").json()
   assert any(d["id"] == data["id"] for d in drafts)
-  posts = client.get("/api/posts").json()
+  posts = admin_client.get("/api/posts").json()
   assert not any(p["slug"] == data["slug"] for p in posts)
 
 
-def test_generate_from_brief_builds_rich_prompt(client, monkeypatch):
+def test_generate_from_brief_builds_rich_prompt(admin_client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
   mock_client = _make_mock_client()
   with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
-    client.post("/api/posts/generate/claude-code-repo-best-practices")
+    admin_client.post("/api/posts/generate/claude-code-repo-best-practices")
 
   generation_call = mock_client.messages.create.call_args_list[0]
   user_content = generation_call.kwargs["messages"][0]["content"]
@@ -194,10 +204,10 @@ def test_generate_from_brief_builds_rich_prompt(client, monkeypatch):
   assert "Required sections" in user_content
 
 
-def test_generate_from_brief_not_found(client, monkeypatch):
+def test_generate_from_brief_not_found(admin_client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
-  resp = client.post("/api/posts/generate/nonexistent-brief-id")
+  resp = admin_client.post("/api/posts/generate/nonexistent-brief-id")
 
   assert resp.status_code == 404
   assert "nonexistent-brief-id" in resp.json()["detail"]
@@ -205,13 +215,13 @@ def test_generate_from_brief_not_found(client, monkeypatch):
 
 # ─── Existing-posts corpus (inline cross-post linking) ─────────────────────────
 
-def test_generate_prompt_includes_existing_posts_corpus(client, monkeypatch):
+def test_generate_prompt_includes_existing_posts_corpus(admin_client, monkeypatch):
   """The seeded posts should be listed in the prompt so Claude can link to them inline."""
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
   mock_client = _make_mock_client()
   with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
-    client.post(
+    admin_client.post(
       "/api/posts/generate",
       json={"description": "A practical intro to Python type hints and why they matter"},
     )
@@ -222,7 +232,7 @@ def test_generate_prompt_includes_existing_posts_corpus(client, monkeypatch):
   assert "htmx-is-enough" in user_content
 
 
-def test_generate_prompt_omits_existing_posts_tag_when_no_posts(client, monkeypatch):
+def test_generate_prompt_omits_existing_posts_tag_when_no_posts(admin_client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
   import db
   with db.get_conn() as conn:
@@ -230,7 +240,7 @@ def test_generate_prompt_omits_existing_posts_tag_when_no_posts(client, monkeypa
 
   mock_client = _make_mock_client()
   with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
-    client.post(
+    admin_client.post(
       "/api/posts/generate",
       json={"description": "A practical intro to Python type hints and why they matter"},
     )

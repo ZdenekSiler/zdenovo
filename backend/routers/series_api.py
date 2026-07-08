@@ -66,7 +66,7 @@ def list_series() -> list[SeriesOut]:
 
 
 @router.post("", response_model=SeriesOut, status_code=201)
-def create_series(body: SeriesIn, _: None = Depends(_get_require_admin)) -> SeriesOut:
+def create_series(body: SeriesIn, _: None = Depends(_get_require_admin())) -> SeriesOut:
     """Create a new series (admin only)."""
     series_id = _slugify(body.title)
     with get_conn() as conn:
@@ -90,7 +90,7 @@ def create_series(body: SeriesIn, _: None = Depends(_get_require_admin)) -> Seri
 
 
 @router.delete("/{series_id}", status_code=204)
-def delete_series(series_id: str, _: None = Depends(_get_require_admin)) -> None:
+def delete_series(series_id: str, _: None = Depends(_get_require_admin())) -> None:
     """Delete a series and clear it from any referencing posts (admin only)."""
     with get_conn() as conn:
         result = conn.execute("DELETE FROM series WHERE id = ?", (series_id,))

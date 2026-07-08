@@ -20,24 +20,24 @@ def test_list_comments_empty_for_unknown_slug(client):
   assert resp.json() == []
 
 
-def test_list_comments_returns_existing_comments_oldest_first(client):
-  _insert_comment(client, body="First")
-  _insert_comment(client, body="Second")
-  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+def test_list_comments_returns_existing_comments_oldest_first(admin_client):
+  _insert_comment(admin_client, body="First")
+  _insert_comment(admin_client, body="Second")
+  comments = admin_client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
   assert len(comments) == 2
   assert comments[0]["body"] == "First"
   assert comments[1]["body"] == "Second"
 
 
-# ─── Create ───────────────────────────────────────────────────────────────────
+# ─── Create (admin only) ──────────────────────────────────────────────────────
 
-def test_create_comment_returns_201(client):
-  resp = client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": "Nice!"})
+def test_create_comment_returns_201(admin_client):
+  resp = admin_client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": "Nice!"})
   assert resp.status_code == 201
 
 
-def test_create_comment_has_expected_fields(client):
-  resp = client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": "Nice!"})
+def test_create_comment_has_expected_fields(admin_client):
+  resp = admin_client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": "Nice!"})
   data = resp.json()
   assert data["author"] == "Bob"
   assert data["body"] == "Nice!"
@@ -46,58 +46,65 @@ def test_create_comment_has_expected_fields(client):
   assert data["created_at"]
 
 
-def test_create_comment_post_not_found_returns_404(client):
-  resp = client.post("/api/comments", json={"post_slug": "no-such-post", "author": "Bob", "body": "Nice!"})
+def test_create_comment_post_not_found_returns_404(admin_client):
+  resp = admin_client.post("/api/comments", json={"post_slug": "no-such-post", "author": "Bob", "body": "Nice!"})
   assert resp.status_code == 404
 
 
-def test_create_comment_empty_author_returns_422(client):
-  resp = client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "", "body": "Nice!"})
+def test_create_comment_empty_author_returns_422(admin_client):
+  resp = admin_client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "", "body": "Nice!"})
   assert resp.status_code == 422
 
 
-def test_create_comment_empty_body_returns_422(client):
-  resp = client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": ""})
+def test_create_comment_empty_body_returns_422(admin_client):
+  resp = admin_client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": ""})
   assert resp.status_code == 422
 
 
-def test_create_comment_author_too_long_returns_422(client):
-  resp = client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "x" * 81, "body": "Nice!"})
+def test_create_comment_author_too_long_returns_422(admin_client):
+  resp = admin_client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "x" * 81, "body": "Nice!"})
   assert resp.status_code == 422
 
 
-def test_create_comment_appears_in_list(client):
-  _insert_comment(client, author="Carol", body="Hello!")
-  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+def test_create_comment_appears_in_list(admin_client):
+  _insert_comment(admin_client, author="Carol", body="Hello!")
+  comments = admin_client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
   assert any(c["author"] == "Carol" for c in comments)
 
 
-# ─── Delete ───────────────────────────────────────────────────────────────────
+def test_create_comment_requires_admin(client):
+  resp = client.post(
+    "/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": "Nice!"}, follow_redirects=False
+  )
+  assert resp.status_code == 303
 
-def test_delete_comment_returns_204(client):
-  comment_id = _insert_comment(client)
-  resp = client.delete(f"/api/comments/{comment_id}")
+
+# ─── Delete (admin only) ──────────────────────────────────────────────────────
+
+def test_delete_comment_returns_204(admin_client):
+  comment_id = _insert_comment(admin_client)
+  resp = admin_client.delete(f"/api/comments/{comment_id}")
   assert resp.status_code == 204
 
 
-def test_delete_comment_removes_it(client):
-  comment_id = _insert_comment(client)
-  client.delete(f"/api/comments/{comment_id}")
-  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+def test_delete_comment_removes_it(admin_client):
+  comment_id = _insert_comment(admin_client)
+  admin_client.delete(f"/api/comments/{comment_id}")
+  comments = admin_client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
   assert not any(c["id"] == comment_id for c in comments)
 
 
-def test_delete_comment_not_found_returns_404(client):
-  resp = client.delete("/api/comments/nonexistent-id")
+def test_delete_comment_not_found_returns_404(admin_client):
+  resp = admin_client.delete("/api/comments/nonexistent-id")
   assert resp.status_code == 404
 
 
 # ─── Cascade delete ───────────────────────────────────────────────────────────
 
-def test_delete_post_also_deletes_its_comments(client):
-  _insert_comment(client)
-  client.delete(f"/api/posts/{SEED_SLUG}")
-  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+def test_delete_post_also_deletes_its_comments(admin_client):
+  _insert_comment(admin_client)
+  admin_client.delete(f"/api/posts/{SEED_SLUG}")
+  comments = admin_client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
   assert comments == []
 
 
@@ -131,25 +138,25 @@ def test_comment_form_submit_returns_partial(client):
 
 # ─── is_generated flag ──────────────────────────────────────────────────────
 
-def test_create_comment_is_generated_defaults_to_false(client):
-  resp = client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": "Nice!"})
+def test_create_comment_is_generated_defaults_to_false(admin_client):
+  resp = admin_client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": "Nice!"})
   assert resp.json()["is_generated"] is False
 
 
-def test_comment_out_includes_is_generated_field(client):
-  _insert_comment(client)
-  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+def test_comment_out_includes_is_generated_field(admin_client):
+  _insert_comment(admin_client)
+  comments = admin_client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
   assert "is_generated" in comments[0]
   assert comments[0]["is_generated"] is False
 
 
-def test_public_post_does_not_show_generated_flag(client):
-  _insert_comment(client)
-  resp = client.get(f"/blog/{SEED_SLUG}")
+def test_public_post_does_not_show_generated_flag(admin_client):
+  _insert_comment(admin_client)
+  resp = admin_client.get(f"/blog/{SEED_SLUG}")
   assert b"AI" not in resp.content or b"is_generated" not in resp.content
 
 
-# ─── Generate endpoint ───────────────────────────────────────────────────────
+# ─── Generate endpoint (admin only) ─────────────────────────────────────────
 
 def _mock_comment_response():
   """Return a mock Anthropic message with a write_comments tool_use block."""
@@ -170,7 +177,7 @@ def _mock_comment_response():
   return msg
 
 
-def test_generate_comments_returns_201(client, monkeypatch):
+def test_generate_comments_returns_201(admin_client, monkeypatch):
   from unittest.mock import MagicMock
   from routers.comments_api import comment_generator
   mock_client = MagicMock()
@@ -178,16 +185,16 @@ def test_generate_comments_returns_201(client, monkeypatch):
   comment_generator._client = mock_client
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
-  resp = client.post(f"/api/comments/generate?post_slug={SEED_SLUG}")
+  resp = admin_client.post(f"/api/comments/generate?post_slug={SEED_SLUG}")
   assert resp.status_code == 201
 
 
-def test_generate_comments_post_not_found_returns_404(client):
-  resp = client.post("/api/comments/generate?post_slug=nonexistent")
+def test_generate_comments_post_not_found_returns_404(admin_client):
+  resp = admin_client.post("/api/comments/generate?post_slug=nonexistent")
   assert resp.status_code == 404
 
 
-def test_generate_comments_inserts_with_is_generated_true(client, monkeypatch):
+def test_generate_comments_inserts_with_is_generated_true(admin_client, monkeypatch):
   from unittest.mock import MagicMock
   from routers.comments_api import comment_generator
   mock_client = MagicMock()
@@ -195,8 +202,8 @@ def test_generate_comments_inserts_with_is_generated_true(client, monkeypatch):
   comment_generator._client = mock_client
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
-  client.post(f"/api/comments/generate?post_slug={SEED_SLUG}")
-  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+  admin_client.post(f"/api/comments/generate?post_slug={SEED_SLUG}")
+  comments = admin_client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
   generated = [c for c in comments if c["is_generated"]]
   assert len(generated) == 1
   assert generated[0]["author"] == "Mika"
@@ -330,66 +337,66 @@ def _insert_generated_comment(slug: str = SEED_SLUG) -> str:
 
 # ─── Status field ────────────────────────────────────────────────────────────
 
-def test_real_comment_has_status_published(client):
-  resp = client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": "Nice!"})
+def test_real_comment_has_status_published(admin_client):
+  resp = admin_client.post("/api/comments", json={"post_slug": SEED_SLUG, "author": "Bob", "body": "Nice!"})
   assert resp.json()["status"] == "published"
 
 
-def test_comment_out_includes_status_field(client):
-  _insert_comment(client)
-  comments = client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
+def test_comment_out_includes_status_field(admin_client):
+  _insert_comment(admin_client)
+  comments = admin_client.get(f"/api/comments?post_slug={SEED_SLUG}").json()
   assert "status" in comments[0]
 
 
-# ─── Approve endpoint ───────────────────────────────────────────────────────
+# ─── Approve endpoint (admin only) ──────────────────────────────────────────
 
-def test_approve_comment_returns_200(client):
+def test_approve_comment_returns_200(admin_client):
   comment_id = _insert_generated_comment()
-  resp = client.patch(f"/api/comments/{comment_id}/approve")
+  resp = admin_client.patch(f"/api/comments/{comment_id}/approve")
   assert resp.status_code == 200
 
 
-def test_approve_comment_sets_status_approved(client):
+def test_approve_comment_sets_status_approved(admin_client):
   comment_id = _insert_generated_comment()
-  resp = client.patch(f"/api/comments/{comment_id}/approve")
+  resp = admin_client.patch(f"/api/comments/{comment_id}/approve")
   assert resp.json()["status"] == "approved"
 
 
-def test_approve_non_generated_returns_409(client):
-  comment_id = _insert_comment(client)
-  resp = client.patch(f"/api/comments/{comment_id}/approve")
+def test_approve_non_generated_returns_409(admin_client):
+  comment_id = _insert_comment(admin_client)
+  resp = admin_client.patch(f"/api/comments/{comment_id}/approve")
   assert resp.status_code == 409
 
 
-def test_approve_nonexistent_returns_404(client):
-  resp = client.patch("/api/comments/nonexistent-id/approve")
+def test_approve_nonexistent_returns_404(admin_client):
+  resp = admin_client.patch("/api/comments/nonexistent-id/approve")
   assert resp.status_code == 404
 
 
-# ─── Publish endpoint ───────────────────────────────────────────────────────
+# ─── Publish endpoint (admin only) ──────────────────────────────────────────
 
-def test_publish_comment_returns_200(client):
+def test_publish_comment_returns_200(admin_client):
   comment_id = _insert_generated_comment()
-  client.patch(f"/api/comments/{comment_id}/approve")
-  resp = client.patch(f"/api/comments/{comment_id}/publish")
+  admin_client.patch(f"/api/comments/{comment_id}/approve")
+  resp = admin_client.patch(f"/api/comments/{comment_id}/publish")
   assert resp.status_code == 200
 
 
-def test_publish_comment_sets_status_published(client):
+def test_publish_comment_sets_status_published(admin_client):
   comment_id = _insert_generated_comment()
-  client.patch(f"/api/comments/{comment_id}/approve")
-  resp = client.patch(f"/api/comments/{comment_id}/publish")
+  admin_client.patch(f"/api/comments/{comment_id}/approve")
+  resp = admin_client.patch(f"/api/comments/{comment_id}/publish")
   assert resp.json()["status"] == "published"
 
 
-def test_publish_non_approved_returns_409(client):
+def test_publish_non_approved_returns_409(admin_client):
   comment_id = _insert_generated_comment()
-  resp = client.patch(f"/api/comments/{comment_id}/publish")
+  resp = admin_client.patch(f"/api/comments/{comment_id}/publish")
   assert resp.status_code == 409
 
 
-def test_publish_nonexistent_returns_404(client):
-  resp = client.patch("/api/comments/nonexistent-id/publish")
+def test_publish_nonexistent_returns_404(admin_client):
+  resp = admin_client.patch("/api/comments/nonexistent-id/publish")
   assert resp.status_code == 404
 
 
@@ -416,15 +423,15 @@ def test_public_post_hides_approved_comments(client):
   assert b"Approved but not published" not in resp.content
 
 
-def test_public_post_shows_published_ai_comments(client):
+def test_public_post_shows_published_ai_comments(admin_client):
   comment_id = _insert_generated_comment()
-  client.patch(f"/api/comments/{comment_id}/approve")
-  client.patch(f"/api/comments/{comment_id}/publish")
-  resp = client.get(f"/blog/{SEED_SLUG}")
+  admin_client.patch(f"/api/comments/{comment_id}/approve")
+  admin_client.patch(f"/api/comments/{comment_id}/publish")
+  resp = admin_client.get(f"/blog/{SEED_SLUG}")
   assert b"Generated comment" in resp.content
 
 
-def test_public_post_always_shows_real_comments(client):
-  _insert_comment(client, body="Real human comment here")
-  resp = client.get(f"/blog/{SEED_SLUG}")
+def test_public_post_always_shows_real_comments(admin_client):
+  _insert_comment(admin_client, body="Real human comment here")
+  resp = admin_client.get(f"/blog/{SEED_SLUG}")
   assert b"Real human comment here" in resp.content

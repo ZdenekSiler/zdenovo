@@ -204,7 +204,7 @@ def list_comments(post_slug: str) -> list[dict]:
 
 
 @router.post("", response_model=CommentOut, status_code=201)
-def create_comment(body: CommentIn, _: None = Depends(_get_require_admin)) -> dict:
+def create_comment(body: CommentIn, _: None = Depends(_get_require_admin())) -> dict:
     """Create a comment on a post (admin only)."""
     with get_conn() as conn:
         post = conn.execute(
@@ -235,7 +235,7 @@ def create_comment(body: CommentIn, _: None = Depends(_get_require_admin)) -> di
 
 
 @router.post("/generate", status_code=201)
-def generate_fake_comments(post_slug: str, _: None = Depends(_get_require_admin)) -> list[dict]:
+def generate_fake_comments(post_slug: str, _: None = Depends(_get_require_admin())) -> list[dict]:
     """Generate 1-2 AI comments for a post (admin only)."""
     with get_conn() as conn:
         post = conn.execute(
@@ -249,7 +249,7 @@ def generate_fake_comments(post_slug: str, _: None = Depends(_get_require_admin)
 
 
 @router.delete("/{comment_id}", status_code=204)
-def delete_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> None:
+def delete_comment(comment_id: str, _: None = Depends(_get_require_admin())) -> None:
     """Delete a comment (admin only)."""
     with get_conn() as conn:
         result = conn.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
@@ -258,7 +258,7 @@ def delete_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> No
 
 
 @router.patch("/{comment_id}/approve", response_model=CommentOut)
-def approve_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> dict:
+def approve_comment(comment_id: str, _: None = Depends(_get_require_admin())) -> dict:
     """Approve a generated comment (admin only)."""
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
@@ -272,7 +272,7 @@ def approve_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> d
 
 
 @router.patch("/{comment_id}/publish", response_model=CommentOut)
-def publish_comment(comment_id: str, _: None = Depends(_get_require_admin)) -> dict:
+def publish_comment(comment_id: str, _: None = Depends(_get_require_admin())) -> dict:
     """Publish an approved comment (admin only)."""
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()

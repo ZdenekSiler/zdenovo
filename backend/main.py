@@ -29,7 +29,7 @@ load_dotenv()  # no-op if .env absent; prod uses file secrets
 from code_validator import validate_content
 from config import read_secret
 from data.analytics import refresh_popular_posts
-from data.posts import get_all_posts, get_all_tags, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, get_series_siblings, search_posts, total_pages
+from data.posts import get_all_posts, get_all_tags, get_category_counts, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, get_series_siblings, search_posts, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, deploy_row_to_dict, draft_row_to_dict, get_conn, init_db
 from middleware.csrf import CSRFMiddleware
@@ -38,7 +38,7 @@ from routers.drafts_api import _regenerate_draft, generate_daily_drafts, generat
 from routers.generate_api import router as generate_router
 from routers.posts_api import router as posts_router
 from routers.series_api import router as series_router
-from routers.topics_api import _enrich_topics, _load_topics, _save_topics, _slugify, router as topics_router
+from routers.topics_api import _enrich_topics, _load_topics, _save_topics, _slugify, category_balance, create_topics, router as topics_router
 from routers.auth import AdminRequired, _is_admin, require_admin, validate_redirect_url, verify_admin_password
 from routers.deploys_api import router as deploys_router
 from routers.seo import router as seo_router
@@ -418,9 +418,10 @@ async def admin_deploys(request: Request, _: None = Depends(require_admin)) -> s
 
 
 @app.get("/admin/posts", response_class=HTMLResponse)
-async def admin_posts(request: Request, _: None = Depends(require_admin)) -> str:
-    """Admin page listing all published posts."""
-    posts = get_all_posts()
+async def admin_posts(request: Request, category: str | None = None, _: None = Depends(require_admin)) -> str:
+    """Admin page listing all published posts, optionally filtered by category."""
+    from data.categories import load_categories
+    posts = get_all_posts(category=category)
     with get_conn() as conn:
         pending_count = conn.execute(
             "SELECT COUNT(*) FROM drafts WHERE status = 'pending'"
@@ -430,7 +431,44 @@ async def admin_posts(request: Request, _: None = Depends(require_admin)) -> str
         "posts": posts,
         "pending_count": pending_count,
         "comment_count": comment_count,
+        "category_counts": get_category_counts(),
+        "current_category": category,
+        "categories": load_categories(),
     })
+
+
+def _category_picker_html(slug: str, current: str | None) -> str:
+    """HTML for the inline category-picker <select> on /admin/posts (mirrors _ai_toggle_btn's
+    pattern of building a small swappable fragment for HTMX partial updates)."""
+    from data.categories import load_categories
+    options = [f'<option value=""{" selected" if current is None else ""}>Uncategorized</option>']
+    for c in load_categories():
+        selected = " selected" if c["id"] == current else ""
+        options.append(f'<option value="{c["id"]}"{selected}>{c["label"]}</option>')
+    return (
+        f'<select name="category" hx-post="/admin/posts/{slug}/category" '
+        f'hx-trigger="change" hx-target="this" hx-swap="outerHTML" '
+        f'class="category-picker text-[11px] bg-zinc-950 border border-zinc-800 rounded px-1.5 py-1 text-zinc-400">'
+        + "".join(options) +
+        "</select>"
+    )
+
+
+@app.post("/admin/posts/{slug}/category", response_class=HTMLResponse)
+async def admin_set_post_category(
+    request: Request, slug: str, category: str = Form(""), _: None = Depends(require_admin)
+) -> str:
+    """Set or clear a post's category from the admin inline picker."""
+    from data.categories import load_categories
+    value = category.strip() or None
+    if value is not None and value not in {c["id"] for c in load_categories()}:
+        raise HTTPException(status_code=422, detail=f"Unknown category '{value}'")
+    with get_conn() as conn:
+        row = conn.execute("SELECT slug FROM posts WHERE slug = ?", (slug,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Post not found")
+        conn.execute("UPDATE posts SET category = ? WHERE slug = ?", (value, slug))
+    return _category_picker_html(slug, value)
 
 
 @app.post("/api/posts/{slug}/toggle-ai-comments", response_class=HTMLResponse)
@@ -748,6 +786,14 @@ async def admin_topics(request: Request, _: None = Depends(require_admin)) -> st
     })
 
 
+@app.get("/admin/topics/categories", response_class=HTMLResponse)
+async def admin_topic_categories(request: Request, _: None = Depends(require_admin)) -> str:
+    """Category balance dashboard — shows how the topic pool is distributed across
+    the fixed discovery categories, so rotation balance is visible at a glance."""
+    categories = category_balance(_enrich_topics(_load_topics()))
+    return templates.TemplateResponse(request, "admin_topic_categories.html", {"categories": categories})
+
+
 @app.get("/admin/topics/new", response_class=HTMLResponse)
 async def admin_topic_new(request: Request, _: None = Depends(require_admin)) -> str:
     """New topic creation form."""
@@ -776,12 +822,7 @@ async def admin_topic_create(
     _: None = Depends(require_admin),
 ) -> RedirectResponse:
     """Create a new topic."""
-    topics = _load_topics()
-    topic_id = _slugify(title_hint)
-    if any(t["id"] == topic_id for t in topics):
-        topic_id = f"{topic_id}-{len(topics)}"
-    topic = {
-        "id": topic_id,
+    data = {
         "title_hint": title_hint.strip(),
         "description": description.strip(),
         "audience": audience.strip(),
@@ -789,8 +830,7 @@ async def admin_topic_create(
         "tags": [t.strip() for t in tags.split(",") if t.strip()],
         "outline": [line.strip() for line in outline.splitlines() if line.strip()],
     }
-    topics.append(topic)
-    _save_topics(topics)
+    create_topics([data])
     return RedirectResponse("/admin/topics", status_code=303)
 
 

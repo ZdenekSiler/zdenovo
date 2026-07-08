@@ -23,15 +23,24 @@ Where code goes and how modules depend on each other. For the descriptive refere
 - `db` is the foundation — every router and `data/` module may import it; it imports nothing internal.
 - `data.posts`, `data.projects` are read-only helpers for HTML routes — they don't import from `routers/`.
 - Router dependency direction is **one-way only**:
-  `routers/posts_api.py` → `routers/generate_api.py` → `routers/drafts_api.py`
+  `routers/posts_api.py` → `routers/generate_api.py` → `routers/drafts_api.py` → `routers/topics_api.py`
   - `generate_api` may import from `posts_api` (`PostOut`, `_slugify`)
-  - `drafts_api` may import from `generate_api` (`PostBrief`, `_build_brief_message`, `_call_claude`)
-  - `topics_api` and `comments_api` are standalone — they don't import from other routers
-  - `main.py` imports helpers from `topics_api` (`_load_topics`, `_save_topics`, `_slugify`)
-    for the admin HTML routes
-  - Never the reverse — this avoids circular imports. If a new module needs something from
-    a module "below" it in this chain, that's a sign the shared code belongs in `db.py` or
-    a new shared module instead.
+  - `drafts_api` may import from `generate_api` (`PostBrief`, `_build_brief_message`, `_call_claude`,
+    `blog_generator`) and from `topics_api` (`TopicIn`, `create_topics`, `_load_topics`) —
+    the latter is needed for topic-pool replenishment (`discover_and_replenish_topics()`)
+  - `topics_api` does NOT import from `drafts_api` at module level (that would be circular,
+    since `drafts_api` already imports from `topics_api`). Its `POST /api/topics/discover`
+    route needs `drafts_api.discover_and_replenish_topics()`, so it imports it lazily inside
+    the route function body — the same lazy-import-at-call-time pattern already used for
+    `_get_require_admin()`. This is a deliberate exception to "topics_api is standalone,"
+    not an accident — keep it lazy if you add more topics_api → drafts_api calls.
+  - `comments_api` is standalone — it doesn't import from other routers
+  - `main.py` imports helpers from `topics_api` (`_load_topics`, `_save_topics`, `_slugify`,
+    `create_topics`) for the admin HTML routes
+  - Otherwise, never the reverse — this avoids circular imports. If a new module needs
+    something from a module "below" it in this chain, that's a sign the shared code belongs
+    in `db.py` or a new shared module instead, unless it's a route-time-only call that can
+    use the lazy-import pattern above.
 
 ## API Conventions
 

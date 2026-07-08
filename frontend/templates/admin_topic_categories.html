@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Category Balance{% endblock %}
+
+{% block content %}
+<div class="mb-10">
+  <p class="section-heading">Admin</p>
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">Category Balance</h1>
+  <p class="text-sm text-zinc-500">
+    How the topic pool is spread across discovery categories — trending-topic discovery
+    steers toward whichever category is thinnest here.
+  </p>
+</div>
+
+<div class="mb-6">
+  <a href="/admin/topics" class="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors border border-indigo-500/30 rounded-lg px-3 py-1.5 hover:border-indigo-500/50">
+    ← Back to topics
+  </a>
+</div>
+
+<div class="space-y-4">
+  {% for c in categories %}
+  <div class="card">
+    <div class="flex items-center justify-between gap-3 flex-wrap mb-1">
+      <p class="text-sm font-semibold text-zinc-200">{{ c.label }}</p>
+      <div class="flex items-baseline gap-3 text-xs text-zinc-500">
+        <span><span class="text-emerald-400 font-semibold">{{ c.available }}</span> available</span>
+        <span>{{ c.used }} used</span>
+        <span>{{ c.total }} total</span>
+      </div>
+    </div>
+    {% if categories | map(attribute="available") | list | max > 0 %}
+    <div class="mt-2 mb-4 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+      <div class="h-full bg-indigo-500/70" style="width: {{ (c.available / (categories | map(attribute='available') | list | max)) * 100 }}%"></div>
+    </div>
+    {% endif %}
+
+    {% if c.topics %}
+    <div class="divide-y divide-zinc-800/60">
+      {% for t in c.topics %}
+      <div class="flex items-center justify-between gap-3 py-2 flex-wrap">
+        <div class="min-w-0">
+          <p class="text-xs text-zinc-300 truncate">{{ t.title_hint }}</p>
+          {% if t.tags %}
+          <div class="flex flex-wrap gap-1 mt-1">
+            {% for tag in t.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        <div class="shrink-0">
+          {% if t.status == 'available' %}
+          <span class="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Available</span>
+          {% elif t.status == 'draft_pending' %}
+          <a href="/admin/drafts/{{ t.draft_id }}" class="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors">Draft</a>
+          {% elif t.status == 'published' %}
+          <a href="/admin/drafts/{{ t.draft_id }}" class="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors">Published</a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-xs text-zinc-600 py-2">No topics in this category yet.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

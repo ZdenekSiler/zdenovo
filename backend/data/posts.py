@@ -2,6 +2,7 @@ import logging
 import math
 import re
 
+from data.categories import load_categories
 from db import get_conn, row_to_dict
 
 log = logging.getLogger(__name__)
@@ -9,9 +10,14 @@ log = logging.getLogger(__name__)
 PAGE_SIZE = 5
 
 
-def get_all_posts() -> list[dict]:
+def get_all_posts(category: str | None = None) -> list[dict]:
     with get_conn() as conn:
-        rows = conn.execute("SELECT * FROM posts ORDER BY date DESC").fetchall()
+        if category:
+            rows = conn.execute(
+                "SELECT * FROM posts WHERE category = ? ORDER BY date DESC", (category,)
+            ).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM posts ORDER BY date DESC").fetchall()
     return [row_to_dict(r) for r in rows]
 
 
@@ -55,6 +61,25 @@ def get_posts_page(page: int, tag: str | None = None) -> tuple[list[dict], int]:
 
 def total_pages(total: int) -> int:
     return max(1, math.ceil(total / PAGE_SIZE))
+
+
+def get_category_counts() -> list[dict]:
+    """Post counts per fixed category, for the public blog nav and admin filter row.
+    Returns categories in a fixed, stable order plus an 'Uncategorized' bucket only
+    when at least one post has no category."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT category, COUNT(*) as n FROM posts GROUP BY category"
+        ).fetchall()
+    counts = {row["category"]: row["n"] for row in rows}
+    result = [
+        {"id": c["id"], "label": c["label"], "count": counts.get(c["id"], 0)}
+        for c in load_categories()
+    ]
+    uncategorized_count = counts.get(None, 0)
+    if uncategorized_count:
+        result.append({"id": None, "label": "Uncategorized", "count": uncategorized_count})
+    return result
 
 
 def get_popular_posts(limit: int = 5) -> list[dict]:

@@ -18,6 +18,7 @@ zdenovo/
 │   │   ├── posts.py               # Read helpers used by HTML routes (pagination, tags)
 │   │   ├── projects.py            # Static project list for /projects
 │   │   ├── daily_topics.json      # Topics for the scheduled draft generator
+│   │   ├── topic_categories.json  # Fixed rotation categories for trending-topic discovery
 │   │   └── post_briefs.json       # On-demand generation briefs (/api/posts/briefs)
 │   ├── code_validator.py           # Code block extraction and syntax validation
 │   ├── routers/
@@ -135,6 +136,7 @@ to `/api/posts` or, for drafts, it's inserted directly by `drafts_api`).
 | `POST` | `/api/topics` | Create a topic (id auto-derived from title_hint) |
 | `PUT` | `/api/topics/{id}` | Replace a topic's fields |
 | `DELETE` | `/api/topics/{id}` | Delete a topic (204 No Content) |
+| `POST` | `/api/topics/discover` | Trigger trending-topic discovery for whichever category is least represented in the available pool (also runs automatically when the pool is low) |
 
 Request body (POST / PUT):
 
@@ -150,20 +152,28 @@ Request body (POST / PUT):
 ```
 
 Topics are stored in `data/daily_topics.json` (file-based, not in SQLite). The scheduler
-picks 3 random topics daily to generate drafts.
+samples `DAILY_COUNT` (1) random topic(s) daily to generate drafts, replenishing the
+pool via trending-topic discovery when it runs low (see "Draft Generation Pipeline" below).
 
 ## Draft Generation Pipeline
 
 1. **Scheduler** — `AsyncIOScheduler` (UTC) runs `generate_daily_drafts()` daily at 02:00,
    set up in `main.py`'s `lifespan`. The same function backs `POST /api/drafts/generate`.
-2. `generate_daily_drafts()` samples `DAILY_COUNT` topics from `data/daily_topics.json`
+2. `generate_daily_drafts()` checks the available (unused) topic pool in
+   `data/daily_topics.json`. If it's below `POOL_MIN_THRESHOLD` (5), it calls
+   `discover_and_replenish_topics()` first: picks the most under-represented of the 4
+   fixed categories in `data/topic_categories.json`, asks Claude (`discover_trending_topics()`,
+   Haiku + `web_search`) for 3-5 fresh candidates, filters out near-duplicates, and
+   persists survivors via `topics_api.create_topics()`. This also runs on demand via
+   `POST /api/topics/discover` or the "Discover trending topics" button on `/admin/topics`.
+3. It then samples `DAILY_COUNT` topic(s) from the (possibly replenished) pool
    (`PostBrief` model, shared with `generate_api`).
-3. Each topic is rendered to a prompt via `_build_brief_message()` and sent to Claude via
+4. Each topic is rendered to a prompt via `_build_brief_message()` and sent to Claude via
    `_call_claude()` (forced `write_post` tool use → `PostOut`).
-4. After review passes, `_find_sources()` uses Claude with `web_search` to find 3-5
+5. After review passes, `_find_sources()` uses Claude with `web_search` to find 3-5
    authoritative external references for the post topic.
-5. Results (including sources) are inserted into the `drafts` table with `status='pending'`.
-5. An admin reviews drafts at `/admin/drafts` / `/admin/drafts/{id}` and either
+6. Results (including sources) are inserted into the `drafts` table with `status='pending'`.
+7. An admin reviews drafts at `/admin/drafts` / `/admin/drafts/{id}` and either
    `POST /api/drafts/{id}/approve` (copies the row into `posts`, marks `status='approved'`)
    or `DELETE`s it.
 
@@ -213,6 +223,7 @@ real money; burn expensive model tokens only where quality demands it.
 | Blog post generation | `claude-sonnet-4-6` | Creative writing needs the strongest model — quality directly affects the published blog |
 | Slop review / scoring | `claude-haiku-4-5-20251001` | Classification task — Haiku is fast, cheap, and accurate enough for pass/fail judgments |
 | Source finding | `claude-haiku-4-5-20251001` | Web search + extraction — Haiku handles structured output well at 1/10th the cost |
+| Trending topic discovery | `claude-haiku-4-5-20251001` | Same cost profile as source finding; only invoked when the topic pool is low or via manual trigger — never on every generation cycle |
 
 **Cost reduction levers (in order of impact):**
 
@@ -220,12 +231,15 @@ real money; burn expensive model tokens only where quality demands it.
    biggest waste: regenerating posts on the same subject.
 2. **Prompt caching** — system prompts and tool definitions are cache-eligible (90% input
    discount on cache hits). Keep system prompts stable and front-loaded.
-3. **Use Haiku for all secondary tasks** — review, scoring, source search, classification.
-   Reserve Sonnet for the primary creative generation only.
+3. **Use Haiku for all secondary tasks** — review, scoring, source search, topic discovery,
+   classification. Reserve Sonnet for the primary creative generation only.
 4. **DAILY_COUNT = 1** — generate one draft per day, not three. Most drafts get rejected
    anyway; quality over quantity.
-5. **Generate only when the pool has available topics** — scheduler silently skips when all
-   topics are consumed.
+5. **Threshold-gated topic discovery** — the pool only replenishes itself (via a paid
+   `web_search` call) when the available count drops below `POOL_MIN_THRESHOLD`, and each
+   call requests a batch of candidates rather than one call per topic. Pool state (low,
+   exhausted, discovery added 0) is logged via `log.info`/`log.warning`/`log.error`, not
+   silently skipped.
 
 **Why not Ollama / local LLMs on the server?**
 

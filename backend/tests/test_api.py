@@ -52,121 +52,126 @@ def test_seed_post_has_image(client):
     assert r.json()["image"] is not None
 
 
-def test_create_post_with_image(client):
-    r = client.post("/api/posts", json={**_NEW_POST, "title": "Image Post", "image": "https://example.com/img.jpg"})
+def test_create_post_with_image(admin_client):
+    r = admin_client.post("/api/posts", json={**_NEW_POST, "title": "Image Post", "image": "https://example.com/img.jpg"})
     assert r.status_code == 201
     assert r.json()["image"] == "https://example.com/img.jpg"
 
 
-def test_create_post_without_image_defaults_null(client):
-    r = client.post("/api/posts", json=_NEW_POST)
+def test_create_post_without_image_defaults_null(admin_client):
+    r = admin_client.post("/api/posts", json=_NEW_POST)
     assert r.status_code == 201
     assert r.json()["image"] is None
 
 
-def test_update_post_sets_image(client):
-    client.post("/api/posts", json=_NEW_POST)
-    r = client.put("/api/posts/hello-world", json={**_NEW_POST, "image": "https://example.com/new.jpg"})
+def test_update_post_sets_image(admin_client):
+    admin_client.post("/api/posts", json=_NEW_POST)
+    r = admin_client.put("/api/posts/hello-world", json={**_NEW_POST, "image": "https://example.com/new.jpg"})
     assert r.status_code == 200
     assert r.json()["image"] == "https://example.com/new.jpg"
 
 
-def test_create_post_returns_201(client):
-    r = client.post("/api/posts", json=_NEW_POST)
+def test_create_post_returns_201(admin_client):
+    r = admin_client.post("/api/posts", json=_NEW_POST)
     assert r.status_code == 201
 
 
-def test_create_post_slug_derived_from_title(client):
-    r = client.post("/api/posts", json=_NEW_POST)
+def test_create_post_slug_derived_from_title(admin_client):
+    r = admin_client.post("/api/posts", json=_NEW_POST)
     assert r.json()["slug"] == "hello-world"
 
 
-def test_create_post_duplicate_returns_409(client):
-    client.post("/api/posts", json=_NEW_POST)
-    r = client.post("/api/posts", json=_NEW_POST)
+def test_create_post_duplicate_returns_409(admin_client):
+    admin_client.post("/api/posts", json=_NEW_POST)
+    r = admin_client.post("/api/posts", json=_NEW_POST)
     assert r.status_code == 409
 
 
-def test_create_post_missing_title_returns_422(client):
-    r = client.post("/api/posts", json={"summary": "x", "content": "x"})
+def test_create_post_missing_title_returns_422(admin_client):
+    r = admin_client.post("/api/posts", json={"summary": "x", "content": "x"})
     assert r.status_code == 422
+
+
+def test_create_post_requires_admin(client):
+    r = client.post("/api/posts", json=_NEW_POST, follow_redirects=False)
+    assert r.status_code == 303
 
 
 # ── PUT /api/posts/{slug} ─────────────────────────────────────────────────────
 
-def test_update_post_returns_200(client):
-    client.post("/api/posts", json=_NEW_POST)
-    r = client.put("/api/posts/hello-world", json={**_NEW_POST, "summary": "Updated."})
+def test_update_post_returns_200(admin_client):
+    admin_client.post("/api/posts", json=_NEW_POST)
+    r = admin_client.put("/api/posts/hello-world", json={**_NEW_POST, "summary": "Updated."})
     assert r.status_code == 200
     assert r.json()["summary"] == "Updated."
 
 
-def test_update_post_missing_returns_404(client):
-    r = client.put("/api/posts/no-such-post", json=_NEW_POST)
+def test_update_post_missing_returns_404(admin_client):
+    r = admin_client.put("/api/posts/no-such-post", json=_NEW_POST)
     assert r.status_code == 404
 
 
 # ── DELETE /api/posts/{slug} ──────────────────────────────────────────────────
 
-def test_delete_post_returns_204(client):
-    client.post("/api/posts", json=_NEW_POST)
-    r = client.delete("/api/posts/hello-world")
+def test_delete_post_returns_204(admin_client):
+    admin_client.post("/api/posts", json=_NEW_POST)
+    r = admin_client.delete("/api/posts/hello-world")
     assert r.status_code == 204
 
 
-def test_delete_post_removes_it(client):
-    client.post("/api/posts", json=_NEW_POST)
-    client.delete("/api/posts/hello-world")
-    r = client.get("/api/posts/hello-world")
+def test_delete_post_removes_it(admin_client):
+    admin_client.post("/api/posts", json=_NEW_POST)
+    admin_client.delete("/api/posts/hello-world")
+    r = admin_client.get("/api/posts/hello-world")
     assert r.status_code == 404
 
 
-def test_delete_post_missing_returns_404(client):
-    r = client.delete("/api/posts/no-such-post")
+def test_delete_post_missing_returns_404(admin_client):
+    r = admin_client.delete("/api/posts/no-such-post")
     assert r.status_code == 404
 
 
 # ── POST /api/posts/{slug}/unpublish ─────────────────────────────────────────
 
-def test_unpublish_returns_204(client):
-    client.post("/api/posts", json=_NEW_POST)
-    r = client.post("/api/posts/hello-world/unpublish")
+def test_unpublish_returns_204(admin_client):
+    admin_client.post("/api/posts", json=_NEW_POST)
+    r = admin_client.post("/api/posts/hello-world/unpublish")
     assert r.status_code == 204
 
 
-def test_unpublish_removes_from_posts(client):
-    client.post("/api/posts", json=_NEW_POST)
-    client.post("/api/posts/hello-world/unpublish")
-    r = client.get("/api/posts/hello-world")
+def test_unpublish_removes_from_posts(admin_client):
+    admin_client.post("/api/posts", json=_NEW_POST)
+    admin_client.post("/api/posts/hello-world/unpublish")
+    r = admin_client.get("/api/posts/hello-world")
     assert r.status_code == 404
 
 
-def test_unpublish_creates_pending_draft(client):
-    client.post("/api/posts", json=_NEW_POST)
-    client.post("/api/posts/hello-world/unpublish")
-    drafts = client.get("/api/drafts").json()
+def test_unpublish_creates_pending_draft(admin_client):
+    admin_client.post("/api/posts", json=_NEW_POST)
+    admin_client.post("/api/posts/hello-world/unpublish")
+    drafts = admin_client.get("/api/drafts").json()
     assert any(d["slug"] == "hello-world" and d["status"] == "pending" for d in drafts)
 
 
-def test_unpublish_preserves_title_and_content(client):
-    client.post("/api/posts", json=_NEW_POST)
-    client.post("/api/posts/hello-world/unpublish")
-    drafts = client.get("/api/drafts").json()
+def test_unpublish_preserves_title_and_content(admin_client):
+    admin_client.post("/api/posts", json=_NEW_POST)
+    admin_client.post("/api/posts/hello-world/unpublish")
+    drafts = admin_client.get("/api/drafts").json()
     draft = next(d for d in drafts if d["slug"] == "hello-world")
     assert draft["title"] == _NEW_POST["title"]
     assert draft["content"] == _NEW_POST["content"]
 
 
-def test_unpublish_removes_comments(client):
-    client.post("/api/posts", json=_NEW_POST)
-    client.post("/api/comments", json={"post_slug": "hello-world", "author": "X", "body": "hi"})
-    client.post("/api/posts/hello-world/unpublish")
-    comments = client.get("/api/comments?post_slug=hello-world").json()
+def test_unpublish_removes_comments(admin_client):
+    admin_client.post("/api/posts", json=_NEW_POST)
+    admin_client.post("/api/comments", json={"post_slug": "hello-world", "author": "X", "body": "hi"})
+    admin_client.post("/api/posts/hello-world/unpublish")
+    comments = admin_client.get("/api/comments?post_slug=hello-world").json()
     assert comments == []
 
 
-def test_unpublish_not_found_returns_404(client):
-    r = client.post("/api/posts/no-such-post/unpublish")
+def test_unpublish_not_found_returns_404(admin_client):
+    r = admin_client.post("/api/posts/no-such-post/unpublish")
     assert r.status_code == 404
 
 
@@ -264,3 +269,128 @@ def test_search_results_are_json_post_objects(client):
     assert "slug" in results[0]
     assert "title" in results[0]
     assert "date" in results[0]
+
+
+# ── PATCH /api/posts/{slug}/category ──────────────────────────────────────────
+
+def test_post_response_includes_category_field(client):
+    r = client.get("/api/posts/htmx-is-enough")
+    assert r.json()["category"] is None
+
+
+def test_assign_post_category_sets_category(admin_client):
+    r = admin_client.patch("/api/posts/htmx-is-enough/category", json={"category": "deploy-devops-war-stories"})
+    assert r.status_code == 204
+    assert admin_client.get("/api/posts/htmx-is-enough").json()["category"] == "deploy-devops-war-stories"
+
+
+def test_assign_post_category_clears_with_null(admin_client):
+    admin_client.patch("/api/posts/htmx-is-enough/category", json={"category": "deploy-devops-war-stories"})
+    r = admin_client.patch("/api/posts/htmx-is-enough/category", json={"category": None})
+    assert r.status_code == 204
+    assert admin_client.get("/api/posts/htmx-is-enough").json()["category"] is None
+
+
+def test_assign_post_category_missing_post_returns_404(admin_client):
+    r = admin_client.patch("/api/posts/no-such-post/category", json={"category": "python-backend"})
+    assert r.status_code == 404
+
+
+def test_assign_post_category_unknown_id_returns_422(admin_client):
+    r = admin_client.patch("/api/posts/htmx-is-enough/category", json={"category": "not-a-real-category"})
+    assert r.status_code == 422
+
+
+def test_assign_post_category_requires_admin(client):
+    r = client.patch(
+        "/api/posts/htmx-is-enough/category", json={"category": "python-backend"}, follow_redirects=False
+    )
+    assert r.status_code == 303
+
+
+# ── POST /api/posts/categorize-all ────────────────────────────────────────────
+
+def test_categorize_all_categorizes_seed_posts(admin_client):
+    resp = admin_client.post("/api/posts/categorize-all")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 3
+    assert data["categorized"] == 3
+    assert data["uncategorized"] == 0
+    posts = {p["slug"]: p["category"] for p in admin_client.get("/api/posts").json()}
+    assert posts["why-i-switched-to-type-hints"] == "python-backend"
+    assert posts["designing-with-subagents"] == "ai-agents-llm"
+    assert posts["htmx-is-enough"] == "deploy-devops-war-stories"
+
+
+def test_categorize_all_leaves_no_match_uncategorized(admin_client):
+    admin_client.post("/api/posts", json={**_NEW_POST, "title": "Woodworking Tips", "tags": ["woodworking"]})
+    resp = admin_client.post("/api/posts/categorize-all")
+    data = resp.json()
+    assert data["uncategorized"] == 1
+    assert admin_client.get("/api/posts/woodworking-tips").json()["category"] is None
+
+
+def test_categorize_all_never_overwrites_manual_assignment(admin_client):
+    admin_client.patch("/api/posts/htmx-is-enough/category", json={"category": "python-backend"})
+    admin_client.post("/api/posts/categorize-all")
+    assert admin_client.get("/api/posts/htmx-is-enough").json()["category"] == "python-backend"
+
+
+def test_categorize_all_is_idempotent(admin_client):
+    admin_client.post("/api/posts/categorize-all")
+    resp = admin_client.post("/api/posts/categorize-all")
+    data = resp.json()
+    assert data["categorized"] == 0
+    assert data["uncategorized"] == 0
+
+
+def test_categorize_all_requires_admin(client):
+    r = client.post("/api/posts/categorize-all", follow_redirects=False)
+    assert r.status_code == 303
+
+
+# ── /admin/posts category filter + inline picker ──────────────────────────────
+
+def test_admin_posts_shows_category_filter_pills(admin_client):
+    r = admin_client.get("/admin/posts")
+    assert r.status_code == 200
+    assert b"Categorize all" in r.content
+    assert b"category-picker" in r.content
+
+
+def test_admin_posts_filters_by_category(admin_client):
+    admin_client.patch("/api/posts/why-i-switched-to-type-hints/category", json={"category": "python-backend"})
+    r = admin_client.get("/admin/posts?category=python-backend")
+    html = r.content.decode()
+    assert "Type Hints" in html
+    assert "HTMX Is Enough" not in html
+
+
+def test_admin_set_post_category_sets_it(admin_client):
+    r = admin_client.post("/admin/posts/htmx-is-enough/category", data={"category": "deploy-devops-war-stories"})
+    assert r.status_code == 200
+    assert admin_client.get("/api/posts/htmx-is-enough").json()["category"] == "deploy-devops-war-stories"
+
+
+def test_admin_set_post_category_clears_with_blank(admin_client):
+    admin_client.post("/admin/posts/htmx-is-enough/category", data={"category": "deploy-devops-war-stories"})
+    admin_client.post("/admin/posts/htmx-is-enough/category", data={"category": ""})
+    assert admin_client.get("/api/posts/htmx-is-enough").json()["category"] is None
+
+
+def test_admin_set_post_category_missing_post_returns_404(admin_client):
+    r = admin_client.post("/admin/posts/no-such-post/category", data={"category": "python-backend"})
+    assert r.status_code == 404
+
+
+def test_admin_set_post_category_unknown_id_returns_422(admin_client):
+    r = admin_client.post("/admin/posts/htmx-is-enough/category", data={"category": "not-a-real-category"})
+    assert r.status_code == 422
+
+
+def test_admin_set_post_category_requires_admin(client):
+    r = client.post(
+        "/admin/posts/htmx-is-enough/category", data={"category": "python-backend"}, follow_redirects=False
+    )
+    assert r.status_code == 303

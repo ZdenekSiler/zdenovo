@@ -49,6 +49,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE posts ADD COLUMN series_id TEXT REFERENCES series(id)")
         if "series_order" not in cols:
             conn.execute("ALTER TABLE posts ADD COLUMN series_order INTEGER")
+        if "category" not in cols:
+            conn.execute("ALTER TABLE posts ADD COLUMN category TEXT")
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS drafts (
