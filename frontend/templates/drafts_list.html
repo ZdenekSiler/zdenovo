@@ -19,6 +19,12 @@
   </button>
 </div>
 
+<div class="mb-6 flex flex-wrap gap-1.5">
+  <a href="/admin/drafts?status=pending" class="tag-btn{% if current_status == 'pending' %} active{% endif %}">Pending ({{ status_counts.pending }})</a>
+  <a href="/admin/drafts?status=approved" class="tag-btn{% if current_status == 'approved' %} active{% endif %}">Approved ({{ status_counts.approved }})</a>
+  <a href="/admin/drafts?status=all" class="tag-btn{% if current_status == 'all' %} active{% endif %}">All ({{ status_counts.all }})</a>
+</div>
+
 {% if drafts %}
 <div class="space-y-3">
   {% for draft in drafts %}
@@ -29,8 +35,6 @@
         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-900/40 text-yellow-400 border border-yellow-800/50">pending</span>
         {% elif draft.status == 'approved' %}
         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-900/40 text-green-400 border border-green-800/50">approved</span>
-        {% else %}
-        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-zinc-800 text-zinc-500 border border-zinc-700">rejected</span>
         {% endif %}
         <span class="text-[10px] text-zinc-600">{{ draft.topic_id }}</span>
         {% if draft.quality_score is not none %}
@@ -83,8 +87,12 @@
 </div>
 {% else %}
 <div class="text-center py-16">
-  <p class="text-sm text-zinc-600 mb-4">No drafts yet.</p>
-  <p class="text-xs text-zinc-700">Click "Generate today's drafts" to create 3 posts from the topic pool.</p>
+  {% if current_status == 'pending' %}
+  <p class="text-sm text-zinc-600 mb-4">No pending drafts.</p>
+  <p class="text-xs text-zinc-700">Click "Generate today's drafts" to create one from the topic pool.</p>
+  {% else %}
+  <p class="text-sm text-zinc-600">No {{ current_status }} drafts.</p>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

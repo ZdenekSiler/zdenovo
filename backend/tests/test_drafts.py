@@ -208,6 +208,102 @@ def test_admin_drafts_page_returns_200(admin_client):
   assert b"Draft Posts" in resp.content
 
 
+# ─── data/drafts.py ────────────────────────────────────────────────────────────
+
+def test_get_drafts_no_filter_returns_all(admin_client, monkeypatch):
+  draft_id = _insert_draft(admin_client, monkeypatch)
+  admin_client.post(f"/api/drafts/{draft_id}/approve")
+  from data.drafts import get_drafts
+  assert len(get_drafts()) == 1
+
+
+def test_get_drafts_filtered_by_status(admin_client, monkeypatch):
+  draft_id = _insert_draft(admin_client, monkeypatch)
+  admin_client.post(f"/api/drafts/{draft_id}/approve")
+  from data.drafts import get_drafts
+  assert get_drafts("pending") == []
+  approved = get_drafts("approved")
+  assert len(approved) == 1
+  assert approved[0]["id"] == draft_id
+
+
+def test_get_draft_status_counts(admin_client, monkeypatch):
+  pending_id = _insert_draft(admin_client, monkeypatch)
+  approved_id = _insert_draft(admin_client, monkeypatch)
+  admin_client.post(f"/api/drafts/{approved_id}/approve")
+  from data.drafts import get_draft_status_counts
+  counts = get_draft_status_counts()
+  assert counts["pending"] == 1
+  assert counts["approved"] == 1
+  assert counts["all"] == 2
+
+
+def test_get_draft_status_counts_empty_db(client):
+  from data.drafts import get_draft_status_counts
+  counts = get_draft_status_counts()
+  assert counts == {"pending": 0, "approved": 0, "all": 0}
+
+
+# ─── /admin/drafts status filtering ───────────────────────────────────────────
+
+def test_admin_drafts_page_defaults_to_pending_only(admin_client, monkeypatch):
+  pending_id = _insert_draft(admin_client, monkeypatch)
+  approved_id = _insert_draft(admin_client, monkeypatch)
+  admin_client.post(f"/api/drafts/{approved_id}/approve")
+  resp = admin_client.get("/admin/drafts")
+  html = resp.content.decode()
+  assert f'id="draft-{pending_id}"' in html
+  assert f'id="draft-{approved_id}"' not in html
+  assert 'href="/admin/drafts?status=pending" class="tag-btn active"' in html
+
+
+def test_admin_drafts_page_status_all_shows_everything(admin_client, monkeypatch):
+  pending_id = _insert_draft(admin_client, monkeypatch)
+  approved_id = _insert_draft(admin_client, monkeypatch)
+  admin_client.post(f"/api/drafts/{approved_id}/approve")
+  resp = admin_client.get("/admin/drafts?status=all")
+  html = resp.content.decode()
+  assert f'id="draft-{pending_id}"' in html
+  assert f'id="draft-{approved_id}"' in html
+
+
+def test_admin_drafts_page_status_approved_filters(admin_client, monkeypatch):
+  pending_id = _insert_draft(admin_client, monkeypatch)
+  approved_id = _insert_draft(admin_client, monkeypatch)
+  admin_client.post(f"/api/drafts/{approved_id}/approve")
+  resp = admin_client.get("/admin/drafts?status=approved")
+  html = resp.content.decode()
+  assert f'id="draft-{approved_id}"' in html
+  assert f'id="draft-{pending_id}"' not in html
+
+
+def test_admin_drafts_page_shows_filter_pill_counts(admin_client, monkeypatch):
+  pending_id = _insert_draft(admin_client, monkeypatch)
+  approved_id = _insert_draft(admin_client, monkeypatch)
+  admin_client.post(f"/api/drafts/{approved_id}/approve")
+  resp = admin_client.get("/admin/drafts?status=all")
+  assert b"Pending (1)" in resp.content
+  assert b"Approved (1)" in resp.content
+  assert b"All (2)" in resp.content
+
+
+def test_admin_drafts_page_no_rejected_badge_rendered(admin_client, monkeypatch):
+  _insert_draft(admin_client, monkeypatch)
+  resp = admin_client.get("/admin/drafts?status=all")
+  assert b"rejected" not in resp.content
+
+
+def test_admin_drafts_page_empty_pending_shows_pending_message(admin_client):
+  resp = admin_client.get("/admin/drafts")
+  assert b"No pending drafts." in resp.content
+
+
+def test_admin_drafts_page_empty_approved_shows_generic_message(admin_client, monkeypatch):
+  _insert_draft(admin_client, monkeypatch)
+  resp = admin_client.get("/admin/drafts?status=approved")
+  assert b"No approved drafts." in resp.content
+
+
 def test_admin_draft_preview_returns_200(admin_client, monkeypatch):
   draft_id = _insert_draft(admin_client, monkeypatch)
   resp = admin_client.get(f"/admin/drafts/{draft_id}")

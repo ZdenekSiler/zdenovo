@@ -16,6 +16,7 @@ zdenovo/
 │   ├── db.py                     # SQLite connection, schema init, seed data, row_to_dict helpers
 │   ├── data/
 │   │   ├── posts.py               # Read helpers used by HTML routes (pagination, tags)
+│   │   ├── drafts.py              # Read helpers for the admin drafts page (status filter, counts)
 │   │   ├── projects.py            # Static project list for /projects
 │   │   ├── daily_topics.json      # Topics for the scheduled draft generator
 │   │   ├── topic_categories.json  # Fixed rotation categories for trending-topic discovery

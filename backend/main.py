@@ -29,6 +29,7 @@ load_dotenv()  # no-op if .env absent; prod uses file secrets
 from code_validator import validate_content
 from config import read_secret
 from data.analytics import refresh_popular_posts
+from data.drafts import get_draft_status_counts, get_drafts
 from data.posts import get_all_posts, get_all_tags, get_category_counts, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, get_series_siblings, search_posts, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, deploy_row_to_dict, draft_row_to_dict, get_conn, init_db
@@ -549,14 +550,18 @@ async def admin_series_delete(
 # ─── Admin Drafts ─────────────────────────────────────────────────────────────
 
 @app.get("/admin/drafts", response_class=HTMLResponse)
-async def admin_drafts(request: Request, _: None = Depends(require_admin)) -> str:
-    """List all drafts."""
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT * FROM drafts ORDER BY generated_at DESC"
-        ).fetchall()
-    drafts = [draft_row_to_dict(r) for r in rows]
-    return templates.TemplateResponse(request, "drafts_list.html", {"drafts": drafts})
+async def admin_drafts(
+    request: Request, status: str | None = None, _: None = Depends(require_admin)
+) -> str:
+    """List drafts, filtered by status. Defaults to pending-only (the actionable
+    review queue) when no ?status= is given; ?status=all shows everything."""
+    effective_status = status or "pending"
+    drafts = get_drafts(None if effective_status == "all" else effective_status)
+    return templates.TemplateResponse(request, "drafts_list.html", {
+        "drafts": drafts,
+        "status_counts": get_draft_status_counts(),
+        "current_status": effective_status,
+    })
 
 
 @app.get("/admin/drafts/{draft_id}", response_class=HTMLResponse)
