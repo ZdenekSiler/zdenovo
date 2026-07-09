@@ -273,7 +273,10 @@ class BlogGenerator:
     try:
       message = self._get_client().messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=2048,
+        # Up to 5 web searches inject their results into the output stream *and* the model
+        # must emit 3-5 full topic briefs afterward. 2048 was exhausted by the searches
+        # before the suggest_topics call, truncating it to empty input (stop_reason=max_tokens).
+        max_tokens=8192,
         system=[
           {"type": "text", "text": self._trending_topics_system_prompt, "cache_control": {"type": "ephemeral"}},
         ],
@@ -292,8 +295,13 @@ class BlogGenerator:
 
     tool_block = next((b for b in message.content if b.type == "tool_use" and b.name == "suggest_topics"), None)
     if tool_block is None:
+      log.warning("Topic discovery returned no suggest_topics tool call (stop_reason=%s)", message.stop_reason)
       return []
-    return tool_block.input.get("topics", [])
+    topics = tool_block.input.get("topics", [])
+    if not topics:
+      # Empty input usually means the tool call was truncated mid-JSON by the token limit.
+      log.warning("Topic discovery produced 0 topics (stop_reason=%s) — likely max_tokens truncation", message.stop_reason)
+    return topics
 
   def generate_with_review(self, user_message: str) -> tuple[PostOut, ReviewResult]:
     """Generate a post and review it. Retry up to MAX_GENERATION_ATTEMPTS, feeding review feedback into retries."""
