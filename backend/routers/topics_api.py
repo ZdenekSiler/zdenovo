@@ -106,6 +106,27 @@ def _enrich_topics(topics: list[dict]) -> list[dict]:
     return enriched
 
 
+def _format_generated_at(iso: str) -> str:
+    """Human-readable UTC timestamp for the admin topics list."""
+    try:
+        return datetime.fromisoformat(iso).strftime("%b %d, %Y %H:%M")
+    except ValueError:
+        return ""
+
+
+def list_topics_for_admin() -> list[dict]:
+    """Enriched topics for /admin/topics: newest-first, each carrying a human-readable
+    `generated` timestamp (when the topic entered the pool)."""
+    with get_conn() as conn:
+        rows = conn.execute("SELECT * FROM topics ORDER BY created_at DESC, rowid DESC").fetchall()
+    topics = []
+    for row in rows:
+        topic = topic_row_to_dict(row)
+        topic["generated"] = _format_generated_at(row["created_at"])
+        topics.append(topic)
+    return _enrich_topics(topics)
+
+
 def category_balance(topics: list[dict]) -> list[dict]:
     """Available/used/total topic counts *and* the topics themselves, per fixed discovery
     category, for the admin category-balance dashboard. Topics that don't match any

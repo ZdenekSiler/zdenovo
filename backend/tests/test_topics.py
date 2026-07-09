@@ -151,6 +151,46 @@ def test_admin_topics_discover_button_has_loading_and_result_feedback(admin, sam
     assert b"handleTopicDiscoverResult" in r.content
 
 
+# ─── Generated timestamp + newest-first ordering ─────────────────────────────
+
+def _seed_topics_with_dates(rows: list[tuple[str, str, str]]) -> None:
+    """rows = [(id, title_hint, created_at_iso), ...] — replaces the topics table."""
+    with db.get_conn() as conn:
+        conn.execute("DELETE FROM topics")
+        conn.executemany(
+            "INSERT INTO topics (id, title_hint, description, audience, tone, tags, outline, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            [(rid, title, "d", "a", "t", "[]", "[]", ts) for rid, title, ts in rows],
+        )
+
+
+def test_list_topics_for_admin_orders_newest_first(test_db):
+    from datetime import datetime, timedelta, timezone
+    from routers.topics_api import list_topics_for_admin
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    _seed_topics_with_dates([
+        ("old", "Old Topic", base.isoformat()),
+        ("new", "New Topic", (base + timedelta(days=5)).isoformat()),
+        ("mid", "Mid Topic", (base + timedelta(days=2)).isoformat()),
+    ])
+    result = list_topics_for_admin()
+    assert [t["id"] for t in result] == ["new", "mid", "old"]
+    assert result[0]["generated"] == "Jan 06, 2026 00:00"
+
+
+def test_admin_topics_page_shows_generated_column_newest_first(admin, test_db):
+    from datetime import datetime, timedelta, timezone
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    _seed_topics_with_dates([
+        ("aaa", "Alpha Topic", base.isoformat()),
+        ("zzz", "Zeta Topic", (base + timedelta(days=1)).isoformat()),
+    ])
+    body = admin.get("/admin/topics").content.decode()
+    assert "Generated" in body
+    # Newest (Zeta) is rendered above the oldest (Alpha)
+    assert body.index("Zeta Topic") < body.index("Alpha Topic")
+
+
 # ─── Category balance dashboard ──────────────────────────────────────────────
 
 def test_category_balance_counts_by_tag_overlap():

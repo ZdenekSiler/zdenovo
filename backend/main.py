@@ -39,7 +39,7 @@ from routers.drafts_api import _regenerate_draft, generate_daily_drafts, generat
 from routers.generate_api import router as generate_router
 from routers.posts_api import router as posts_router
 from routers.series_api import router as series_router
-from routers.topics_api import _enrich_topics, _load_topics, _save_topics, _slugify, category_balance, create_topics, router as topics_router
+from routers.topics_api import _enrich_topics, _load_topics, _save_topics, _slugify, category_balance, create_topics, list_topics_for_admin, router as topics_router
 from routers.auth import AdminRequired, _is_admin, require_admin, validate_redirect_url, verify_admin_password
 from routers.deploys_api import router as deploys_router
 from routers.seo import router as seo_router
@@ -783,7 +783,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str
 @app.get("/admin/topics", response_class=HTMLResponse)
 async def admin_topics(request: Request, _: None = Depends(require_admin)) -> str:
     """List all generation topics."""
-    topics = _enrich_topics(_load_topics())
+    topics = list_topics_for_admin()
     available_count = sum(1 for t in topics if t["status"] == "available")
     return templates.TemplateResponse(request, "admin_topics.html", {
         "topics": topics,

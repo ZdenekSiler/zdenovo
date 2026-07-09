@@ -47,6 +47,7 @@
         <th class="pb-2.5 pr-4 font-medium hidden md:table-cell">Audience</th>
         <th class="pb-2.5 pr-4 font-medium">Tags</th>
         <th class="pb-2.5 pr-4 font-medium hidden sm:table-cell">Outline</th>
+        <th class="pb-2.5 pr-4 font-medium hidden lg:table-cell whitespace-nowrap">Generated</th>
         <th class="pb-2.5 font-medium text-right">Actions</th>
       </tr>
     </thead>
@@ -70,6 +71,7 @@
           </div>
         </td>
         <td class="py-2.5 pr-4 text-zinc-500 hidden sm:table-cell">{{ t.outline | length }} items</td>
+        <td class="py-2.5 pr-4 text-zinc-500 hidden lg:table-cell whitespace-nowrap">{{ t.generated }}</td>
         <td class="py-2.5 text-right whitespace-nowrap">
           {% if t.status == 'available' %}
           <form method="post" action="/admin/topics/{{ t.id }}/generate" class="inline">
