@@ -92,6 +92,18 @@ def test_admin_topics_page_has_discover_button(admin, topics_file):
     assert b'hx-post="/api/topics/discover"' in r.content
 
 
+def test_admin_topics_discover_button_has_loading_and_result_feedback(admin, topics_file):
+    r = admin.get("/admin/topics")
+    assert r.status_code == 200
+    # Loading state: spinner indicator + button disabled during the ~30s call
+    assert b'id="discover-spinner"' in r.content
+    assert b'hx-indicator="#discover-spinner"' in r.content
+    assert b'hx-disabled-elt="this"' in r.content
+    # Result feedback: a live region the handler writes the added/filtered count into
+    assert b'id="discover-result"' in r.content
+    assert b"handleTopicDiscoverResult" in r.content
+
+
 # ─── Category balance dashboard ──────────────────────────────────────────────
 
 def test_category_balance_counts_by_tag_overlap():

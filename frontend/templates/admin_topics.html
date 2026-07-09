@@ -15,15 +15,27 @@
   <a href="/admin/topics/categories" class="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-colors border border-zinc-700 rounded-lg px-3 py-1.5 hover:border-zinc-600">
     Category balance
   </a>
-  <button
-    hx-post="/api/topics/discover"
-    hx-swap="none"
-    hx-on::after-request="window.location.reload()"
-    onclick="return confirm('Search for trending topics? This uses API credits.')"
-    class="btn-primary text-xs">
-    Discover trending topics
-  </button>
+  <div class="flex items-center gap-3">
+    <button
+      hx-post="/api/topics/discover"
+      hx-swap="none"
+      hx-indicator="#discover-spinner"
+      hx-disabled-elt="this"
+      hx-confirm="Search for trending topics? This uses API credits and takes ~30s."
+      hx-on::after-request="handleTopicDiscoverResult(event)"
+      class="btn-primary text-xs">
+      Discover trending topics
+    </button>
+    <div id="discover-spinner" class="htmx-indicator flex items-center gap-2 text-xs text-indigo-400">
+      <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      Searching the web with Claude — this takes ~30s...
+    </div>
+  </div>
 </div>
+<div id="discover-result" class="mb-6 -mt-2 text-xs" role="status" aria-live="polite"></div>
 
 {% if topics %}
 <div class="card overflow-x-auto">
@@ -89,4 +101,54 @@
   <p class="text-sm text-zinc-600">No topics yet. Add one to get started.</p>
 </div>
 {% endif %}
+
+<script>
+(function () {
+  function showResult(msg, tone) {
+    var el = document.getElementById("discover-result");
+    if (!el) return;
+    var colors = { ok: "text-emerald-400", warn: "text-amber-400", error: "text-red-400" };
+    el.textContent = msg;
+    el.className = "mb-6 -mt-2 text-xs " + (colors[tone] || colors.ok);
+  }
+
+  // Called by the Discover button's hx-on::after-request. On a successful add we stash the
+  // message and reload so the new rows show; when nothing is added there's nothing to reload.
+  window.handleTopicDiscoverResult = function (event) {
+    var xhr = event.detail.xhr;
+    if (!event.detail.successful) {
+      showResult("Discovery failed (HTTP " + (xhr ? xhr.status : "?") + "). Check server logs.", "error");
+      return;
+    }
+    var data = null;
+    try { data = JSON.parse(xhr.responseText); } catch (e) { /* fall through */ }
+    if (!data) {
+      showResult("Discovery ran but the response was unreadable.", "warn");
+      return;
+    }
+    if (data.added > 0) {
+      var msg = "Added " + data.added + " new topic" + (data.added === 1 ? "" : "s");
+      if (data.filtered > 0) {
+        msg += " (" + data.filtered + " filtered as duplicate" + (data.filtered === 1 ? "" : "s") + ")";
+      }
+      msg += " in “" + data.category + "”.";
+      sessionStorage.setItem("topicDiscoverFlash", JSON.stringify({ msg: msg, tone: "ok" }));
+      window.location.reload();
+    } else {
+      showResult(
+        "No new topics added — all " + (data.candidates || 0) + " candidate" +
+        ((data.candidates === 1) ? "" : "s") + " were already in the pool. Try again or add one manually.",
+        "warn"
+      );
+    }
+  };
+
+  // Drain a flash message stashed just before a reload.
+  var raw = sessionStorage.getItem("topicDiscoverFlash");
+  if (raw) {
+    sessionStorage.removeItem("topicDiscoverFlash");
+    try { var f = JSON.parse(raw); showResult(f.msg, f.tone); } catch (e) { /* ignore */ }
+  }
+})();
+</script>
 {% endblock %}
