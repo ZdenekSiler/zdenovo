@@ -101,6 +101,18 @@ def _pick_understocked_category(available: list[PostBrief]) -> dict:
   return min(categories, key=lambda c: counts[c["id"]])
 
 
+def _existing_subjects() -> list[dict]:
+  """Every subject already covered — current topics + generated drafts + published posts —
+  as {title_hint, tags} dicts, so trending-topic discovery never re-suggests one of them."""
+  subjects = [{"title_hint": t["title_hint"], "tags": t.get("tags", [])} for t in _load_topics()]
+  with get_conn() as conn:
+    draft_rows = conn.execute("SELECT title, tags FROM drafts").fetchall()
+    post_rows = conn.execute("SELECT title, tags FROM posts").fetchall()
+  subjects += [{"title_hint": r["title"], "tags": json.loads(r["tags"])} for r in draft_rows]
+  subjects += [{"title_hint": r["title"], "tags": json.loads(r["tags"])} for r in post_rows]
+  return subjects
+
+
 def discover_and_replenish_topics(category_id: str | None = None) -> dict:
   """Discover trending topics via web search, filter duplicates, and persist survivors
   to the topic pool. Used by both the automatic threshold check and the manual endpoint."""
@@ -115,7 +127,7 @@ def discover_and_replenish_topics(category_id: str | None = None) -> dict:
 
   raw_candidates = blog_generator.discover_trending_topics(category, existing_topics=topics)
   validated = [v for c in raw_candidates if (v := _validate_candidate(c)) is not None]
-  existing_dicts = [t.model_dump() for t in topics]
+  existing_dicts = _existing_subjects()
   accepted = [c for c in validated if not _is_duplicate_candidate(c, existing_dicts)]
 
   created = create_topics(accepted) if accepted else []

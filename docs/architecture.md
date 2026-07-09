@@ -18,7 +18,7 @@ zdenovo/
 │   │   ├── posts.py               # Read helpers used by HTML routes (pagination, tags)
 │   │   ├── drafts.py              # Read helpers for the admin drafts page (status filter, counts)
 │   │   ├── projects.py            # Static project list for /projects
-│   │   ├── daily_topics.json      # Topics for the scheduled draft generator
+│   │   ├── daily_topics.json      # One-time seed for the `topics` table (pool lives in SQLite)
 │   │   ├── topic_categories.json  # Fixed rotation categories for trending-topic discovery
 │   │   └── post_briefs.json       # On-demand generation briefs (/api/posts/briefs)
 │   ├── code_validator.py           # Code block extraction and syntax validation
@@ -152,7 +152,9 @@ Request body (POST / PUT):
 }
 ```
 
-Topics are stored in `data/daily_topics.json` (file-based, not in SQLite). The scheduler
+Topics are stored in the SQLite `topics` table (in the persistent `db_data` volume, so
+runtime-discovered topics survive deploys). `data/daily_topics.json` is a one-time **seed**
+(like `seed_posts.json`), imported by `init_db()` only into an empty table. The scheduler
 samples `DAILY_COUNT` (1) random topic(s) daily to generate drafts, replenishing the
 pool via trending-topic discovery when it runs low (see "Draft Generation Pipeline" below).
 
@@ -160,13 +162,16 @@ pool via trending-topic discovery when it runs low (see "Draft Generation Pipeli
 
 1. **Scheduler** — `AsyncIOScheduler` (UTC) runs `generate_daily_drafts()` daily at 02:00,
    set up in `main.py`'s `lifespan`. The same function backs `POST /api/drafts/generate`.
-2. `generate_daily_drafts()` checks the available (unused) topic pool in
-   `data/daily_topics.json`. If it's below `POOL_MIN_THRESHOLD` (5), it calls
+2. `generate_daily_drafts()` checks the available (unused) topic pool in the `topics`
+   table. If it's below `POOL_MIN_THRESHOLD` (5), it calls
    `discover_and_replenish_topics()` first: picks the most under-represented of the 4
    fixed categories in `data/topic_categories.json`, asks Claude (`discover_trending_topics()`,
-   Haiku + `web_search`) for 3-5 fresh candidates, filters out near-duplicates, and
-   persists survivors via `topics_api.create_topics()`. This also runs on demand via
-   `POST /api/topics/discover` or the "Discover trending topics" button on `/admin/topics`.
+   Haiku + `web_search`) for 3-5 fresh candidates, filters out near-duplicates —
+   deduplicating against the full surviving history via `_existing_subjects()` (current
+   topics + generated drafts + published posts), so a subject already covered is never
+   re-suggested even after a redeploy — and persists survivors via `topics_api.create_topics()`.
+   This also runs on demand via `POST /api/topics/discover` or the "Discover trending
+   topics" button on `/admin/topics`.
 3. It then samples `DAILY_COUNT` topic(s) from the (possibly replenished) pool
    (`PostBrief` model, shared with `generate_api`).
 4. Each topic is rendered to a prompt via `_build_brief_message()` and sent to Claude via
@@ -184,8 +189,10 @@ pool via trending-topic discovery when it runs low (see "Draft Generation Pipeli
 - **`posts`**: `slug` (PK), `title`, `date`, `summary`, `tags` (JSON array), `content`, `image`, `sources` (JSON array)
 - **`drafts`**: `id` (PK, UUID), `slug`, `title`, `date`, `summary`, `tags`, `content`,
   `image`, `generated_at`, `topic_id`, `status` (`pending` / `approved`), `sources` (JSON array)
-- **Seed**: three initial posts inserted from `seed_posts.json` on first startup if `posts`
-  is empty
+- **`topics`**: `id` (PK, slug), `title_hint`, `description`, `audience`, `tone`, `tags`
+  (JSON array), `outline` (JSON array), `created_at` — the daily-generation topic pool
+- **Seed**: three initial posts from `seed_posts.json` and the topic pool from
+  `data/daily_topics.json`, each inserted on first startup only if its table is empty
 - `blog.db` is gitignored — delete it to reset to seed data; `init_db()` also migrates
   existing databases (e.g. adding the `image` column)
 

@@ -1,16 +1,14 @@
 import json
 import re
-from pathlib import Path
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from data.categories import categorize, load_categories
-from db import get_conn
+from db import get_conn, topic_row_to_dict
 
 router = APIRouter(prefix="/api/topics", tags=["topics"])
-
-DAILY_TOPICS_PATH = Path(__file__).resolve().parent.parent / "data" / "daily_topics.json"
 
 
 # Import require_admin at usage time to avoid circular imports
@@ -39,11 +37,39 @@ class TopicOut(TopicIn):
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _load_topics() -> list[dict]:
-    return json.loads(DAILY_TOPICS_PATH.read_text())
+    """Return all topics as brief-shaped dicts (no `created_at`), in insertion order."""
+    with get_conn() as conn:
+        rows = conn.execute("SELECT * FROM topics ORDER BY rowid").fetchall()
+    return [topic_row_to_dict(r) for r in rows]
 
 
 def _save_topics(topics: list[dict]) -> None:
-    DAILY_TOPICS_PATH.write_text(json.dumps(topics, indent=2) + "\n")
+    """Full-table replace inside one transaction. Preserves each existing id's
+    `created_at`; new ids get the current UTC timestamp. Row order follows the list."""
+    with get_conn() as conn:
+        existing = {
+            row["id"]: row["created_at"]
+            for row in conn.execute("SELECT id, created_at FROM topics")
+        }
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute("DELETE FROM topics")
+        conn.executemany(
+            "INSERT INTO topics (id, title_hint, description, audience, tone, tags, outline, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            [
+                (
+                    t["id"],
+                    t["title_hint"],
+                    t["description"],
+                    t["audience"],
+                    t["tone"],
+                    json.dumps(t.get("tags", [])),
+                    json.dumps(t.get("outline", [])),
+                    existing.get(t["id"], now),
+                )
+                for t in topics
+            ],
+        )
 
 
 def _slugify(text: str) -> str:

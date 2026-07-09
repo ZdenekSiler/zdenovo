@@ -413,41 +413,81 @@ def _make_discovery_mock_client(topics: list[dict] = None):
   return mock_client
 
 
+def _seed_topics(topics: list[dict]) -> None:
+  """Replace the DB-seeded topic pool with a controlled set (insertion order preserved).
+
+  Topics now live in the SQLite `topics` table (not daily_topics.json), so tests seed the
+  table directly instead of monkeypatching a file path."""
+  from db import get_conn
+  with get_conn() as conn:
+    conn.execute("DELETE FROM topics")
+    conn.executemany(
+      "INSERT INTO topics (id, title_hint, description, audience, tone, tags, outline, created_at)"
+      " VALUES (?,?,?,?,?,?,?,?)",
+      [
+        (
+          t["id"], t["title_hint"], t.get("description", "d"), t.get("audience", "a"),
+          t.get("tone", "t"), _json.dumps(t.get("tags", [])), _json.dumps(t.get("outline", [])),
+          "2026-01-01T00:00:00+00:00",
+        )
+        for t in topics
+      ],
+    )
+
+
+def _insert_draft_row(title: str, tags: list[str], status: str = "pending") -> None:
+  """Insert a minimal draft row directly, to exercise cross-source discovery dedup."""
+  import uuid
+
+  from db import get_conn
+  with get_conn() as conn:
+    conn.execute(
+      "INSERT INTO drafts (id, slug, title, date, summary, tags, content, generated_at, topic_id, status)"
+      " VALUES (?,?,?,?,?,?,?,?,?,?)",
+      (
+        str(uuid.uuid4()), title.lower().replace(" ", "-"), title, "2026-01-01",
+        "summary", _json.dumps(tags), "content", "2026-01-01T00:00:00+00:00", "some-topic", status,
+      ),
+    )
+
+
+def _insert_post_row(title: str, tags: list[str]) -> None:
+  """Insert a minimal published post row directly, to exercise cross-source discovery dedup."""
+  from db import get_conn
+  with get_conn() as conn:
+    conn.execute(
+      "INSERT INTO posts (slug, title, date, summary, tags, content) VALUES (?,?,?,?,?,?)",
+      (title.lower().replace(" ", "-"), title, "2026-01-01", "summary", _json.dumps(tags), "content"),
+    )
+
+
 @pytest.fixture()
-def small_topics_file(tmp_path, monkeypatch):
+def small_topics(test_db):
   """A pool of 2 topics (below POOL_MIN_THRESHOLD=5) to exercise automatic discovery."""
   topics = [
-    {"id": "small-one", "title_hint": "Small Topic One", "description": "d", "audience": "a", "tone": "t", "tags": ["python"], "outline": []},
-    {"id": "small-two", "title_hint": "Small Topic Two", "description": "d", "audience": "a", "tone": "t", "tags": ["docker"], "outline": []},
+    {"id": "small-one", "title_hint": "Small Topic One", "tags": ["python"]},
+    {"id": "small-two", "title_hint": "Small Topic Two", "tags": ["docker"]},
   ]
-  path = tmp_path / "daily_topics.json"
-  path.write_text(_json.dumps(topics))
-  from routers import topics_api
-  monkeypatch.setattr(topics_api, "DAILY_TOPICS_PATH", path)
-  return path
+  _seed_topics(topics)
+  return topics
 
 
 @pytest.fixture()
-def healthy_topics_file(tmp_path, monkeypatch):
+def healthy_topics(test_db):
   """A pool of 6 topics (>= POOL_MIN_THRESHOLD=5) — discovery must NOT fire."""
   topics = [
-    {"id": f"healthy-{i}", "title_hint": f"Healthy Topic {i}", "description": "d", "audience": "a", "tone": "t", "tags": ["python"], "outline": []}
+    {"id": f"healthy-{i}", "title_hint": f"Healthy Topic {i}", "tags": ["python"]}
     for i in range(6)
   ]
-  path = tmp_path / "daily_topics.json"
-  path.write_text(_json.dumps(topics))
-  from routers import topics_api
-  monkeypatch.setattr(topics_api, "DAILY_TOPICS_PATH", path)
-  return path
+  _seed_topics(topics)
+  return topics
 
 
 @pytest.fixture()
-def empty_topics_file(tmp_path, monkeypatch):
-  path = tmp_path / "daily_topics.json"
-  path.write_text("[]")
-  from routers import topics_api
-  monkeypatch.setattr(topics_api, "DAILY_TOPICS_PATH", path)
-  return path
+def empty_topics(test_db):
+  """An empty topic pool."""
+  _seed_topics([])
+  return []
 
 
 def test_discover_trending_topics_returns_candidates(client, monkeypatch):
@@ -537,19 +577,22 @@ def test_validate_candidate_rejects_oversized_title():
   assert _validate_candidate(raw) is None
 
 
-def test_discover_and_replenish_topics_adds_valid_candidates(client, small_topics_file, monkeypatch):
+def test_discover_and_replenish_topics_adds_valid_candidates(client, small_topics, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
   mock_client = _make_discovery_mock_client()
   with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
     from routers.drafts_api import discover_and_replenish_topics
     result = discover_and_replenish_topics()
   assert result["added"] == 1
-  topics = _json.loads(small_topics_file.read_text())
+  from routers.topics_api import _load_topics
+  topics = _load_topics()
   assert len(topics) == 3
-  assert "source_note" not in topics[-1]
+  added = topics[-1]
+  assert added["title_hint"] == "Something New in Python 3.14"
+  assert "source_note" not in added
 
 
-def test_discover_and_replenish_topics_filters_duplicate(client, small_topics_file, monkeypatch):
+def test_discover_and_replenish_topics_filters_duplicate(client, small_topics, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
   mock_client = _make_discovery_mock_client(topics=[{
     "title_hint": "Small Topic One", "description": "d", "audience": "a", "tone": "t",
@@ -562,7 +605,7 @@ def test_discover_and_replenish_topics_filters_duplicate(client, small_topics_fi
   assert result["filtered"] == 1
 
 
-def test_discover_and_replenish_topics_reports_zero_on_api_failure(client, small_topics_file, monkeypatch):
+def test_discover_and_replenish_topics_reports_zero_on_api_failure(client, small_topics, monkeypatch):
   import anthropic as anthropic_lib
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
   mock_client = MagicMock()
@@ -577,7 +620,7 @@ def test_discover_and_replenish_topics_reports_zero_on_api_failure(client, small
   assert result["added"] == 0
 
 
-def test_generate_daily_drafts_triggers_discovery_when_pool_low(admin_client, small_topics_file, monkeypatch):
+def test_generate_daily_drafts_triggers_discovery_when_pool_low(admin_client, small_topics, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
   messages = [
     _tool_message("suggest_topics", {"topics": [{
@@ -595,11 +638,11 @@ def test_generate_daily_drafts_triggers_discovery_when_pool_low(admin_client, sm
     resp = admin_client.post("/api/drafts/generate")
   assert resp.status_code == 201
   assert resp.json()["generated"] == 1
-  topics = _json.loads(small_topics_file.read_text())
-  assert len(topics) == 3
+  from routers.topics_api import _load_topics
+  assert len(_load_topics()) == 3
 
 
-def test_generate_daily_drafts_skips_discovery_when_pool_healthy(admin_client, healthy_topics_file, monkeypatch):
+def test_generate_daily_drafts_skips_discovery_when_pool_healthy(admin_client, healthy_topics, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
   messages = [
     _tool_message("write_post", MOCK_POST_DATA),
@@ -615,7 +658,7 @@ def test_generate_daily_drafts_skips_discovery_when_pool_healthy(admin_client, h
   assert mock_client.messages.create.call_count == 3
 
 
-def test_generate_daily_drafts_degrades_gracefully_when_pool_exhausted(admin_client, empty_topics_file, monkeypatch):
+def test_generate_daily_drafts_degrades_gracefully_when_pool_exhausted(admin_client, empty_topics, monkeypatch):
   import anthropic as anthropic_lib
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
   mock_client = MagicMock()
@@ -626,3 +669,77 @@ def test_generate_daily_drafts_degrades_gracefully_when_pool_exhausted(admin_cli
     resp = admin_client.post("/api/drafts/generate")
   assert resp.status_code == 201
   assert resp.json()["generated"] == 0
+
+
+# ─── Cross-source discovery dedup ─────────────────────────────────────────────
+# discover_and_replenish_topics() dedups new candidates against the FULL covered
+# history — current topics + generated drafts + published posts — not just the pool.
+
+
+def _candidate(title_hint: str, tags: list[str]) -> dict:
+  return {
+    "title_hint": title_hint, "description": "d", "audience": "a", "tone": "t",
+    "tags": tags, "outline": [], "source_note": "found via search",
+  }
+
+
+def test_discovery_dedups_against_existing_topic(client, test_db, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  _seed_topics([{"id": "redis-caching", "title_hint": "Mastering Redis Caching Strategies", "tags": ["redis"]}])
+  # Candidate re-covers the existing topic (title word-overlap ratio 1.0).
+  mock_client = _make_discovery_mock_client(topics=[
+    _candidate("Mastering Redis Caching Strategies Deep Dive", ["nosql"]),
+  ])
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+    from routers.drafts_api import discover_and_replenish_topics
+    result = discover_and_replenish_topics()
+  assert result["added"] == 0
+  assert result["filtered"] == 1
+
+
+def test_discovery_dedups_against_existing_draft(client, test_db, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  # Pool topic is unrelated, so any filtering must come from the draft corpus.
+  _seed_topics([{"id": "bash-basics", "title_hint": "Bash Scripting Basics", "tags": ["bash"]}])
+  _insert_draft_row("GraphQL Federation at Scale", ["graphql"])
+  mock_client = _make_discovery_mock_client(topics=[
+    _candidate("GraphQL Federation at Scale Explained", ["api"]),
+  ])
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+    from routers.drafts_api import discover_and_replenish_topics
+    result = discover_and_replenish_topics()
+  assert result["added"] == 0
+  assert result["filtered"] == 1
+
+
+def test_discovery_dedups_against_published_post(client, test_db, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  # Pool topic is unrelated, so any filtering must come from the published-post corpus.
+  _seed_topics([{"id": "bash-basics", "title_hint": "Bash Scripting Basics", "tags": ["bash"]}])
+  _insert_post_row("Kubernetes Operators From Scratch", ["kubernetes"])
+  mock_client = _make_discovery_mock_client(topics=[
+    _candidate("Kubernetes Operators From Scratch Tutorial", ["ops"]),
+  ])
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+    from routers.drafts_api import discover_and_replenish_topics
+    result = discover_and_replenish_topics()
+  assert result["added"] == 0
+  assert result["filtered"] == 1
+
+
+def test_discovery_accepts_fresh_candidate_across_all_sources(client, test_db, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  _seed_topics([{"id": "redis-caching", "title_hint": "Mastering Redis Caching Strategies", "tags": ["redis"]}])
+  _insert_draft_row("GraphQL Federation at Scale", ["graphql"])
+  _insert_post_row("Kubernetes Operators From Scratch", ["kubernetes"])
+  # Unrelated to every existing topic, draft, and post → survives dedup.
+  mock_client = _make_discovery_mock_client(topics=[
+    _candidate("Why Rust Ownership Beats Garbage Collection", ["rust"]),
+  ])
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+    from routers.drafts_api import discover_and_replenish_topics
+    result = discover_and_replenish_topics()
+  assert result["added"] == 1
+  from routers.topics_api import _load_topics
+  titles = [t["title_hint"] for t in _load_topics()]
+  assert "Why Rust Ownership Beats Garbage Collection" in titles

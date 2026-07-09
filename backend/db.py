@@ -1,15 +1,22 @@
 import json
 import os
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 DB_PATH = Path(os.getenv("DB_DIR", str(Path(__file__).parent))) / "blog.db"
 SEED_PATH = Path(__file__).parent / "seed_posts.json"
+TOPICS_SEED_PATH = Path(__file__).parent / "data" / "daily_topics.json"
 
 
 def _load_seed() -> list[dict]:
     return json.loads(SEED_PATH.read_text(encoding="utf-8"))
+
+
+def _load_topics_seed() -> list[dict]:
+    """Seed rows for the topics table. daily_topics.json is no longer the live store —
+    it's a one-time seed (like seed_posts.json), imported only into an empty topics table."""
+    return json.loads(TOPICS_SEED_PATH.read_text(encoding="utf-8"))
 
 
 def get_conn() -> sqlite3.Connection:
@@ -123,6 +130,23 @@ def init_db() -> None:
             )
         """)
 
+        # ── topics table ───────────────────────────────────────────────────────
+        # The daily-generation topic pool. Lives in the persistent DB (db_data volume)
+        # so runtime-discovered topics survive container rebuilds, and so trending-topic
+        # discovery keeps its "already covered" memory across deploys.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS topics (
+                id          TEXT PRIMARY KEY,
+                title_hint  TEXT NOT NULL,
+                description TEXT NOT NULL,
+                audience    TEXT NOT NULL,
+                tone        TEXT NOT NULL,
+                tags        TEXT NOT NULL DEFAULT '[]',
+                outline     TEXT NOT NULL DEFAULT '[]',
+                created_at  TEXT NOT NULL
+            )
+        """)
+
         # ── FTS5 full-text search ──────────────────────────────────────────────
         conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
@@ -185,6 +209,27 @@ def init_db() -> None:
                 ],
             )
 
+        # Seed topics once from daily_topics.json. Keyed on an empty table so redeploys
+        # never reset the pool over runtime-discovered topics.
+        if conn.execute("SELECT COUNT(*) FROM topics").fetchone()[0] == 0:
+            now = datetime.now(timezone.utc).isoformat()
+            conn.executemany(
+                "INSERT INTO topics (id, title_hint, description, audience, tone, tags, outline, created_at) VALUES (?,?,?,?,?,?,?,?)",
+                [
+                    (
+                        t["id"],
+                        t["title_hint"],
+                        t["description"],
+                        t["audience"],
+                        t["tone"],
+                        json.dumps(t.get("tags", [])),
+                        json.dumps(t.get("outline", [])),
+                        now,
+                    )
+                    for t in _load_topics_seed()
+                ],
+            )
+
 
 def row_to_dict(row: sqlite3.Row) -> dict:
     d = dict(row)
@@ -219,4 +264,14 @@ def comment_row_to_dict(row: sqlite3.Row) -> dict:
 def deploy_row_to_dict(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["deployed_at"] = datetime.fromisoformat(d["deployed_at"])
+    return d
+
+
+def topic_row_to_dict(row: sqlite3.Row) -> dict:
+    """Brief-shaped topic dict (id + brief fields). Drops the non-brief `created_at`
+    column so callers can build a PostBrief(**topic) directly."""
+    d = dict(row)
+    d["tags"] = json.loads(d["tags"])
+    d["outline"] = json.loads(d["outline"])
+    d.pop("created_at", None)
     return d
