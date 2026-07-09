@@ -160,6 +160,27 @@ def test_home_sidebar_shows_profile_card(client):
     assert b"Most Popular" not in r.content
 
 
+# ── Admin pages are full-width (public right sidebar removed) ──────────────────
+
+def test_admin_topics_has_no_public_sidebar(admin_client):
+    r = admin_client.get("/admin/topics")
+    assert r.status_code == 200
+    assert b'id="terminal-widget"' not in r.content
+    assert b"Open to opportunities" not in r.content
+
+
+def test_admin_posts_has_no_public_sidebar(admin_client):
+    r = admin_client.get("/admin/posts")
+    assert r.status_code == 200
+    assert b'id="terminal-widget"' not in r.content
+
+
+def test_public_home_keeps_sidebar(client):
+    r = client.get("/")
+    assert b'id="terminal-widget"' in r.content
+    assert b"Open to opportunities" in r.content
+
+
 # ── About ─────────────────────────────────────────────────────────────────────
 
 def test_about_returns_200(client):

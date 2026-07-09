@@ -133,6 +133,7 @@
     </main>
 
     <!-- ── Right sidebar ── -->
+    {% block right_sidebar %}
     <aside class="w-64 shrink-0 hidden lg:block">
       <div class="sticky top-16 space-y-4">
       {% block sidebar %}
@@ -184,6 +185,7 @@
       {% endblock %}
       </div>
     </aside>
+    {% endblock %}
 
   </div>
 
