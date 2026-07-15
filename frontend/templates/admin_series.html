@@ -206,6 +206,26 @@
         {% endfor %}
       </ul>
       {% endif %}
+      {% if s.missing %}
+      <div class="mt-3 border-t border-zinc-800/60 pt-3">
+        <p class="text-[10px] text-amber-500/80 mb-2">Missing parts (failed or not yet generated):</p>
+        {% for m in s.missing %}
+        <div class="flex items-center gap-2 text-xs mb-1">
+          <span class="text-zinc-600 shrink-0">Part {{ m.order }}</span>
+          <span class="text-zinc-400 truncate flex-1">{{ m.title }}</span>
+          <button
+            hx-post="/api/series/{{ s.id }}/parts/{{ m.order }}/generate"
+            hx-swap="none"
+            hx-disabled-elt="this"
+            hx-on::after-request="this.textContent='generating…'; setTimeout(function(){ window.location.reload() }, 4000)"
+            class="btn-ghost text-[11px] text-amber-400 hover:text-amber-300 border-amber-900/40 shrink-0">
+            Generate
+          </button>
+        </div>
+        {% endfor %}
+        <p class="text-[10px] text-zinc-600 mt-1">Generates in the background (~1–2 min); refresh to see the draft.</p>
+      </div>
+      {% endif %}
     </div>
     <form action="/admin/series/{{ s.id }}/delete" method="post">
       <button type="submit" class="btn-ghost text-xs text-red-400 hover:text-red-300 border-red-900/40"

@@ -605,6 +605,48 @@ def generate_series(series_id: str, series_title: str, parts: list[SeriesPart]) 
       log.warning("Series %s: shared source search failed: %s", series_id, exc)
 
 
+def _existing_series_sources(series_id: str) -> str | None:
+  """Reuse a sibling's sources (published post or pending draft) so regenerating one part
+  costs no extra web search. Returns a JSON sources string, or None."""
+  with get_conn() as conn:
+    for table in ("posts", "drafts"):
+      row = conn.execute(
+        f"SELECT sources FROM {table} WHERE series_id = ? AND sources IS NOT NULL"
+        f" AND sources != '[]' LIMIT 1", (series_id,)
+      ).fetchone()
+      if row and row["sources"]:
+        return row["sources"]
+  return None
+
+
+def generate_series_part(series_id: str, series_title: str, parts: list[SeriesPart], part_number: int) -> None:
+  """(Re)generate a single series part from its stored brief — for filling a part that failed
+  to generate, without rebuilding the whole series. Reuses siblings' sources (no extra search)."""
+  target = next((p for p in parts if p.part_number == part_number), None)
+  if target is None:
+    log.warning("Series %s: part %d not in outline; nothing to generate", series_id, part_number)
+    return
+  try:
+    user_message = _build_series_part_message(series_title, target, parts)
+    post, review = blog_generator.generate_with_review(
+      user_message, max_attempts=SERIES_GENERATION_ATTEMPTS, series=True, with_sources=False,
+    )
+    with get_conn() as conn:
+      # Drop any existing pending draft for this slot so we don't create a duplicate.
+      conn.execute("DELETE FROM drafts WHERE series_id = ? AND series_order = ? AND status = 'pending'",
+                   (series_id, part_number))
+    _insert_draft(post, topic_id=f"series:{series_id}", review=review,
+                  series_id=series_id, series_order=part_number)
+    reuse = _existing_series_sources(series_id)
+    if reuse:
+      with get_conn() as conn:
+        conn.execute("UPDATE drafts SET sources = ? WHERE series_id = ? AND series_order = ? AND status = 'pending'",
+                     (reuse, series_id, part_number))
+    log.info("Series %s: regenerated part %d (%r)", series_id, part_number, post.slug)
+  except Exception as exc:
+    log.warning("Series %s: regenerating part %d failed: %s", series_id, part_number, exc)
+
+
 def _fetch_unsplash_image(query: str) -> str | None:
   access_key = read_secret("unsplash_access_key", "UNSPLASH_ACCESS_KEY")
   if not access_key:

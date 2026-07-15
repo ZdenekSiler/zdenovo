@@ -550,6 +550,14 @@ async def admin_series(request: Request, _: None = Depends(require_admin)) -> st
         ]
         parts.sort(key=lambda x: (x["order"] is None, x["order"] or 0))
         s["parts"] = parts
+        # Outline parts that have neither a published post nor a pending draft — offer to (re)generate.
+        present = {p["order"] for p in parts}
+        missing = []
+        if s.get("outline"):
+            for op in json.loads(s["outline"]).get("parts", []):
+                if op["part_number"] not in present:
+                    missing.append({"order": op["part_number"], "title": op["title"]})
+        s["missing"] = sorted(missing, key=lambda m: m["order"])
     from routers.series_api import load_series_types
     return templates.TemplateResponse(
         request, "admin_series.html", {"series": series, "series_types": load_series_types()}

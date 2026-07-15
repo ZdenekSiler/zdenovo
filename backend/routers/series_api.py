@@ -164,13 +164,16 @@ async def generate_series_route(
     )
 
     created_at = datetime.now(timezone.utc).isoformat()
+    # Persist the outline so a single part can be regenerated later (e.g. after a failure)
+    # without re-planning or rebuilding the whole series.
+    outline_json = json.dumps({"total": len(plan.parts), "parts": [p.model_dump() for p in plan.parts]})
     with get_conn() as conn:
         # Short, shareable id from the topic + spec type (e.g. "langchain-deep-dive"),
         # not the planner's verbose title — the title is kept for display.
         series_id = _unique_series_id(conn, f"{body.topic}-{series_type['id']}")
         conn.execute(
-            "INSERT INTO series (id, title, description, created_at) VALUES (?,?,?,?)",
-            (series_id, plan.series_title, plan.series_description, created_at),
+            "INSERT INTO series (id, title, description, created_at, outline) VALUES (?,?,?,?,?)",
+            (series_id, plan.series_title, plan.series_description, created_at, outline_json),
         )
 
     # Fire-and-forget: parts generate off the event loop and land in /admin/drafts as they finish.
@@ -211,6 +214,28 @@ def series_progress(series_id: str, _: None = Depends(_get_require_admin())) -> 
     ]
     parts.sort(key=lambda x: (x.series_order is None, x.series_order or 0))
     return SeriesProgressOut(series_id=series_id, parts=parts)
+
+
+@router.post("/{series_id}/parts/{part_number}/generate", status_code=202)
+async def generate_series_part_route(
+    series_id: str, part_number: int, _: None = Depends(_get_require_admin())
+) -> dict:
+    """(Re)generate a single part from the series' stored outline, in the background — for
+    filling a part that failed to generate, without rebuilding the whole series (admin only)."""
+    from routers.generate_api import SeriesPart, generate_series_part
+
+    with get_conn() as conn:
+        row = conn.execute("SELECT title, outline FROM series WHERE id = ?", (series_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Series not found")
+    if not row["outline"]:
+        raise HTTPException(status_code=400, detail="This series has no stored outline; regenerate the whole series.")
+    parts = [SeriesPart(**p) for p in json.loads(row["outline"]).get("parts", [])]
+    if not any(p.part_number == part_number for p in parts):
+        raise HTTPException(status_code=404, detail=f"Part {part_number} is not in this series' outline")
+
+    asyncio.create_task(asyncio.to_thread(generate_series_part, series_id, row["title"], parts, part_number))
+    return {"series_id": series_id, "part_number": part_number, "status": "generating"}
 
 
 @router.delete("/{series_id}", status_code=204)

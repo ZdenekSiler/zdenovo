@@ -266,6 +266,65 @@ def test_series_progress_requires_admin(client):
   assert r.status_code == 303
 
 
+def _seed_series_with_outline(series_id: str, total: int) -> None:
+  import db
+  parts = [{"part_number": i, "title": f"P{i}", "angle": "a", "key_points": ["x"], "suggested_tags": ["t"]}
+           for i in range(1, total + 1)]
+  with db.get_conn() as conn:
+    conn.execute(
+      "INSERT INTO series (id, title, description, created_at, outline) VALUES (?,?,?,?,?)",
+      (series_id, series_id.upper(), "d", "2026-07-15",
+       json.dumps({"total": total, "parts": parts})),
+    )
+
+
+def test_generate_series_stores_outline(admin_client, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=_mock_client(PLAN_DATA)), \
+       patch("routers.generate_api.generate_series"):
+    resp = admin_client.post("/api/series/generate", json={"topic": "LangChain", "series_type": "deep-dive", "parts": 3})
+  sid = resp.json()["series_id"]
+  import db
+  with db.get_conn() as conn:
+    row = conn.execute("SELECT outline FROM series WHERE id = ?", (sid,)).fetchone()
+  outline = json.loads(row["outline"])
+  assert outline["total"] == 3 and len(outline["parts"]) == 3
+
+
+def test_generate_part_creates_draft_from_outline(test_db, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  from routers.generate_api import SeriesPart, generate_series_part
+  _seed_series_with_outline("s1", 2)
+  parts = [SeriesPart(part_number=i, title=f"P{i}", angle="a", key_points=["x"], suggested_tags=["t"]) for i in (1, 2)]
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=_mock_client_usage(POST_DATA)):
+    generate_series_part("s1", "S1", parts, 2)
+  import db
+  with db.get_conn() as conn:
+    rows = conn.execute("SELECT series_order, status FROM drafts WHERE series_id = 's1'").fetchall()
+  assert any(r["series_order"] == 2 and r["status"] == "pending" for r in rows)
+
+
+def test_generate_part_endpoint_202(admin_client):
+  _seed_series_with_outline("s3", 2)
+  with patch("routers.generate_api.generate_series_part"):
+    r = admin_client.post("/api/series/s3/parts/2/generate")
+  assert r.status_code == 202
+  assert r.json()["part_number"] == 2
+
+
+def test_generate_part_endpoint_unknown_series_404(admin_client):
+  assert admin_client.post("/api/series/nope/parts/1/generate").status_code == 404
+
+
+def test_generate_part_endpoint_unknown_part_404(admin_client):
+  _seed_series_with_outline("s4", 1)
+  assert admin_client.post("/api/series/s4/parts/9/generate").status_code == 404
+
+
+def test_generate_part_endpoint_requires_admin(client):
+  assert client.post("/api/series/x/parts/1/generate", follow_redirects=False).status_code == 303
+
+
 def test_generate_series_endpoint_rejects_unknown_type(admin_client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
   resp = admin_client.post(

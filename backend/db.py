@@ -126,6 +126,10 @@ def init_db() -> None:
                 created_at  TEXT NOT NULL
             )
         """)
+        series_cols = {row[1] for row in conn.execute("PRAGMA table_info(series)")}
+        # The planned outline (JSON: total + per-part briefs) so any part can be regenerated later.
+        if "outline" not in series_cols:
+            conn.execute("ALTER TABLE series ADD COLUMN outline TEXT")
 
         # ── api_costs table (one row per Claude call, for cost tracking) ─────────
         conn.execute("""
