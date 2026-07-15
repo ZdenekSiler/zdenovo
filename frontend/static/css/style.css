@@ -670,6 +670,39 @@ pre[class*="language-"] {
 /* ─── Series nav strip ─── */
 .series-nav { font-size: 0.8125rem; }
 
+/* ─── Series ("chapter") posts — a distinct look from standalone posts ─── */
+.series-band {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.875rem;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.25);
+}
+.series-band-part {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  white-space: nowrap;
+}
+.series-band-title { font-size: 0.8125rem; font-weight: 600; color: #c7d2fe; text-decoration: none; }
+.series-band-title:hover { color: #a5b4fc; }
+/* Chapter reading treatment: roomier lines, and section headers get an indigo accent
+   bar instead of the standalone posts' top hairline rule. */
+.series-post .prose-custom { line-height: 1.9; }
+.series-post .prose-custom h2 {
+  border-top: none;
+  padding-top: 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid #6366f1;
+}
+
 /* ─── Mobile bottom nav ─── */
 .bottom-nav-tab {
   display: flex;
@@ -781,6 +814,14 @@ html.light .tldr-card {
   border-color: #c7d2fe;
 }
 html.light .tldr-card p { color: #374151 !important; }
+html.light .series-band { border-bottom-color: rgba(99, 102, 241, 0.3); }
+html.light .series-band-part {
+  color: #4f46e5;
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.35);
+}
+html.light .series-band-title { color: #4f46e5; }
+html.light .series-post .prose-custom h2 { border-left-color: #6366f1; }
 html.light .tldr-label { color: #4f46e5; }
 
 /* ── Sidebar ── */

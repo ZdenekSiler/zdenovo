@@ -65,8 +65,19 @@
 
 {% block content %}
 <div id="toc-mobile" class="mb-6 lg:hidden"></div>
-<article>
+<article{% if post.series_id %} class="series-post"{% endif %}>
   <header class="mb-10">
+    {% if post.series_id and series_position %}
+    <div class="series-band">
+      <span class="series-band-part">Part {{ series_position }}{% if series_posts %} / {{ series_posts | length }}{% endif %}</span>
+      {% if series_title %}
+      <a href="/series/{{ post.series_id }}"
+         hx-get="/series/{{ post.series_id }}" hx-target="#main-content" hx-select="#main-content"
+         hx-push-url="true" hx-swap="innerHTML" hx-indicator="#htmx-indicator"
+         class="series-band-title">{{ series_title }}</a>
+      {% endif %}
+    </div>
+    {% endif %}
     <a href="/blog"
        hx-get="/blog"
        hx-target="#main-content"

@@ -551,3 +551,23 @@ def test_post_page_series_strip_links_to_series_page(admin_client):
     r = admin_client.get("/blog/rust-part-1")
     assert r.status_code == 200
     assert b'href="/series/learning-rust"' in r.content
+
+
+def test_series_post_has_distinct_chapter_look(admin_client):
+    _make_series_with_parts(admin_client)
+    r = admin_client.get("/blog/rust-part-1")
+    assert r.status_code == 200
+    # series posts get the chapter band + modifier class; standalone posts don't
+    assert b'class="series-post"' in r.content
+    assert b'series-band' in r.content
+    assert b'series-band-part' in r.content
+
+
+def test_standalone_post_has_no_chapter_look(admin_client):
+    admin_client.post("/api/posts", json={
+        "title": "Solo Post", "summary": "Standalone.", "tags": ["x"], "content": "Body here.",
+    })
+    r = admin_client.get("/blog/solo-post")
+    assert r.status_code == 200
+    assert b'series-band' not in r.content
+    assert b'class="series-post"' not in r.content

@@ -152,6 +152,32 @@ def test_generate_series_derives_short_id_from_topic_and_type(admin_client, monk
   assert resp.json()["series_id"] == "langchain-deep-dive"
 
 
+def test_series_parts_use_the_series_prompt_and_tool(test_db, monkeypatch):
+  # Series parts are written with the distinct chapter prompt (no Mermaid, chapter structure),
+  # not the standalone blog_system prompt.
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  from routers.generate_api import blog_generator
+  mock = _mock_client(POST_DATA)
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock):
+    blog_generator.generate_post("Write part 2.", series=True)
+  kwargs = mock.messages.create.call_args.kwargs
+  system_text = kwargs["system"][0]["text"]
+  assert "series" in system_text.lower() and "Key takeaways" in system_text
+  # the distinct tool's content spec forbids Mermaid
+  content_desc = kwargs["tools"][0]["input_schema"]["properties"]["content"]["description"]
+  assert "Mermaid" in content_desc
+
+
+def test_standalone_posts_use_the_default_prompt(test_db, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  from routers.generate_api import blog_generator
+  mock = _mock_client(POST_DATA)
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock):
+    blog_generator.generate_post("Write a one-off post.", series=False)
+  system_text = mock.messages.create.call_args.kwargs["system"][0]["text"]
+  assert "war stories" in system_text.lower()  # the standalone voice prompt
+
+
 def test_series_progress_reports_pending_and_published_parts(admin_client):
   import db
   now = datetime.now(timezone.utc).isoformat()

@@ -117,6 +117,8 @@ class BlogGenerator:
     self._trending_topics_tool: dict = {}
     self._series_plan_system_prompt = ""
     self._series_plan_tool: dict = {}
+    self._series_system_prompt = ""
+    self._series_post_tool: dict = {}
 
   def _ensure_prompts(self) -> None:
     if self._prompts_loaded:
@@ -131,6 +133,8 @@ class BlogGenerator:
     self._trending_topics_tool = json.loads((PROMPTS_DIR / "trending_topics_tool.json").read_text(encoding="utf-8"))
     self._series_plan_system_prompt = (PROMPTS_DIR / "series_plan_system.md").read_text(encoding="utf-8")
     self._series_plan_tool = json.loads((PROMPTS_DIR / "series_plan_tool.json").read_text(encoding="utf-8"))
+    self._series_system_prompt = (PROMPTS_DIR / "blog_series_system.md").read_text(encoding="utf-8")
+    self._series_post_tool = json.loads((PROMPTS_DIR / "blog_series_tool.json").read_text(encoding="utf-8"))
     self._prompts_loaded = True
 
   def _get_client(self) -> anthropic.Anthropic:
@@ -151,15 +155,19 @@ class BlogGenerator:
       label, usage.input_tokens, usage.output_tokens, cache_read, cache_create,
     )
 
-  def generate_post(self, user_message: str) -> PostOut:
+  def generate_post(self, user_message: str, series: bool = False) -> PostOut:
     self._ensure_prompts()
+    # Series parts use a distinct system prompt + tool (chapter structure, no Mermaid,
+    # comparison-only tables) so they read differently from standalone posts.
+    base_prompt = self._series_system_prompt if series else self._system_prompt
+    post_tool = self._series_post_tool if series else self._post_tool
     # The existing-posts corpus is identical across every generation within a run (it's the
     # published `posts` table, unchanged while drafts accumulate). Sending it as its own
     # cached system block — rather than appending it to the per-call user message — lets
     # back-to-back generations (e.g. the parts of a series) reuse it at the ~90% cache
     # discount instead of paying full price on every call and retry.
     system_blocks = [
-      {"type": "text", "text": self._system_prompt, "cache_control": {"type": "ephemeral"}},
+      {"type": "text", "text": base_prompt, "cache_control": {"type": "ephemeral"}},
     ]
     corpus = _project_corpus_for_prompt()
     if corpus:
@@ -177,7 +185,7 @@ class BlogGenerator:
         model="claude-sonnet-4-6",
         max_tokens=8192,
         system=system_blocks,
-        tools=[{**self._post_tool, "cache_control": {"type": "ephemeral"}}],
+        tools=[{**post_tool, "cache_control": {"type": "ephemeral"}}],
         tool_choice={"type": "tool", "name": "write_post"},
         messages=[{"role": "user", "content": user_message}],
       )
@@ -337,14 +345,14 @@ class BlogGenerator:
     return topics
 
   def generate_with_review(
-    self, user_message: str, max_attempts: int = MAX_GENERATION_ATTEMPTS
+    self, user_message: str, max_attempts: int = MAX_GENERATION_ATTEMPTS, series: bool = False
   ) -> tuple[PostOut, ReviewResult]:
     """Generate a post and review it. Retry up to `max_attempts`, feeding review feedback into retries."""
     best_post = None
     best_review = None
     prompt = user_message
     for attempt in range(max_attempts):
-      post = self.generate_post(prompt)
+      post = self.generate_post(prompt, series=series)
       review = self.review_post(post)
       if best_review is None or review.score > best_review.score:
         best_post = post
@@ -504,7 +512,7 @@ def generate_series(series_id: str, series_title: str, parts: list[SeriesPart]) 
     try:
       user_message = _build_series_part_message(series_title, part, parts)
       post, review = blog_generator.generate_with_review(
-        user_message, max_attempts=SERIES_GENERATION_ATTEMPTS
+        user_message, max_attempts=SERIES_GENERATION_ATTEMPTS, series=True
       )
       _insert_draft(
         post,
