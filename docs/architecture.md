@@ -114,6 +114,23 @@ All generation routes call Claude (`claude-sonnet-4-6`) with a forced `write_pos
 call and return a `PostOut` (not yet persisted — the caller decides whether to `POST` it
 to `/api/posts` or, for drafts, it's inserted directly by `drafts_api`).
 
+### Series — `/api/series` (`routers/series_api.py`)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/series` | List all series with post counts |
+| `POST` | `/api/series` | Create an empty series (`{title, description}`) |
+| `POST` | `/api/series/generate` | Plan + generate a multi-part series from `{topic, series_type, parts?, guidance?}` |
+| `DELETE` | `/api/series/{id}` | Delete a series (unassigns its posts) |
+
+`POST /api/series/generate` plans N parts with Claude Haiku (`plan_series` tool, spec types
+in `data/series_types.json`), creates the `series` row, and returns `202` immediately with the
+outline. Each part is then generated in the **background** (off the event loop via
+`asyncio.to_thread`) through the normal post pipeline and inserted into `drafts` with
+`series_id`/`series_order` set — so the series assignment carries into `posts` on approval and
+the "Part N of M" nav works once parts are published. Progress is observed via drafts appearing
+in `/admin/drafts` (no separate job-status table).
+
 ### Drafts — `/api/drafts` (`routers/drafts_api.py`)
 
 | Method | Path | Description |

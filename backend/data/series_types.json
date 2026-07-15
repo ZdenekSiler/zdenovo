@@ -1,0 +1,26 @@
+[
+  {
+    "id": "deep-dive",
+    "label": "Deep dive",
+    "description": "One topic explored progressively, each part more technical than the last.",
+    "default_parts": 4,
+    "arc_guidance": "One topic explored progressively: each part goes deeper and more technical than the last (orientation → core mechanics → internals/advanced → production reality). The series should build a single, coherent through-line rather than four disconnected posts.",
+    "part_guidance": "Part 1 orients a curious newcomer to the topic; the final part is production-grade and opinionated. Each part assumes the reader has read the earlier ones — do not re-explain fundamentals already covered. Later parts should reference concepts introduced earlier."
+  },
+  {
+    "id": "overview",
+    "label": "Overview / survey",
+    "description": "A broad survey of a topic, each part covering a different sub-area at similar depth.",
+    "default_parts": 4,
+    "arc_guidance": "A broad landscape survey: partition the topic into distinct sub-areas and give each part one sub-area, all at a similar introductory-to-intermediate depth. Together the parts map the whole space; individually each stands on its own.",
+    "part_guidance": "Each part covers a clearly different sub-area with minimal overlap between parts. Depth is consistent across parts — none should be dramatically more advanced than another. A reader can read parts in any order, but part 1 sets up the overall map and the final part can tie the pieces together."
+  },
+  {
+    "id": "tutorial",
+    "label": "Tutorial series",
+    "description": "A hands-on build where each part adds to a running project.",
+    "default_parts": 4,
+    "arc_guidance": "A step-by-step, hands-on build: the series constructs one running project or example incrementally, each part adding a working, runnable increment on top of the previous part's code.",
+    "part_guidance": "Each part starts from where the previous part ended and produces a runnable checkpoint. Include concrete code and commands. State prerequisites at the top of each part and do not re-derive setup already done in earlier parts. The final part ships or hardens the project."
+  }
+]

@@ -1,8 +1,11 @@
 """REST API for post series/collections."""
 
+import asyncio
+import json
 import logging
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +14,13 @@ from pydantic import BaseModel, Field
 from db import get_conn, row_to_dict
 
 logger = logging.getLogger(__name__)
+
+SERIES_TYPES_PATH = Path(__file__).parent.parent / "data" / "series_types.json"
+
+
+def load_series_types() -> list[dict]:
+    """Spec templates that shape a generated series (deep-dive, overview, tutorial)."""
+    return json.loads(SERIES_TYPES_PATH.read_text(encoding="utf-8"))
 
 
 router = APIRouter(prefix="/api/series", tags=["series"])
@@ -33,6 +43,22 @@ class SeriesOut(BaseModel):
     post_count: int = 0
 
 
+class SeriesGenerateIn(BaseModel):
+    """Request body for generating a whole series from one topic + a spec type."""
+    topic: str = Field(..., min_length=1, max_length=300)
+    series_type: str = Field(..., min_length=1)     # one of series_types.json ids
+    parts: int | None = Field(default=None, ge=2, le=8)
+    guidance: str | None = Field(default=None, max_length=1000)
+
+
+class SeriesGenerateOut(BaseModel):
+    """202 response: the series was created and its parts are generating in the background."""
+    series_id: str
+    series_title: str
+    series_description: str | None = None
+    parts: list[dict]
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _slugify(title: str) -> str:
@@ -41,6 +67,17 @@ def _slugify(title: str) -> str:
     slug = re.sub(r"[^\w\s-]", "", slug)
     slug = re.sub(r"[\s_]+", "-", slug)
     return slug[:80]
+
+
+def _unique_series_id(conn, title: str) -> str:
+    """Slug from title, suffixed (-2, -3, …) if that id already exists."""
+    base = _slugify(title)
+    series_id = base
+    n = 2
+    while conn.execute("SELECT id FROM series WHERE id = ?", (series_id,)).fetchone():
+        series_id = f"{base}-{n}"
+        n += 1
+    return series_id
 
 
 def _get_require_admin() -> Callable:
@@ -87,6 +124,51 @@ def create_series(body: SeriesIn, _: None = Depends(_get_require_admin())) -> Se
         "created_at": created_at,
         "post_count": 0,
     }
+
+
+@router.post("/generate", response_model=SeriesGenerateOut, status_code=202)
+async def generate_series_route(
+    body: SeriesGenerateIn, _: None = Depends(_get_require_admin())
+) -> SeriesGenerateOut:
+    """Plan a multi-part series from a topic + spec, create the series row, and generate
+    each part into `drafts` in the background (admin only). Returns 202 with the outline.
+
+    Generation reuses the single-post engine in generate_api; imported lazily here (route-time
+    only) to keep this router free of module-level cross-router imports — the same pattern
+    topics_api uses to reach drafts_api (see .claude/rules/architecture.md)."""
+    # Lazy import: route-time only, avoids a module-level series_api → generate_api dependency.
+    from routers.generate_api import blog_generator, generate_series
+
+    series_type = next((t for t in load_series_types() if t["id"] == body.series_type), None)
+    if series_type is None:
+        valid = ", ".join(t["id"] for t in load_series_types())
+        raise HTTPException(status_code=400, detail=f"Unknown series_type. Valid types: {valid}")
+
+    count = body.parts or series_type.get("default_parts", 4)
+    # Planning is one blocking Haiku call — run off the event loop.
+    plan = await asyncio.to_thread(
+        blog_generator.plan_series, body.topic, series_type, count, body.guidance or ""
+    )
+
+    created_at = datetime.now(timezone.utc).isoformat()
+    with get_conn() as conn:
+        series_id = _unique_series_id(conn, plan.series_title)
+        conn.execute(
+            "INSERT INTO series (id, title, description, created_at) VALUES (?,?,?,?)",
+            (series_id, plan.series_title, plan.series_description, created_at),
+        )
+
+    # Fire-and-forget: parts generate off the event loop and land in /admin/drafts as they finish.
+    asyncio.create_task(
+        asyncio.to_thread(generate_series, series_id, plan.series_title, plan.parts)
+    )
+
+    return SeriesGenerateOut(
+        series_id=series_id,
+        series_title=plan.series_title,
+        series_description=plan.series_description,
+        parts=[p.model_dump() for p in plan.parts],
+    )
 
 
 @router.delete("/{series_id}", status_code=204)

@@ -87,6 +87,12 @@ def init_db() -> None:
             conn.execute("ALTER TABLE drafts ADD COLUMN admin_remarks TEXT")
         if "sources" not in draft_cols:
             conn.execute("ALTER TABLE drafts ADD COLUMN sources TEXT NOT NULL DEFAULT '[]'")
+        # Series generation carries the series assignment on the draft so it survives
+        # into `posts` on approval (no FK — foreign keys are off codebase-wide).
+        if "series_id" not in draft_cols:
+            conn.execute("ALTER TABLE drafts ADD COLUMN series_id TEXT")
+        if "series_order" not in draft_cols:
+            conn.execute("ALTER TABLE drafts ADD COLUMN series_order INTEGER")
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS comments (

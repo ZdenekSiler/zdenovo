@@ -9,7 +9,40 @@
 </div>
 
 <div class="card mb-8">
-  <p class="text-xs font-semibold text-zinc-400 mb-4">Create new series</p>
+  <p class="text-xs font-semibold text-zinc-400 mb-1">Generate a series</p>
+  <p class="text-[11px] text-zinc-600 mb-4">Plan N related posts on one topic. Parts generate in the background and land in
+    <a href="/admin/drafts" class="text-indigo-400 hover:text-indigo-300">Drafts</a> for review.</p>
+  <form id="series-gen-form" class="space-y-3">
+    <input type="text" name="topic" placeholder="Topic (e.g. LangChain)" required
+           class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
+    <div class="flex gap-3">
+      <select name="series_type" required
+              class="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500/60">
+        {% for t in series_types %}
+        <option value="{{ t.id }}" data-default-parts="{{ t.default_parts }}">{{ t.label }} — {{ t.description }}</option>
+        {% endfor %}
+      </select>
+      <input type="number" name="parts" min="2" max="8" placeholder="Parts"
+             class="w-24 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
+    </div>
+    <textarea name="guidance" rows="2" placeholder="Extra guidance (optional) — e.g. focus on practical use, target intermediate devs"
+              class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60"></textarea>
+    <div class="flex items-center justify-end gap-3">
+      <span id="series-gen-spinner" class="hidden items-center gap-2 text-xs text-indigo-400">
+        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        Planning the series with Claude...
+      </span>
+      <button type="submit" id="series-gen-btn" class="btn-primary text-xs">Generate series</button>
+    </div>
+  </form>
+  <div id="series-gen-result" class="mt-4 text-xs" role="status" aria-live="polite"></div>
+</div>
+
+<div class="card mb-8">
+  <p class="text-xs font-semibold text-zinc-400 mb-4">Create empty series</p>
   <form action="/admin/series" method="post" class="space-y-3">
     <input type="text" name="title" placeholder="Series title" required
            class="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/60">
@@ -20,6 +53,71 @@
     </div>
   </form>
 </div>
+
+<script>
+(function () {
+  var form = document.getElementById("series-gen-form");
+  if (!form) return;
+  var result = document.getElementById("series-gen-result");
+  var spinner = document.getElementById("series-gen-spinner");
+  var btn = document.getElementById("series-gen-btn");
+
+  function esc(s) {
+    var d = document.createElement("div");
+    d.textContent = s == null ? "" : String(s);
+    return d.innerHTML;
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var topic = form.topic.value.trim();
+    if (!topic) return;
+    var payload = { topic: topic, series_type: form.series_type.value };
+    if (form.parts.value) payload.parts = parseInt(form.parts.value, 10);
+    if (form.guidance.value.trim()) payload.guidance = form.guidance.value.trim();
+
+    spinner.classList.remove("hidden");
+    spinner.classList.add("flex");
+    btn.disabled = true;
+    result.innerHTML = "";
+
+    fetch("/api/series/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }); })
+      .then(function (res) {
+        if (!res.ok) {
+          result.innerHTML = '<p class="text-red-400">' + esc(res.body.detail || "Generation failed") + "</p>";
+          return;
+        }
+        var parts = (res.body.parts || [])
+          .map(function (p) {
+            return '<li class="text-zinc-400"><span class="text-zinc-200">Part ' + p.part_number + ": " + esc(p.title) +
+              '</span> — ' + esc(p.angle) + "</li>";
+          })
+          .join("");
+        result.innerHTML =
+          '<div class="border border-indigo-500/30 bg-indigo-500/5 rounded-lg p-3">' +
+          '<p class="text-zinc-200 font-semibold mb-1">Planned: ' + esc(res.body.series_title) + "</p>" +
+          '<p class="text-zinc-500 mb-2">' + esc(res.body.series_description) + "</p>" +
+          '<ol class="space-y-1 list-none mb-2">' + parts + "</ol>" +
+          '<p class="text-zinc-500">Drafts are generating in the background. ' +
+          '<a href="/admin/drafts" class="text-indigo-400 hover:text-indigo-300">View drafts →</a></p>' +
+          "</div>";
+      })
+      .catch(function () {
+        result.innerHTML = '<p class="text-red-400">Network error — please retry.</p>';
+      })
+      .finally(function () {
+        spinner.classList.add("hidden");
+        spinner.classList.remove("flex");
+        btn.disabled = false;
+      });
+  });
+})();
+</script>
 
 {% if series %}
 <div class="space-y-4">

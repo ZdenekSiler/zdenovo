@@ -167,6 +167,8 @@ def _draft_to_out(d: dict) -> DraftOut:
     quality_strengths=d.get("quality_strengths", []),
     admin_remarks=d.get("admin_remarks"),
     sources=d.get("sources", []),
+    series_id=d.get("series_id"),
+    series_order=d.get("series_order"),
   )
 
 
@@ -363,8 +365,9 @@ def approve_draft(draft_id: str, _: None = Depends(_get_require_admin())):
       )
 
     conn.execute(
-      """INSERT INTO posts (slug, title, date, summary, tags, content, image, sources)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+      """INSERT INTO posts (slug, title, date, summary, tags, content, image, sources,
+                            series_id, series_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
       (
         draft["slug"],
         draft["title"],
@@ -374,6 +377,8 @@ def approve_draft(draft_id: str, _: None = Depends(_get_require_admin())):
         draft["content"],
         draft.get("image"),
         json.dumps(draft.get("sources", [])),
+        draft.get("series_id"),
+        draft.get("series_order"),
       ),
     )
     conn.execute(

@@ -508,7 +508,10 @@ async def admin_series(request: Request, _: None = Depends(require_admin)) -> st
             " GROUP BY s.id ORDER BY s.created_at DESC"
         ).fetchall()
     series = [dict(r) for r in rows]
-    return templates.TemplateResponse(request, "admin_series.html", {"series": series})
+    from routers.series_api import load_series_types
+    return templates.TemplateResponse(
+        request, "admin_series.html", {"series": series, "series_types": load_series_types()}
+    )
 
 
 @app.post("/admin/series", response_class=HTMLResponse)

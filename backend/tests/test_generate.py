@@ -227,9 +227,13 @@ def test_generate_prompt_includes_existing_posts_corpus(admin_client, monkeypatc
     )
 
   generation_call = mock_client.messages.create.call_args_list[0]
-  user_content = generation_call.kwargs["messages"][0]["content"]
-  assert "<existing_posts>" in user_content
-  assert "htmx-is-enough" in user_content
+  # The corpus rides in a dedicated cached system block (not the user message) so back-to-back
+  # generations reuse it at the prompt-cache discount.
+  corpus_blocks = [b for b in generation_call.kwargs["system"] if b["text"].startswith("<existing_posts>")]
+  assert corpus_blocks, "corpus should be its own system block"
+  assert corpus_blocks[0]["cache_control"] == {"type": "ephemeral"}
+  assert "htmx-is-enough" in corpus_blocks[0]["text"]
+  assert "<existing_posts>" not in generation_call.kwargs["messages"][0]["content"]
 
 
 def test_generate_prompt_omits_existing_posts_tag_when_no_posts(admin_client, monkeypatch):
@@ -246,5 +250,7 @@ def test_generate_prompt_omits_existing_posts_tag_when_no_posts(admin_client, mo
     )
 
   generation_call = mock_client.messages.create.call_args_list[0]
-  user_content = generation_call.kwargs["messages"][0]["content"]
-  assert "<existing_posts>" not in user_content
+  # No posts → no corpus block at all (neither a dedicated system block nor the user message).
+  corpus_blocks = [b for b in generation_call.kwargs["system"] if b["text"].startswith("<existing_posts>")]
+  assert not corpus_blocks
+  assert "<existing_posts>" not in generation_call.kwargs["messages"][0]["content"]

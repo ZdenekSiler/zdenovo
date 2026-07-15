@@ -1,0 +1,50 @@
+{
+  "name": "plan_series",
+  "description": "Return an ordered outline for a multi-part blog series: an overall series title/description plus one entry per part.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "series_title": {
+        "type": "string",
+        "description": "Reader-facing name for the whole series, without a part number"
+      },
+      "series_description": {
+        "type": "string",
+        "description": "One-sentence description of what the series covers as a whole"
+      },
+      "parts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "part_number": {
+              "type": "integer",
+              "description": "1-based position of this part in the reading order"
+            },
+            "title": {
+              "type": "string",
+              "description": "Concrete working title for this part, WITHOUT a 'Part N:' prefix"
+            },
+            "angle": {
+              "type": "string",
+              "description": "1-2 sentences on what this part specifically covers and how it differs from the other parts"
+            },
+            "key_points": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "3-6 concrete points or sections this part must cover"
+            },
+            "suggested_tags": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "2-4 suggested tags for this part"
+            }
+          },
+          "required": ["part_number", "title", "angle", "key_points", "suggested_tags"]
+        },
+        "description": "The ordered parts of the series"
+      }
+    },
+    "required": ["series_title", "series_description", "parts"]
+  }
+}

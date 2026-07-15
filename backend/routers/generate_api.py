@@ -28,6 +28,9 @@ def _get_require_admin():
     from routers.auth import require_admin
     return require_admin
 MAX_GENERATION_ATTEMPTS = 3
+# Series generate N posts at once, so each wasted retry is multiplied by N. Cap series parts
+# to fewer attempts than one-off generation — the review loop still keeps the best attempt.
+SERIES_GENERATION_ATTEMPTS = 2
 
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -45,6 +48,20 @@ class PostBrief(BaseModel):
 class GenerateIn(BaseModel):
   description: str = Field(..., min_length=10)
   tags: list[str] = Field(default_factory=list)
+
+
+class SeriesPart(BaseModel):
+  part_number: int
+  title: str
+  angle: str
+  key_points: list[str] = Field(default_factory=list)
+  suggested_tags: list[str] = Field(default_factory=list)
+
+
+class SeriesPlan(BaseModel):
+  series_title: str
+  series_description: str
+  parts: list[SeriesPart]
 
 
 class ReviewResult(BaseModel):
@@ -72,6 +89,8 @@ class DraftOut(BaseModel):
   quality_strengths: list[str] = Field(default_factory=list)
   admin_remarks: str | None = None
   sources: list[Source] = Field(default_factory=list)
+  series_id: str | None = None
+  series_order: int | None = None
 
 
 # ─── Blog generation client ─────────────────────────────────────────────────
@@ -96,6 +115,8 @@ class BlogGenerator:
     self._sources_tool: dict = {}
     self._trending_topics_system_prompt = ""
     self._trending_topics_tool: dict = {}
+    self._series_plan_system_prompt = ""
+    self._series_plan_tool: dict = {}
 
   def _ensure_prompts(self) -> None:
     if self._prompts_loaded:
@@ -108,6 +129,8 @@ class BlogGenerator:
     self._sources_tool = json.loads((PROMPTS_DIR / "sources_tool.json").read_text(encoding="utf-8"))
     self._trending_topics_system_prompt = (PROMPTS_DIR / "trending_topics_system.md").read_text(encoding="utf-8")
     self._trending_topics_tool = json.loads((PROMPTS_DIR / "trending_topics_tool.json").read_text(encoding="utf-8"))
+    self._series_plan_system_prompt = (PROMPTS_DIR / "series_plan_system.md").read_text(encoding="utf-8")
+    self._series_plan_tool = json.loads((PROMPTS_DIR / "series_plan_tool.json").read_text(encoding="utf-8"))
     self._prompts_loaded = True
 
   def _get_client(self) -> anthropic.Anthropic:
@@ -130,20 +153,30 @@ class BlogGenerator:
 
   def generate_post(self, user_message: str) -> PostOut:
     self._ensure_prompts()
+    # The existing-posts corpus is identical across every generation within a run (it's the
+    # published `posts` table, unchanged while drafts accumulate). Sending it as its own
+    # cached system block — rather than appending it to the per-call user message — lets
+    # back-to-back generations (e.g. the parts of a series) reuse it at the ~90% cache
+    # discount instead of paying full price on every call and retry.
+    system_blocks = [
+      {"type": "text", "text": self._system_prompt, "cache_control": {"type": "ephemeral"}},
+    ]
     corpus = _project_corpus_for_prompt()
     if corpus:
       corpus_xml = "\n".join(
         f'<post slug="{p["slug"]}"><title>{p["title"]}</title><summary>{p["summary"]}</summary></post>'
         for p in corpus
       )
-      user_message = f"{user_message}\n\n<existing_posts>\n{corpus_xml}\n</existing_posts>"
+      system_blocks.append({
+        "type": "text",
+        "text": f"<existing_posts>\n{corpus_xml}\n</existing_posts>",
+        "cache_control": {"type": "ephemeral"},
+      })
     try:
       message = self._get_client().messages.create(
         model="claude-sonnet-4-6",
         max_tokens=8192,
-        system=[
-          {"type": "text", "text": self._system_prompt, "cache_control": {"type": "ephemeral"}},
-        ],
+        system=system_blocks,
         tools=[{**self._post_tool, "cache_control": {"type": "ephemeral"}}],
         tool_choice={"type": "tool", "name": "write_post"},
         messages=[{"role": "user", "content": user_message}],
@@ -303,12 +336,14 @@ class BlogGenerator:
       log.warning("Topic discovery produced 0 topics (stop_reason=%s) — likely max_tokens truncation", message.stop_reason)
     return topics
 
-  def generate_with_review(self, user_message: str) -> tuple[PostOut, ReviewResult]:
-    """Generate a post and review it. Retry up to MAX_GENERATION_ATTEMPTS, feeding review feedback into retries."""
+  def generate_with_review(
+    self, user_message: str, max_attempts: int = MAX_GENERATION_ATTEMPTS
+  ) -> tuple[PostOut, ReviewResult]:
+    """Generate a post and review it. Retry up to `max_attempts`, feeding review feedback into retries."""
     best_post = None
     best_review = None
     prompt = user_message
-    for attempt in range(MAX_GENERATION_ATTEMPTS):
+    for attempt in range(max_attempts):
       post = self.generate_post(prompt)
       review = self.review_post(post)
       if best_review is None or review.score > best_review.score:
@@ -316,7 +351,7 @@ class BlogGenerator:
         best_review = review
       if review.verdict == "pass":
         break
-      if attempt < MAX_GENERATION_ATTEMPTS - 1:
+      if attempt < max_attempts - 1:
         prompt = (
           f"{user_message}\n\n"
           f"--- Previous attempt was rejected (score {review.score}/10) ---\n"
@@ -325,6 +360,70 @@ class BlogGenerator:
         )
     best_post.sources = self.find_sources(best_post)
     return best_post, best_review
+
+  def plan_series(self, topic: str, series_type: dict, count: int, extra_guidance: str = "") -> SeriesPlan:
+    """Expand one topic + a series spec into an ordered outline of `count` parts.
+
+    Cheap structured-outlining task — uses Haiku per the cost rules in docs/architecture.md.
+    """
+    self._ensure_prompts()
+    corpus = _project_corpus_for_prompt()
+    corpus_xml = "\n".join(
+      f'<post slug="{p["slug"]}"><title>{p["title"]}</title><summary>{p["summary"]}</summary></post>'
+      for p in corpus
+    )
+    spec_lines = [
+      "<series_spec>",
+      f"<topic>{topic}</topic>",
+      f"<shape>{series_type['label']}</shape>",
+      f"<number_of_parts>{count}</number_of_parts>",
+      f"<arc_guidance>{series_type['arc_guidance']}</arc_guidance>",
+      f"<part_guidance>{series_type['part_guidance']}</part_guidance>",
+    ]
+    if extra_guidance:
+      spec_lines.append(f"<extra_guidance>{extra_guidance}</extra_guidance>")
+    spec_lines.append("</series_spec>")
+    prompt = "\n".join(spec_lines) + f"\n\n<existing_posts>\n{corpus_xml}\n</existing_posts>"
+
+    try:
+      message = self._get_client().messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=4096,
+        system=[
+          {"type": "text", "text": self._series_plan_system_prompt, "cache_control": {"type": "ephemeral"}},
+        ],
+        tools=[{**self._series_plan_tool, "cache_control": {"type": "ephemeral"}}],
+        tool_choice={"type": "tool", "name": "plan_series"},
+        messages=[{"role": "user", "content": prompt}],
+      )
+    except anthropic.APIError as exc:
+      raise HTTPException(status_code=502, detail=f"Claude API error: {exc}") from exc
+
+    self._log_usage("plan_series", message)
+
+    tool_block = next((b for b in message.content if b.type == "tool_use"), None)
+    if tool_block is None:
+      raise HTTPException(status_code=422, detail="Claude did not call plan_series tool")
+    data = tool_block.input
+    parts = data.get("parts", [])
+    if not parts:
+      raise HTTPException(status_code=422, detail="Series planning produced no parts (max_tokens hit?)")
+    # Normalize ordering: trust sequence over the model's part_number field, and cap to `count`.
+    plan_parts = [
+      SeriesPart(
+        part_number=i + 1,
+        title=p["title"],
+        angle=p.get("angle", ""),
+        key_points=p.get("key_points", []),
+        suggested_tags=p.get("suggested_tags", []),
+      )
+      for i, p in enumerate(parts[:count])
+    ]
+    return SeriesPlan(
+      series_title=data.get("series_title", topic),
+      series_description=data.get("series_description", ""),
+      parts=plan_parts,
+    )
 
 
 blog_generator = BlogGenerator()
@@ -367,6 +466,56 @@ def _build_brief_message(brief: PostBrief) -> str:
     parts.append(f"Required sections to cover:\n{sections}")
   parts.append("</brief>")
   return "\n".join(parts)
+
+
+def _build_series_part_message(series_title: str, part: SeriesPart, outline: list[SeriesPart]) -> str:
+  """Brief message for one series part, with cross-part context so the writer stays in lane."""
+  total = len(outline)
+  outline_lines = "\n".join(
+    f"  {p.part_number}. {p.title}" + (" (this part)" if p.part_number == part.part_number else "")
+    for p in outline
+  )
+  lines = [
+    f"Today's date: {Date.today().isoformat()}",
+    "<brief>",
+    f"This is Part {part.part_number} of {total} in the series \"{series_title}\".",
+    "Full series outline (for context — write ONLY this part):",
+    outline_lines,
+    f"Title hint: {part.title}",
+    f"This part's angle: {part.angle}",
+  ]
+  if part.key_points:
+    points = "\n".join(f"  - {kp}" for kp in part.key_points)
+    lines.append(f"Required points to cover:\n{points}")
+  if part.suggested_tags:
+    lines.append(f"Suggested tags: {', '.join(part.suggested_tags)}")
+  lines.append(
+    "Assume the reader has read the earlier parts — do not re-explain what they covered. "
+    "You may mention what other parts cover, but keep this post focused on its own angle."
+  )
+  lines.append("</brief>")
+  return "\n".join(lines)
+
+
+def generate_series(series_id: str, series_title: str, parts: list[SeriesPart]) -> None:
+  """Generate one draft per part, assigning each to the series. Runs in the background
+  (off the event loop). Each part is isolated so one failure doesn't abort the rest."""
+  for part in parts:
+    try:
+      user_message = _build_series_part_message(series_title, part, parts)
+      post, review = blog_generator.generate_with_review(
+        user_message, max_attempts=SERIES_GENERATION_ATTEMPTS
+      )
+      _insert_draft(
+        post,
+        topic_id=f"series:{series_id}",
+        review=review,
+        series_id=series_id,
+        series_order=part.part_number,
+      )
+      log.info("Series %s: generated part %d/%d (%r)", series_id, part.part_number, len(parts), post.slug)
+    except Exception as exc:
+      log.warning("Series %s: part %d failed: %s", series_id, part.part_number, exc)
 
 
 def _fetch_unsplash_image(query: str) -> str | None:
@@ -423,7 +572,13 @@ def _find_sources(post: PostOut) -> list[Source]:
   return blog_generator.find_sources(post)
 
 
-def _insert_draft(post: PostOut, topic_id: str, review: ReviewResult | None = None) -> DraftOut:
+def _insert_draft(
+  post: PostOut,
+  topic_id: str,
+  review: ReviewResult | None = None,
+  series_id: str | None = None,
+  series_order: int | None = None,
+) -> DraftOut:
   now = datetime.now(timezone.utc)
   draft_id = str(uuid.uuid4())
   q_score = review.score if review else None
@@ -434,8 +589,8 @@ def _insert_draft(post: PostOut, topic_id: str, review: ReviewResult | None = No
     conn.execute(
       """INSERT INTO drafts
          (id, slug, title, date, summary, tags, content, image, generated_at, topic_id, status,
-          quality_score, quality_issues, quality_strengths, sources)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)""",
+          quality_score, quality_issues, quality_strengths, sources, series_id, series_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)""",
       (
         draft_id,
         post.slug,
@@ -451,6 +606,8 @@ def _insert_draft(post: PostOut, topic_id: str, review: ReviewResult | None = No
         q_issues,
         q_strengths,
         sources_json,
+        series_id,
+        series_order,
       ),
     )
   return DraftOut(
@@ -470,6 +627,8 @@ def _insert_draft(post: PostOut, topic_id: str, review: ReviewResult | None = No
     quality_issues=review.issues if review else [],
     quality_strengths=review.strengths if review else [],
     sources=post.sources,
+    series_id=series_id,
+    series_order=series_order,
   )
 
 
