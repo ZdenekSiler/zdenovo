@@ -59,6 +59,19 @@ class SeriesGenerateOut(BaseModel):
     parts: list[dict]
 
 
+class SeriesProgressPart(BaseModel):
+    series_order: int | None = None
+    title: str
+    status: str          # "pending" (draft awaiting review) or "published" (live post)
+    ref: str             # /admin/drafts/{id} or /blog/{slug}
+
+
+class SeriesProgressOut(BaseModel):
+    """How many parts of a generating series exist so far (drafts + published posts)."""
+    series_id: str
+    parts: list[SeriesProgressPart]
+
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 def _slugify(title: str) -> str:
@@ -171,6 +184,33 @@ async def generate_series_route(
         series_description=plan.series_description,
         parts=[p.model_dump() for p in plan.parts],
     )
+
+
+@router.get("/{series_id}/progress", response_model=SeriesProgressOut)
+def series_progress(series_id: str, _: None = Depends(_get_require_admin())) -> SeriesProgressOut:
+    """Parts of a series that exist so far — pending drafts + published posts. Polled by the
+    admin generate form to show live progress while parts generate in the background."""
+    with get_conn() as conn:
+        draft_rows = conn.execute(
+            "SELECT id, title, series_order FROM drafts"
+            " WHERE series_id = ? AND status = 'pending' ORDER BY series_order ASC",
+            (series_id,),
+        ).fetchall()
+        post_rows = conn.execute(
+            "SELECT slug, title, series_order FROM posts WHERE series_id = ? ORDER BY series_order ASC",
+            (series_id,),
+        ).fetchall()
+    parts = [
+        SeriesProgressPart(series_order=d["series_order"], title=d["title"],
+                           status="pending", ref=f"/admin/drafts/{d['id']}")
+        for d in draft_rows
+    ] + [
+        SeriesProgressPart(series_order=p["series_order"], title=p["title"],
+                           status="published", ref=f"/blog/{p['slug']}")
+        for p in post_rows
+    ]
+    parts.sort(key=lambda x: (x.series_order is None, x.series_order or 0))
+    return SeriesProgressOut(series_id=series_id, parts=parts)
 
 
 @router.delete("/{series_id}", status_code=204)

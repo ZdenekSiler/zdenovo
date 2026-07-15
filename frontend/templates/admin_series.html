@@ -92,20 +92,7 @@
           result.innerHTML = '<p class="text-red-400">' + esc(res.body.detail || "Generation failed") + "</p>";
           return;
         }
-        var parts = (res.body.parts || [])
-          .map(function (p) {
-            return '<li class="text-zinc-400"><span class="text-zinc-200">Part ' + p.part_number + ": " + esc(p.title) +
-              '</span> — ' + esc(p.angle) + "</li>";
-          })
-          .join("");
-        result.innerHTML =
-          '<div class="border border-indigo-500/30 bg-indigo-500/5 rounded-lg p-3">' +
-          '<p class="text-zinc-200 font-semibold mb-1">Planned: ' + esc(res.body.series_title) + "</p>" +
-          '<p class="text-zinc-500 mb-2">' + esc(res.body.series_description) + "</p>" +
-          '<ol class="space-y-1 list-none mb-2">' + parts + "</ol>" +
-          '<p class="text-zinc-500">Drafts are generating in the background. ' +
-          '<a href="/admin/drafts" class="text-indigo-400 hover:text-indigo-300">View drafts →</a></p>' +
-          "</div>";
+        startProgress(res.body);
       })
       .catch(function () {
         result.innerHTML = '<p class="text-red-400">Network error — please retry.</p>';
@@ -116,6 +103,77 @@
         btn.disabled = false;
       });
   });
+
+  var SPINNER_SVG =
+    '<svg class="animate-spin h-4 w-4 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">' +
+    '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
+    '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>';
+
+  // Render the planned outline, then poll for each part's draft to land and tick it off live.
+  function startProgress(body) {
+    var seriesId = body.series_id;
+    var total = (body.parts || []).length;
+    var rows = (body.parts || []).map(function (p) {
+      return '<li id="sgp-' + p.part_number + '" class="flex items-start gap-2">' +
+        '<span class="sgp-status text-yellow-500/80 shrink-0 w-3 text-center" title="generating…">◌</span>' +
+        '<span class="min-w-0"><span class="sgp-title text-zinc-200">Part ' + p.part_number + ': ' + esc(p.title) + '</span>' +
+        ' <span class="text-zinc-500">— ' + esc(p.angle) + '</span></span></li>';
+    }).join("");
+    result.innerHTML =
+      '<div class="border border-indigo-500/30 bg-indigo-500/5 rounded-lg p-3">' +
+      '<p class="text-zinc-200 font-semibold mb-1">' + esc(body.series_title) + '</p>' +
+      '<p class="text-zinc-500 mb-2">' + esc(body.series_description) + '</p>' +
+      '<p id="sgp-head" class="flex items-center gap-2 text-indigo-400 mb-2">' + SPINNER_SVG +
+      '<span id="sgp-count">Generating 0 of ' + total + ' — each part is written by Claude, this takes a few minutes…</span></p>' +
+      '<ol class="space-y-1.5 list-none mb-1">' + rows + '</ol>' +
+      '<p class="text-zinc-500"><a href="/admin/drafts" class="text-indigo-400 hover:text-indigo-300">Open drafts →</a></p>' +
+      '</div>';
+
+    var started = Date.now();
+    var timer = setInterval(function () {
+      fetch("/api/series/" + encodeURIComponent(seriesId) + "/progress")
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (prog) {
+          if (!prog) return;
+          var seen = {};
+          prog.parts.forEach(function (part) {
+            var li = document.getElementById("sgp-" + part.series_order);
+            if (!li) return;
+            seen[part.series_order] = true;
+            var st = li.querySelector(".sgp-status");
+            st.textContent = "✓";
+            st.setAttribute("title", part.status);
+            st.className = "sgp-status shrink-0 w-3 text-center " +
+              (part.status === "published" ? "text-emerald-400" : "text-emerald-400");
+            if (!li.dataset.linked) {
+              var t = li.querySelector(".sgp-title");
+              if (t) {
+                var a = document.createElement("a");
+                a.href = part.ref;
+                a.className = "sgp-title text-zinc-100 hover:text-indigo-400 underline decoration-zinc-700";
+                a.textContent = t.textContent;
+                t.replaceWith(a);
+                li.dataset.linked = "1";
+              }
+            }
+          });
+          var done = Object.keys(seen).length;
+          var head = document.getElementById("sgp-head");
+          if (done >= total) {
+            clearInterval(timer);
+            if (head) head.innerHTML =
+              '<span class="text-emerald-400">✓ All ' + total + ' drafts ready.</span> ' +
+              '<a href="/admin/drafts" class="text-indigo-400 hover:text-indigo-300 ml-1">Review them →</a>';
+          } else {
+            var c = document.getElementById("sgp-count");
+            if (c) c.textContent = "Generating " + done + " of " + total +
+              " — each part is written by Claude, this takes a few minutes…";
+          }
+          if (Date.now() - started > 20 * 60 * 1000) clearInterval(timer);  // safety stop
+        })
+        .catch(function () { /* transient network blip — keep polling */ });
+    }, 8000);
+  }
 })();
 </script>
 

@@ -152,6 +152,33 @@ def test_generate_series_derives_short_id_from_topic_and_type(admin_client, monk
   assert resp.json()["series_id"] == "langchain-deep-dive"
 
 
+def test_series_progress_reports_pending_and_published_parts(admin_client):
+  import db
+  now = datetime.now(timezone.utc).isoformat()
+  with db.get_conn() as conn:
+    conn.execute("INSERT INTO series (id, title, description, created_at) VALUES (?,?,?,?)",
+                 ("s1", "S1", "d", now))
+    # part 1 published, part 2 still a pending draft
+    conn.execute("INSERT INTO posts (slug, title, date, summary, tags, content, series_id, series_order)"
+                 " VALUES (?,?,?,?,?,?,?,?)",
+                 ("s1-part-1", "Part One", "2026-07-15", "s", '["t"]', "body", "s1", 1))
+    conn.execute("INSERT INTO drafts (id, slug, title, date, summary, tags, content, generated_at,"
+                 " topic_id, status, sources, series_id, series_order)"
+                 " VALUES (?,?,?,?,?,?,?,?,?,'pending','[]',?,?)",
+                 ("d2", "s1-part-2", "Part Two", "2026-07-15", "s", '["t"]', "body", now, "series:s1", "s1", 2))
+  r = admin_client.get("/api/series/s1/progress")
+  assert r.status_code == 200
+  parts = r.json()["parts"]
+  assert [p["series_order"] for p in parts] == [1, 2]
+  assert parts[0]["status"] == "published" and parts[0]["ref"] == "/blog/s1-part-1"
+  assert parts[1]["status"] == "pending" and parts[1]["ref"] == "/admin/drafts/d2"
+
+
+def test_series_progress_requires_admin(client):
+  r = client.get("/api/series/whatever/progress", follow_redirects=False)
+  assert r.status_code == 303
+
+
 def test_generate_series_endpoint_rejects_unknown_type(admin_client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
   resp = admin_client.post(
