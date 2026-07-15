@@ -47,6 +47,10 @@
       <span>{{ draft.reading_time }} min read</span>
       <span class="text-zinc-800">·</span>
       <span class="text-zinc-700">topic: {{ draft.topic_id }}</span>
+      {% if draft.gen_cost_usd is not none %}
+      <span class="text-zinc-800">·</span>
+      <span class="text-pink-400/80" title="Estimated Anthropic API cost to generate this draft">gen cost ${{ "%.4f"|format(draft.gen_cost_usd) }}</span>
+      {% endif %}
     </div>
   </header>
 

@@ -694,17 +694,50 @@ async def admin_comments(request: Request, _: None = Depends(require_admin)) -> 
 
 # ─── Admin Stats ──────────────────────────────────────────────────────────────
 
+def _api_cost_summary() -> dict:
+    """Aggregate api_costs for the admin cost panel: totals + breakdown by model/step/day."""
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    today = now.strftime("%Y-%m-%d")
+    d7 = (now - timedelta(days=6)).strftime("%Y-%m-%d")
+    d30 = (now - timedelta(days=29)).strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        def since(day: str) -> float:
+            row = conn.execute(
+                "SELECT COALESCE(SUM(cost_usd), 0) FROM api_costs WHERE substr(created_at, 1, 10) >= ?", (day,)
+            ).fetchone()
+            return round(row[0], 4)
+        today_cost = round(conn.execute(
+            "SELECT COALESCE(SUM(cost_usd), 0) FROM api_costs WHERE substr(created_at, 1, 10) = ?", (today,)
+        ).fetchone()[0], 4)
+        by_model = [dict(r) for r in conn.execute(
+            "SELECT model, COUNT(*) AS calls, ROUND(SUM(cost_usd), 4) AS cost FROM api_costs GROUP BY model ORDER BY cost DESC")]
+        by_step = [dict(r) for r in conn.execute(
+            "SELECT step, COUNT(*) AS calls, ROUND(SUM(cost_usd), 4) AS cost FROM api_costs GROUP BY step ORDER BY cost DESC")]
+        recent_days = [dict(r) for r in conn.execute(
+            "SELECT substr(created_at, 1, 10) AS day, ROUND(SUM(cost_usd), 4) AS cost, COUNT(*) AS calls"
+            " FROM api_costs GROUP BY day ORDER BY day DESC LIMIT 14")]
+        n_calls = conn.execute("SELECT COUNT(*) FROM api_costs").fetchone()[0]
+    return {
+        "today": today_cost, "last7": since(d7), "last30": since(d30),
+        "all_total": since("0000"), "calls": n_calls,
+        "by_model": by_model, "by_step": by_step, "recent_days": recent_days,
+    }
+
+
 @app.get("/admin/stats", response_class=HTMLResponse)
 async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str:
-    """Display analytics from Cloudflare."""
+    """Display analytics from Cloudflare + Anthropic API cost tracking."""
     import urllib.request
     from datetime import timedelta
-    
+
+    cost = _api_cost_summary()
+
     cf_token = read_secret("cloudflare_api_token", "CLOUDFLARE_API_TOKEN")
     zone_id = os.environ.get("CF_ZONE_ID", "")
 
     if not cf_token or not zone_id:
-        return templates.TemplateResponse(request, "admin_stats.html", {"error": "Analytics not configured. Set CLOUDFLARE_API_TOKEN and CF_ZONE_ID."})
+        return templates.TemplateResponse(request, "admin_stats.html", {"cost": cost, "error": "Analytics not configured. Set CLOUDFLARE_API_TOKEN and CF_ZONE_ID."})
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     week_ago = (datetime.now(timezone.utc) - timedelta(days=6)).strftime("%Y-%m-%d")
@@ -772,12 +805,12 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str
         log.error("Cloudflare API request failed: %s", exc, exc_info=True)
         return templates.TemplateResponse(
             request, "admin_stats.html",
-            {"error": "Failed to fetch analytics from Cloudflare."}
+            {"cost": cost, "error": "Failed to fetch analytics from Cloudflare."}
         )
 
     if data.get("errors") or not data.get("data"):
         msg = data.get("errors", [{}])[0].get("message", "Unknown error") if data.get("errors") else "Empty response"
-        return templates.TemplateResponse(request, "admin_stats.html", {"error": f"Cloudflare API error: {msg}"})
+        return templates.TemplateResponse(request, "admin_stats.html", {"cost": cost, "error": f"Cloudflare API error: {msg}"})
 
     zones = data["data"].get("viewer", {}).get("zones", [{}])
     zone = zones[0] if zones else {}
@@ -815,6 +848,7 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str
     top_browsers = [{"browser": r["dimensions"]["userAgent"], "count": r["count"]} for r in zone.get("topBrowsers", [])]
 
     return templates.TemplateResponse(request, "admin_stats.html", {
+        "cost": cost,
         "daily": daily,
         "totals": totals,
         "top_pages": top_pages,

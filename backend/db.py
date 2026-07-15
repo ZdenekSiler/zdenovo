@@ -58,6 +58,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE posts ADD COLUMN series_order INTEGER")
         if "category" not in cols:
             conn.execute("ALTER TABLE posts ADD COLUMN category TEXT")
+        if "gen_cost_usd" not in cols:
+            conn.execute("ALTER TABLE posts ADD COLUMN gen_cost_usd REAL")
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS drafts (
@@ -93,6 +95,9 @@ def init_db() -> None:
             conn.execute("ALTER TABLE drafts ADD COLUMN series_id TEXT")
         if "series_order" not in draft_cols:
             conn.execute("ALTER TABLE drafts ADD COLUMN series_order INTEGER")
+        # Per-post generation cost (USD) — sum of the Claude calls that produced this draft.
+        if "gen_cost_usd" not in draft_cols:
+            conn.execute("ALTER TABLE drafts ADD COLUMN gen_cost_usd REAL")
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS comments (
@@ -119,6 +124,24 @@ def init_db() -> None:
                 title       TEXT NOT NULL,
                 description TEXT,
                 created_at  TEXT NOT NULL
+            )
+        """)
+
+        # ── api_costs table (one row per Claude call, for cost tracking) ─────────
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS api_costs (
+                id            TEXT PRIMARY KEY,
+                created_at    TEXT NOT NULL,
+                step          TEXT NOT NULL,
+                model         TEXT NOT NULL,
+                input_tokens  INTEGER NOT NULL DEFAULT 0,
+                output_tokens INTEGER NOT NULL DEFAULT 0,
+                cache_read    INTEGER NOT NULL DEFAULT 0,
+                cache_write   INTEGER NOT NULL DEFAULT 0,
+                web_searches  INTEGER NOT NULL DEFAULT 0,
+                cost_usd      REAL NOT NULL DEFAULT 0,
+                ref_kind      TEXT,
+                ref_id        TEXT
             )
         """)
 

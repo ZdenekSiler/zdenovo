@@ -40,6 +40,67 @@ def _mock_client(payload: dict) -> MagicMock:
   return client
 
 
+def _mock_client_usage(payload: dict, model: str = "claude-sonnet-4-6", inp: int = 1000, out: int = 2000) -> MagicMock:
+  """Mock client whose responses carry realistic token usage, so cost recording runs."""
+  tool_block = MagicMock()
+  tool_block.type = "tool_use"
+  tool_block.input = payload
+  usage = MagicMock()
+  usage.input_tokens = inp
+  usage.output_tokens = out
+  usage.cache_read_input_tokens = 0
+  usage.cache_creation_input_tokens = 0
+  usage.server_tool_use = None
+  message = MagicMock()
+  message.content = [tool_block]
+  message.usage = usage
+  message.model = model
+  client = MagicMock()
+  client.messages.create.return_value = message
+  return client
+
+
+# ─── Cost tracking ────────────────────────────────────────────────────────────
+
+def test_compute_cost_math():
+  from routers.generate_api import _compute_cost
+  # 1000 input + 2000 output on Sonnet = (1000*3 + 2000*15)/1e6 = 0.033
+  assert _compute_cost("claude-sonnet-4-6", 1000, 2000, 0, 0, 0) == round(0.033, 6)
+  # web searches add $0.01 each
+  assert _compute_cost("claude-haiku-4-5-20251001", 0, 0, 0, 0, 2) == round(0.02, 6)
+
+
+def test_generation_records_api_cost_row(test_db, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  from routers.generate_api import blog_generator
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=_mock_client_usage(POST_DATA)):
+    blog_generator.generate_post("write a post")
+  import db
+  with db.get_conn() as conn:
+    row = conn.execute("SELECT step, cost_usd FROM api_costs ORDER BY created_at DESC LIMIT 1").fetchone()
+  assert row is not None and row["cost_usd"] > 0
+
+
+def test_draft_stores_gen_cost(test_db, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  from routers.generate_api import blog_generator, _insert_draft
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=_mock_client_usage(POST_DATA)):
+    post, review = blog_generator.generate_with_review("write", max_attempts=1, with_sources=False)
+    draft = _insert_draft(post, topic_id="freeform", review=review)
+  assert draft.gen_cost_usd is not None and draft.gen_cost_usd > 0
+
+
+def test_series_runs_find_sources_once(test_db, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  from routers.generate_api import blog_generator, generate_series, SeriesPart
+  parts = [SeriesPart(part_number=i, title=f"P{i}", angle="a", key_points=["x"], suggested_tags=["t"]) for i in (1, 2, 3)]
+  calls = {"n": 0}
+  monkeypatch.setattr(blog_generator, "find_sources", lambda post: calls.__setitem__("n", calls["n"] + 1) or [])
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=_mock_client_usage(POST_DATA)):
+    generate_series("s", "S", parts)
+  assert calls["n"] == 1  # once for the whole series, not once per part
+
+
 # ─── Schema migration ─────────────────────────────────────────────────────────
 
 def test_init_db_adds_series_id_column_to_drafts(test_db):

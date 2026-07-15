@@ -287,6 +287,18 @@
   color: #a5b4fc;
   margin-bottom: 0.5rem;
 }
+/* Series TL;DR — juicier than the standalone card: violet→fuchsia gradient with a glow. */
+.tldr-series {
+  background: linear-gradient(135deg, #2e1065 0%, #4c1d95 45%, #831843 100%);
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.25), 0 10px 34px -10px rgba(219, 39, 119, 0.5);
+}
+.tldr-series::before {
+  height: 4px;
+  background: linear-gradient(90deg, #a78bfa, #f472b6, #fbbf24);
+}
+.tldr-series .tldr-label { color: #f0abfc; }
+.tldr-series p { color: #f5e8ff !important; }
 
 /* ─── Table of contents ─── */
 .toc {
@@ -822,6 +834,13 @@ html.light .series-band-part {
 }
 html.light .series-band-title { color: #4f46e5; }
 html.light .series-post .prose-custom h2 { border-left-color: #6366f1; }
+html.light .tldr-series {
+  background: linear-gradient(135deg, #faf5ff 0%, #fdf2f8 100%) !important;
+  border-color: #d8b4fe;
+  box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.15), 0 8px 24px -10px rgba(217, 70, 239, 0.35);
+}
+html.light .tldr-series .tldr-label { color: #a21caf; }
+html.light .tldr-series p { color: #6b21a8 !important; }
 html.light .tldr-label { color: #4f46e5; }
 
 /* ── Sidebar ── */

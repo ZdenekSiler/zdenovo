@@ -32,6 +32,31 @@ MAX_GENERATION_ATTEMPTS = 3
 # to fewer attempts than one-off generation — the review loop still keeps the best attempt.
 SERIES_GENERATION_ATTEMPTS = 2
 
+# USD per MILLION tokens (input / output). Cache reads bill at 0.1x input, cache writes at 1.25x.
+# Update these if Anthropic pricing changes; the Console remains the source of truth for billing.
+MODEL_PRICING = {
+  "claude-sonnet-4-6": {"in": 3.0, "out": 15.0},
+  "claude-haiku-4-5-20251001": {"in": 1.0, "out": 5.0},
+}
+_DEFAULT_PRICING = {"in": 1.0, "out": 5.0}
+WEB_SEARCH_USD = 0.01  # per web search request
+
+
+def _as_int(v) -> int:
+  """Coerce usage fields to int; non-ints (e.g. test MagicMocks) count as 0."""
+  return v if isinstance(v, int) else 0
+
+
+def _compute_cost(model: str, inp: int, out: int, cache_read: int, cache_write: int, searches: int) -> float:
+  p = MODEL_PRICING.get(model, _DEFAULT_PRICING)
+  token_cost = (
+    inp * p["in"]
+    + cache_read * p["in"] * 0.1
+    + cache_write * p["in"] * 1.25
+    + out * p["out"]
+  ) / 1_000_000
+  return round(token_cost + searches * WEB_SEARCH_USD, 6)
+
 
 # ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -91,6 +116,7 @@ class DraftOut(BaseModel):
   sources: list[Source] = Field(default_factory=list)
   series_id: str | None = None
   series_order: int | None = None
+  gen_cost_usd: float | None = None
 
 
 # ─── Blog generation client ─────────────────────────────────────────────────
@@ -106,6 +132,8 @@ class BlogGenerator:
 
   def __init__(self) -> None:
     self._client: anthropic.Anthropic | None = None
+    self._run_cost = 0.0          # accumulates cost within one generate_with_review run
+    self.last_run_cost = 0.0      # cost of the most recent completed run (read by _insert_draft)
     self._prompts_loaded = False
     self._system_prompt = ""
     self._post_tool: dict = {}
@@ -145,15 +173,38 @@ class BlogGenerator:
       self._client = anthropic.Anthropic(api_key=api_key)
     return self._client
 
-  @staticmethod
-  def _log_usage(label: str, message: anthropic.types.Message) -> None:
+  def _log_usage(self, label: str, message: anthropic.types.Message,
+                 ref_kind: str | None = None, ref_id: str | None = None) -> float:
+    """Log tokens, compute cost, persist a row to api_costs, and add to the current run total.
+    Returns the call's cost in USD. Fail-soft: a recording error never breaks generation."""
     usage = message.usage
-    cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
-    cache_create = getattr(usage, "cache_creation_input_tokens", 0) or 0
+    inp = _as_int(getattr(usage, "input_tokens", 0))
+    out = _as_int(getattr(usage, "output_tokens", 0))
+    cache_read = _as_int(getattr(usage, "cache_read_input_tokens", 0))
+    cache_create = _as_int(getattr(usage, "cache_creation_input_tokens", 0))
+    stu = getattr(usage, "server_tool_use", None)
+    searches = _as_int(getattr(stu, "web_search_requests", 0)) if stu is not None else 0
+    model = str(getattr(message, "model", "") or "")
+    cost = _compute_cost(model, inp, out, cache_read, cache_create, searches)
     log.info(
-      "%s: %d input, %d output, %d cache_read, %d cache_create tokens",
-      label, usage.input_tokens, usage.output_tokens, cache_read, cache_create,
+      "%s: %d input, %d output, %d cache_read, %d cache_create, %d searches -> $%.4f",
+      label, inp, out, cache_read, cache_create, searches, cost,
     )
+    self._run_cost += cost
+    try:
+      with get_conn() as conn:
+        conn.execute(
+          """INSERT INTO api_costs
+             (id, created_at, step, model, input_tokens, output_tokens, cache_read, cache_write,
+              web_searches, cost_usd, ref_kind, ref_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+          (str(uuid.uuid4()), datetime.now(timezone.utc).isoformat(), label, model,
+           inp, out, cache_read, cache_create, searches, cost,
+           ref_kind, ref_id),
+        )
+    except Exception as exc:
+      log.warning("api_costs record failed for %s: %s", label, exc)
+    return cost
 
   def generate_post(self, user_message: str, series: bool = False) -> PostOut:
     self._ensure_prompts()
@@ -273,7 +324,9 @@ class BlogGenerator:
           {"type": "text", "text": self._sources_system_prompt, "cache_control": {"type": "ephemeral"}},
         ],
         tools=[
-          {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
+          # 2 searches (was 5): each web search injects a large (~30-45k token) result
+          # payload, and sources was ~half the cost of a generation. 2 is enough for 3-5 refs.
+          {"type": "web_search_20250305", "name": "web_search", "max_uses": 2},
           {**self._sources_tool, "cache_control": {"type": "ephemeral"}},
         ],
         tool_choice={"type": "any"},
@@ -345,12 +398,16 @@ class BlogGenerator:
     return topics
 
   def generate_with_review(
-    self, user_message: str, max_attempts: int = MAX_GENERATION_ATTEMPTS, series: bool = False
+    self, user_message: str, max_attempts: int = MAX_GENERATION_ATTEMPTS,
+    series: bool = False, with_sources: bool = True,
   ) -> tuple[PostOut, ReviewResult]:
-    """Generate a post and review it. Retry up to `max_attempts`, feeding review feedback into retries."""
+    """Generate a post and review it. Retry up to `max_attempts`, feeding review feedback into retries.
+    Set with_sources=False to skip the (expensive) web-search sources step — series runs it once
+    for the whole series instead of once per part."""
     best_post = None
     best_review = None
     prompt = user_message
+    self._run_cost = 0.0  # accumulate this run's cost across generate + review (+ sources)
     for attempt in range(max_attempts):
       post = self.generate_post(prompt, series=series)
       review = self.review_post(post)
@@ -366,7 +423,9 @@ class BlogGenerator:
           f"Issues found: {'; '.join(review.issues)}\n"
           f"Fix these specific issues in your next attempt."
         )
-    best_post.sources = self.find_sources(best_post)
+    if with_sources:
+      best_post.sources = self.find_sources(best_post)
+    self.last_run_cost = round(self._run_cost, 6)
     return best_post, best_review
 
   def plan_series(self, topic: str, series_type: dict, count: int, extra_guidance: str = "") -> SeriesPlan:
@@ -507,12 +566,17 @@ def _build_series_part_message(series_title: str, part: SeriesPart, outline: lis
 
 def generate_series(series_id: str, series_title: str, parts: list[SeriesPart]) -> None:
   """Generate one draft per part, assigning each to the series. Runs in the background
-  (off the event loop). Each part is isolated so one failure doesn't abort the rest."""
+  (off the event loop). Each part is isolated so one failure doesn't abort the rest.
+
+  Sources are found ONCE for the whole series (not per part) — the web-search step is the
+  single most expensive part of generation, so a series shares one set of references across
+  its parts rather than paying for it N times."""
+  first_post: PostOut | None = None
   for part in parts:
     try:
       user_message = _build_series_part_message(series_title, part, parts)
       post, review = blog_generator.generate_with_review(
-        user_message, max_attempts=SERIES_GENERATION_ATTEMPTS, series=True
+        user_message, max_attempts=SERIES_GENERATION_ATTEMPTS, series=True, with_sources=False,
       )
       _insert_draft(
         post,
@@ -521,9 +585,24 @@ def generate_series(series_id: str, series_title: str, parts: list[SeriesPart]) 
         series_id=series_id,
         series_order=part.part_number,
       )
+      if first_post is None:
+        first_post = post
       log.info("Series %s: generated part %d/%d (%r)", series_id, part.part_number, len(parts), post.slug)
     except Exception as exc:
       log.warning("Series %s: part %d failed: %s", series_id, part.part_number, exc)
+
+  # One sources call for the whole series, applied to every part's draft.
+  if first_post is not None:
+    try:
+      sources = blog_generator.find_sources(first_post)
+      if sources:
+        sources_json = json.dumps([s.model_dump() for s in sources])
+        with get_conn() as conn:
+          conn.execute("UPDATE drafts SET sources = ? WHERE series_id = ? AND status = 'pending'",
+                       (sources_json, series_id))
+        log.info("Series %s: attached %d shared sources to its drafts", series_id, len(sources))
+    except Exception as exc:
+      log.warning("Series %s: shared source search failed: %s", series_id, exc)
 
 
 def _fetch_unsplash_image(query: str) -> str | None:
@@ -586,9 +665,13 @@ def _insert_draft(
   review: ReviewResult | None = None,
   series_id: str | None = None,
   series_order: int | None = None,
+  cost_usd: float | None = None,
 ) -> DraftOut:
   now = datetime.now(timezone.utc)
   draft_id = str(uuid.uuid4())
+  # Default to the cost of the run that just produced this post.
+  if cost_usd is None:
+    cost_usd = blog_generator.last_run_cost
   q_score = review.score if review else None
   q_issues = json.dumps(review.issues) if review else "[]"
   q_strengths = json.dumps(review.strengths) if review else "[]"
@@ -597,8 +680,8 @@ def _insert_draft(
     conn.execute(
       """INSERT INTO drafts
          (id, slug, title, date, summary, tags, content, image, generated_at, topic_id, status,
-          quality_score, quality_issues, quality_strengths, sources, series_id, series_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)""",
+          quality_score, quality_issues, quality_strengths, sources, series_id, series_order, gen_cost_usd)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)""",
       (
         draft_id,
         post.slug,
@@ -616,6 +699,7 @@ def _insert_draft(
         sources_json,
         series_id,
         series_order,
+        cost_usd,
       ),
     )
   return DraftOut(
@@ -637,6 +721,7 @@ def _insert_draft(
     sources=post.sources,
     series_id=series_id,
     series_order=series_order,
+    gen_cost_usd=cost_usd,
   )
 
 

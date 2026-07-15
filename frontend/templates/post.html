@@ -144,8 +144,8 @@
   {% endif %}
 
   {% if post.summary %}
-  <div class="tldr-card">
-    <div class="tldr-label">TL;DR</div>
+  <div class="tldr-card{% if post.series_id %} tldr-series{% endif %}">
+    <div class="tldr-label">{% if post.series_id %}⚡ In this part{% else %}TL;DR{% endif %}</div>
     <p class="text-sm text-zinc-300 leading-relaxed m-0">{{ post.summary }}</p>
   </div>
   {% endif %}

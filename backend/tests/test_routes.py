@@ -563,6 +563,21 @@ def test_series_post_has_distinct_chapter_look(admin_client):
     assert b'series-band-part' in r.content
 
 
+def test_admin_stats_shows_cost_panel(admin_client):
+    import db
+    from datetime import datetime, timezone
+    with db.get_conn() as conn:
+        conn.execute(
+            "INSERT INTO api_costs (id, created_at, step, model, input_tokens, output_tokens,"
+            " cache_read, cache_write, web_searches, cost_usd)"
+            " VALUES ('c1', ?, 'generate', 'claude-sonnet-4-6', 1000, 2000, 0, 0, 0, 0.033)",
+            (datetime.now(timezone.utc).isoformat(),),
+        )
+    r = admin_client.get("/admin/stats")
+    assert r.status_code == 200
+    assert b"Anthropic API costs" in r.content
+
+
 def test_standalone_post_has_no_chapter_look(admin_client):
     admin_client.post("/api/posts", json={
         "title": "Solo Post", "summary": "Standalone.", "tags": ["x"], "content": "Body here.",
