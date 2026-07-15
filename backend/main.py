@@ -30,7 +30,7 @@ from code_validator import validate_content
 from config import read_secret
 from data.analytics import refresh_popular_posts
 from data.drafts import get_draft_status_counts, get_drafts
-from data.posts import get_all_posts, get_all_tags, get_category_counts, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, get_series_siblings, search_posts, total_pages
+from data.posts import get_all_posts, get_all_tags, get_category_counts, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, get_series, get_series_list, get_series_siblings, search_posts, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, deploy_row_to_dict, draft_row_to_dict, get_conn, init_db
 from middleware.csrf import CSRFMiddleware
@@ -312,6 +312,34 @@ async def post(request: Request, slug: str) -> str:
     })
 
 
+@app.get("/series", response_class=HTMLResponse)
+async def series_hub(request: Request) -> str:
+    """Public hub listing all series that have at least one published post."""
+    series = [s for s in get_series_list() if s["post_count"] > 0]
+    return templates.TemplateResponse(request, "series_list.html", {
+        "series": series,
+        "page_title": "Series",
+        "meta_description": "Multi-part series on Zdenovo — deep dives, overviews, and tutorials.",
+        "canonical_url": "https://zdenovo.com/series",
+    })
+
+
+@app.get("/series/{series_id}", response_class=HTMLResponse)
+async def series_detail(request: Request, series_id: str) -> str:
+    """Public landing page for one series: description + ordered list of its published parts."""
+    series = get_series(series_id)
+    parts = get_series_siblings(series_id) if series else []
+    if series is None or not parts:
+        return templates.TemplateResponse(request, "404.html", status_code=404)
+    return templates.TemplateResponse(request, "series_detail.html", {
+        "series": series,
+        "parts": parts,
+        "page_title": series["title"],
+        "meta_description": series.get("description") or f"The {series['title']} series on Zdenovo.",
+        "canonical_url": f"https://zdenovo.com/series/{series_id}",
+    })
+
+
 @app.get("/blog/{slug}/comments/{comment_id}/reply-form", response_class=HTMLResponse)
 async def comment_reply_form(request: Request, slug: str, comment_id: str) -> str:
     """Return inline reply form partial for HTMX."""
@@ -395,6 +423,7 @@ async def admin_root(request: Request, _: None = Depends(require_admin)) -> str:
         ).fetchone()
     real_comment_count = comment_count - generated_comment_count
     topic_count = len(_load_topics())
+    series_count = len(get_series_list())
     return templates.TemplateResponse(request, "admin_hub.html", {
         "post_count": len(posts),
         "pending_count": pending_count,
@@ -403,6 +432,7 @@ async def admin_root(request: Request, _: None = Depends(require_admin)) -> str:
         "generated_comment_count": generated_comment_count,
         "comment_pending_count": comment_pending_count,
         "topic_count": topic_count,
+        "series_count": series_count,
         "last_deploy_commit": last_deploy_row["commit_hash"] if last_deploy_row else None,
         "last_deploy_status": last_deploy_row["status"] if last_deploy_row else None,
     })
@@ -500,14 +530,26 @@ def _ai_toggle_btn(slug: str, enabled: bool) -> str:
 
 @app.get("/admin/series", response_class=HTMLResponse)
 async def admin_series(request: Request, _: None = Depends(require_admin)) -> str:
-    """List all post series."""
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT s.*, COUNT(p.slug) as post_count FROM series s"
-            " LEFT JOIN posts p ON p.series_id = s.id"
-            " GROUP BY s.id ORDER BY s.created_at DESC"
-        ).fetchall()
-    series = [dict(r) for r in rows]
+    """List all post series, each with its parts (pending drafts + published posts)."""
+    series = get_series_list()
+    for s in series:
+        with get_conn() as conn:
+            draft_rows = conn.execute(
+                "SELECT id, title, series_order, quality_score FROM drafts"
+                " WHERE series_id = ? AND status = 'pending' ORDER BY series_order ASC",
+                (s["id"],),
+            ).fetchall()
+        parts = [
+            {"kind": "draft", "order": d["series_order"], "title": d["title"],
+             "ref": f"/admin/drafts/{d['id']}", "score": d["quality_score"]}
+            for d in draft_rows
+        ] + [
+            {"kind": "post", "order": p["series_order"], "title": p["title"],
+             "ref": f"/blog/{p['slug']}"}
+            for p in get_series_siblings(s["id"])
+        ]
+        parts.sort(key=lambda x: (x["order"] is None, x["order"] or 0))
+        s["parts"] = parts
     from routers.series_api import load_series_types
     return templates.TemplateResponse(
         request, "admin_series.html", {"series": series, "series_types": load_series_types()}

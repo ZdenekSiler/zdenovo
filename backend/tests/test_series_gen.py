@@ -139,6 +139,19 @@ def test_generate_series_endpoint_creates_series_row(admin_client, monkeypatch):
   assert series_id in listed
 
 
+def test_generate_series_derives_short_id_from_topic_and_type(admin_client, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=_mock_client(PLAN_DATA)), \
+       patch("routers.generate_api.generate_series"):
+    resp = admin_client.post(
+      "/api/series/generate",
+      json={"topic": "LangChain", "series_type": "deep-dive", "parts": 2},
+    )
+  assert resp.status_code == 202
+  # id comes from topic+type, not the planner's verbose title
+  assert resp.json()["series_id"] == "langchain-deep-dive"
+
+
 def test_generate_series_endpoint_rejects_unknown_type(admin_client, monkeypatch):
   monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
   resp = admin_client.post(

@@ -501,3 +501,53 @@ def test_css_has_cache_busting_version(client):
     # after deploys that change light-mode or other styles.
     r = client.get("/")
     assert b"style.css?v=" in r.content
+
+
+# ── Series pages ──────────────────────────────────────────────────────────────
+
+def _make_series_with_parts(admin_client) -> str:
+    """Create a 2-part published series 'learning-rust' and return its id."""
+    from db import get_conn
+    admin_client.post("/api/series", json={"title": "Learning Rust", "description": "A Rust series."})
+    for n, (title, slug) in enumerate([("Rust Part 1", "rust-part-1"), ("Rust Part 2", "rust-part-2")], start=1):
+        admin_client.post("/api/posts", json={
+            "title": title, "summary": f"Summary {n}.", "tags": ["rust"], "content": "Body content here.",
+        })
+        with get_conn() as conn:
+            conn.execute("UPDATE posts SET series_id = ?, series_order = ? WHERE slug = ?", ("learning-rust", n, slug))
+    return "learning-rust"
+
+
+def test_series_hub_lists_series_with_published_posts(admin_client):
+    _make_series_with_parts(admin_client)
+    r = admin_client.get("/series")
+    assert r.status_code == 200
+    assert b"Learning Rust" in r.content
+
+
+def test_series_hub_omits_series_with_no_published_posts(admin_client):
+    admin_client.post("/api/series", json={"title": "Empty Series", "description": "no posts"})
+    r = admin_client.get("/series")
+    assert r.status_code == 200
+    assert b"Empty Series" not in r.content
+
+
+def test_series_detail_shows_ordered_parts(admin_client):
+    sid = _make_series_with_parts(admin_client)
+    r = admin_client.get(f"/series/{sid}")
+    assert r.status_code == 200
+    body = r.content
+    assert b"Rust Part 1" in body and b"Rust Part 2" in body
+    assert body.index(b"Rust Part 1") < body.index(b"Rust Part 2")
+
+
+def test_series_detail_unknown_returns_404(client):
+    r = client.get("/series/does-not-exist")
+    assert r.status_code == 404
+
+
+def test_post_page_series_strip_links_to_series_page(admin_client):
+    _make_series_with_parts(admin_client)
+    r = admin_client.get("/blog/rust-part-1")
+    assert r.status_code == 200
+    assert b'href="/series/learning-rust"' in r.content

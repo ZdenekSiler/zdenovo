@@ -152,7 +152,9 @@ async def generate_series_route(
 
     created_at = datetime.now(timezone.utc).isoformat()
     with get_conn() as conn:
-        series_id = _unique_series_id(conn, plan.series_title)
+        # Short, shareable id from the topic + spec type (e.g. "langchain-deep-dive"),
+        # not the planner's verbose title — the title is kept for display.
+        series_id = _unique_series_id(conn, f"{body.topic}-{series_type['id']}")
         conn.execute(
             "INSERT INTO series (id, title, description, created_at) VALUES (?,?,?,?)",
             (series_id, plan.series_title, plan.series_description, created_at),

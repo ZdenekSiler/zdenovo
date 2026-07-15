@@ -52,8 +52,10 @@ a module or endpoint, see @.claude/rules/architecture.md.
 Two parallel surfaces:
 
 1. **Server-rendered HTML pages** (`/`, `/projects`, `/blog`, `/blog/{slug}`,
-   `/admin`, `/admin/posts`, `/admin/drafts`, `/admin/comments`, `/admin/topics`,
-   `/admin/stats`) — Jinja2 templates rendered by `main.py`.
+   `/series`, `/series/{id}`, `/admin`, `/admin/posts`, `/admin/drafts`,
+   `/admin/comments`, `/admin/topics`, `/admin/stats`) — Jinja2 templates rendered by
+   `main.py`. `/series` lists all series with published parts; `/series/{id}` shows one
+   series' description + ordered parts (`series_list.html` / `series_detail.html`).
    The sidebar nav in `base.html` uses **HTMX** (`hx-get`, `hx-target="#main-content"`,
    `hx-select="#main-content"`, `hx-push-url="true"`, `hx-swap="innerHTML"`) to swap
    the main content area without a full page reload, giving SPA-like navigation with
@@ -124,12 +126,17 @@ to `/api/posts` or, for drafts, it's inserted directly by `drafts_api`).
 | `DELETE` | `/api/series/{id}` | Delete a series (unassigns its posts) |
 
 `POST /api/series/generate` plans N parts with Claude Haiku (`plan_series` tool, spec types
-in `data/series_types.json`), creates the `series` row, and returns `202` immediately with the
-outline. Each part is then generated in the **background** (off the event loop via
+in `data/series_types.json`), creates the `series` row (id derived as a short
+`slug(topic)-slug(series_type)`, e.g. `langchain-deep-dive`, which is also its public
+`/series/{id}` URL — the planner's fuller title is kept for display), and returns `202`
+immediately with the outline. Each part is then generated in the **background** (off the event loop via
 `asyncio.to_thread`) through the normal post pipeline and inserted into `drafts` with
 `series_id`/`series_order` set — so the series assignment carries into `posts` on approval and
 the "Part N of M" nav works once parts are published. Progress is observed via drafts appearing
 in `/admin/drafts` (no separate job-status table).
+
+See **[series.md](series.md)** for the full generate → validate → publish lifecycle with flow
+diagrams, the spec types, and the admin/public surfaces.
 
 ### Drafts — `/api/drafts` (`routers/drafts_api.py`)
 

@@ -100,6 +100,26 @@ def get_series_siblings(series_id: str) -> list[dict]:
     return [row_to_dict(r) for r in rows]
 
 
+def get_series_list() -> list[dict]:
+    """All series with a count of their *published* posts, newest first."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT s.*, COUNT(p.slug) AS post_count
+               FROM series s
+               LEFT JOIN posts p ON p.series_id = s.id
+               GROUP BY s.id
+               ORDER BY s.created_at DESC"""
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_series(series_id: str) -> dict | None:
+    """The single series row (id, title, description, created_at), or None."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM series WHERE id = ?", (series_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def search_posts(q: str) -> list[dict]:
     """Full-text search over posts using FTS5. Returns up to 10 results ranked by relevance."""
     if not q.strip():

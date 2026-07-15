@@ -14,6 +14,9 @@ Tags stored as JSON arrays. Schema and migrations in `backend/db.py` → `init_d
 **AI prompts:** Generation rules live in `backend/data/prompts/` (Markdown + JSON tool schemas),
 not in Python code. Edit the template files to change generation behavior.
 
+**Series:** Multi-part post collections, generated or assembled manually. See @docs/series.md
+for the generate → validate → publish lifecycle (with flow diagrams), spec types, and pages.
+
 ## Workflows
 
 See @docs/workflows.md for the design-then-implement workflow.

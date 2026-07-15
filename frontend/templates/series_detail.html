@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+{% block canonical_url %}{{ canonical_url }}{% endblock %}
+{% block og_title %}{{ page_title }} — Zdenovo{% endblock %}
+{% block og_description %}{{ meta_description }}{% endblock %}
+{% block og_url %}{{ canonical_url }}{% endblock %}
+
+{% block content %}
+<a href="/series"
+   hx-get="/series"
+   hx-target="#main-content"
+   hx-select="#main-content"
+   hx-push-url="true"
+   hx-swap="innerHTML"
+   hx-indicator="#htmx-indicator"
+   class="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-indigo-400 transition-colors mb-6">
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m15 18-6-6 6-6"/>
+  </svg>
+  All series
+</a>
+
+<div class="mb-8">
+  <p class="section-heading">Series</p>
+  <h1 class="text-2xl font-bold tracking-tight text-zinc-100 mb-2">{{ series.title }}</h1>
+  {% if series.description %}
+  <p class="text-sm text-zinc-500 leading-relaxed mb-2">{{ series.description }}</p>
+  {% endif %}
+  <p class="text-xs text-zinc-600">{{ parts | length }} part{{ 's' if parts | length != 1 else '' }}</p>
+</div>
+
+<ol class="space-y-6">
+  {% for post in parts %}
+  <li class="group">
+    <a href="/blog/{{ post.slug }}"
+       hx-get="/blog/{{ post.slug }}"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-push-url="true"
+       hx-swap="innerHTML"
+       hx-indicator="#htmx-indicator"
+       class="flex gap-4 items-start">
+      <span class="text-[10px] text-indigo-400 bg-indigo-400/10 border border-indigo-400/20 rounded-full px-2 py-0.5 shrink-0 mt-0.5">Part {{ post.series_order }}</span>
+      <div class="flex-1 min-w-0">
+        <h2 class="text-base font-semibold text-zinc-200 group-hover:text-indigo-400 transition-colors leading-snug mb-1">{{ post.title }}</h2>
+        <p class="text-xs text-zinc-500 leading-relaxed mb-1.5">{{ post.summary }}</p>
+        <div class="flex items-center gap-3">
+          <time class="text-[10px] text-zinc-600">{{ post.date | dateformat }}</time>
+          <span class="text-zinc-800">·</span>
+          <span class="text-[10px] text-zinc-600">{{ post.reading_time }} min read</span>
+        </div>
+      </div>
+    </a>
+    {% if not loop.last %}<hr class="border-zinc-800/60 mt-6" />{% endif %}
+  </li>
+  {% endfor %}
+</ol>
+{% endblock %}

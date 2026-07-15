@@ -114,7 +114,7 @@
 
   {% if series_posts and series_position %}
   <div class="series-nav mb-6 p-4 border border-indigo-500/20 bg-indigo-500/5 rounded-xl">
-    <p class="text-xs text-indigo-400 font-medium mb-3">Part {{ series_position }} of {{ series_posts | length }}{% if series_title %} — {{ series_title }}{% endif %}</p>
+    <p class="text-xs text-indigo-400 font-medium mb-3">Part {{ series_position }} of {{ series_posts | length }}{% if series_title %} — <a href="/series/{{ post.series_id }}" hx-get="/series/{{ post.series_id }}" hx-target="#main-content" hx-select="#main-content" hx-push-url="true" hx-swap="innerHTML" hx-indicator="#htmx-indicator" class="underline decoration-indigo-500/40 hover:decoration-indigo-400 hover:text-indigo-300 transition-colors">{{ series_title }}</a>{% endif %}</p>
     <div class="flex gap-3">
       {% if series_position > 1 %}
       {% set prev_post = series_posts[series_position - 2] %}
