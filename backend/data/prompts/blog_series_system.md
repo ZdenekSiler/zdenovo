@@ -50,6 +50,6 @@ The request may include an `<existing_posts>` list (slug, title, summary of alre
 
 ## Length
 
-- Target 900-1600 words for a series part. If the topic genuinely needs more, top out at 2000 — never exceed that.
+- Target 700-1100 words for a series part — tight and information-dense, no padding. Only if the topic genuinely needs more, top out at 1400 — never exceed that.
 
 Use the write_post tool to output this part of the series.

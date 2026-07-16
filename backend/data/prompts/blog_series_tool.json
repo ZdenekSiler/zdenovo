@@ -23,7 +23,7 @@
       },
       "content": {
         "type": "string",
-        "description": "Full part body in Markdown, 900-1600 words, written as a chapter of the series. Must: open with a short 'where we are' orientation that recalls earlier parts by name (or frames the series in Part 1); use ## sections that build sequentially; include fenced code blocks with language tags where relevant; include a key-takeaways callout (> 🧭 Key takeaways) near the end; and close with a one-to-two sentence teaser for the next part (or a short conclusion tying the series together if this is the final part). Do NOT include any Mermaid diagram. Use a Markdown table only for a genuine multi-row comparison — never to decorate; zero tables is fine. Mix prose, lists, and code so no more than 3 plain paragraphs run together."
+        "description": "Full part body in Markdown, 700-1100 words (tight, no padding), written as a chapter of the series. Must: open with a short 'where we are' orientation that recalls earlier parts by name (or frames the series in Part 1); use ## sections that build sequentially; include fenced code blocks with language tags where relevant; include a key-takeaways callout (> 🧭 Key takeaways) near the end; and close with a one-to-two sentence teaser for the next part (or a short conclusion tying the series together if this is the final part). Do NOT include any Mermaid diagram. Use a Markdown table only for a genuine multi-row comparison — never to decorate; zero tables is fine. Mix prose, lists, and code so no more than 3 plain paragraphs run together."
       }
     },
     "required": ["title", "summary", "tags", "content"]

@@ -64,8 +64,10 @@ def _mock_client_usage(payload: dict, model: str = "claude-sonnet-4-6", inp: int
 
 def test_compute_cost_math():
   from routers.generate_api import _compute_cost
-  # 1000 input + 2000 output on Sonnet = (1000*3 + 2000*15)/1e6 = 0.033
+  # 1000 input + 2000 output on Sonnet 4.6 = (1000*3 + 2000*15)/1e6 = 0.033
   assert _compute_cost("claude-sonnet-4-6", 1000, 2000, 0, 0, 0) == round(0.033, 6)
+  # Sonnet 5 intro pricing = (1000*2 + 2000*10)/1e6 = 0.022
+  assert _compute_cost("claude-sonnet-5", 1000, 2000, 0, 0, 0) == round(0.022, 6)
   # web searches add $0.01 each
   assert _compute_cost("claude-haiku-4-5-20251001", 0, 0, 0, 0, 2) == round(0.02, 6)
 

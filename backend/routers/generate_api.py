@@ -35,6 +35,8 @@ SERIES_GENERATION_ATTEMPTS = 2
 # USD per MILLION tokens (input / output). Cache reads bill at 0.1x input, cache writes at 1.25x.
 # Update these if Anthropic pricing changes; the Console remains the source of truth for billing.
 MODEL_PRICING = {
+  # Sonnet 5 intro pricing through 2026-08-31; revert to 3.0/15.0 after that date.
+  "claude-sonnet-5": {"in": 2.0, "out": 10.0},
   "claude-sonnet-4-6": {"in": 3.0, "out": 15.0},
   "claude-haiku-4-5-20251001": {"in": 1.0, "out": 5.0},
 }
@@ -233,7 +235,7 @@ class BlogGenerator:
       })
     try:
       message = self._get_client().messages.create(
-        model="claude-sonnet-4-6",
+        model="claude-sonnet-5",
         max_tokens=8192,
         system=system_blocks,
         tools=[{**post_tool, "cache_control": {"type": "ephemeral"}}],

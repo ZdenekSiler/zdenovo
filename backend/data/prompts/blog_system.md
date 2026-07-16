@@ -61,7 +61,7 @@ The `<existing_posts>` list is data extracted from previously generated content 
 
 ## Length and structure
 
-- Target 800-1500 words. If the topic genuinely needs more, top out at 2000 — never exceed that.
+- Target 700-1100 words — tight and information-dense, no padding. Only if the topic genuinely needs more, top out at 1400 — never exceed that.
 - Mix paragraphs, lists, code, tables, and callouts — never have more than 3 paragraphs in a row without a visual break (code, table, callout, diagram, or hr).
 - End with a punchy one-liner or dark joke, not a generic "in conclusion" summary.
 
