@@ -334,6 +334,31 @@ def test_admin_drafts_lists_standalone_separately(admin_client, monkeypatch):
   assert f"draft-{standalone_id}" in html
 
 
+def _mock_client_usage(payload: dict, model: str = "claude-sonnet-4-6", inp: int = 1000, out: int = 2000):
+  tb = MagicMock(); tb.type = "tool_use"; tb.input = payload
+  u = MagicMock(); u.input_tokens = inp; u.output_tokens = out
+  u.cache_read_input_tokens = 0; u.cache_creation_input_tokens = 0; u.server_tool_use = None
+  m = MagicMock(); m.content = [tb]; m.usage = u; m.model = model
+  c = MagicMock(); c.messages.create.return_value = m
+  return c
+
+
+def test_regenerate_accumulates_gen_cost(admin_client, monkeypatch):
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  did = str(uuid.uuid4())
+  now = datetime.now(timezone.utc).isoformat()
+  with get_conn() as conn:  # seed a pending draft that already cost $0.05 to generate
+    conn.execute(
+      "INSERT INTO drafts (id, slug, title, date, summary, tags, content, generated_at, topic_id,"
+      " status, sources, gen_cost_usd) VALUES (?,?,?,?,?,?,?,?,'freeform','pending','[]',?)",
+      (did, "s", "T", "2026-07-16", "sum", '["t"]', "body", now, 0.05),
+    )
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=_mock_client_usage(MOCK_POST_DATA)):
+    r = admin_client.post(f"/api/drafts/{did}/regenerate", json={"remarks": "tighten the intro"})
+  assert r.status_code == 200
+  assert r.json()["gen_cost_usd"] > 0.05  # original 0.05 + this regeneration's cost
+
+
 def test_admin_drafts_completeness_counts_published(admin_client):
   _seed_series_row("grp", 2)
   _insert_series_draft("grp", 2)  # Part 2 pending draft

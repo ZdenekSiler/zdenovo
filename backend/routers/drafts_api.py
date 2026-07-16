@@ -220,8 +220,12 @@ def _regenerate_draft(draft_id: str, remarks: str) -> DraftOut:
   brief = _find_brief(draft["topic_id"])
   prompt = _build_regenerate_message(draft, remarks, brief)
 
+  # Accumulate this regeneration's cost onto the draft's running gen_cost_usd — a regenerate
+  # is additional spend on the same post, so the per-post figure should reflect the total.
+  blog_generator._run_cost = 0.0
   post = _call_claude(prompt)
   review = _review_post(post)
+  regen_cost = round(blog_generator._run_cost, 6)
   now = datetime.now(timezone.utc)
 
   with get_conn() as conn:
@@ -230,7 +234,7 @@ def _regenerate_draft(draft_id: str, remarks: str) -> DraftOut:
          slug=?, title=?, summary=?, tags=?, content=?,
          generated_at=?, status='pending',
          quality_score=?, quality_issues=?, quality_strengths=?,
-         admin_remarks=?
+         admin_remarks=?, gen_cost_usd=COALESCE(gen_cost_usd, 0) + ?
        WHERE id=?""",
       (
         post.slug,
@@ -243,6 +247,7 @@ def _regenerate_draft(draft_id: str, remarks: str) -> DraftOut:
         json.dumps(review.issues),
         json.dumps(review.strengths),
         remarks,
+        regen_cost,
         draft_id,
       ),
     )
