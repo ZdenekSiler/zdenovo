@@ -503,6 +503,12 @@ def test_css_has_cache_busting_version(client):
     assert b"style.css?v=" in r.content
 
 
+def test_prism_sql_component_is_loaded(client):
+    # SQL code blocks need Prism's sql language component to be highlighted.
+    r = client.get("/")
+    assert b"prism-sql.min.js" in r.content
+
+
 # ── Series pages ──────────────────────────────────────────────────────────────
 
 def _make_series_with_parts(admin_client) -> str:
