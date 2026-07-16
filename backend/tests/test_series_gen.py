@@ -312,6 +312,30 @@ def test_generate_part_endpoint_202(admin_client):
   assert r.json()["part_number"] == 2
 
 
+def test_add_series_part_appends_to_outline_and_generates(admin_client):
+  _seed_series_with_outline("s5", 2)
+  with patch("routers.generate_api.generate_series_part") as mock_gen:
+    r = admin_client.post("/api/series/s5/parts", json={
+      "title": "Comparison Part", "angle": "vs others", "key_points": ["a"], "suggested_tags": ["x"],
+    })
+  assert r.status_code == 202
+  assert r.json()["part_number"] == 3  # appended after the 2 existing
+  assert mock_gen.called
+  import db
+  with db.get_conn() as conn:
+    outline = json.loads(conn.execute("SELECT outline FROM series WHERE id='s5'").fetchone()["outline"])
+  assert outline["total"] == 3
+  assert outline["parts"][-1]["title"] == "Comparison Part"
+
+
+def test_add_series_part_unknown_series_404(admin_client):
+  assert admin_client.post("/api/series/nope/parts", json={"title": "X"}).status_code == 404
+
+
+def test_add_series_part_requires_admin(client):
+  assert client.post("/api/series/x/parts", json={"title": "X"}, follow_redirects=False).status_code == 303
+
+
 def test_generate_part_endpoint_unknown_series_404(admin_client):
   assert admin_client.post("/api/series/nope/parts/1/generate").status_code == 404
 

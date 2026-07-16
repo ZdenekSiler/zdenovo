@@ -59,6 +59,14 @@ class SeriesGenerateOut(BaseModel):
     parts: list[dict]
 
 
+class SeriesPartIn(BaseModel):
+    """Request body for appending a new part to an existing series' outline."""
+    title: str = Field(..., min_length=1, max_length=300)
+    angle: str = Field(default="", max_length=1000)
+    key_points: list[str] = Field(default_factory=list)
+    suggested_tags: list[str] = Field(default_factory=list)
+
+
 class SeriesProgressPart(BaseModel):
     series_order: int | None = None
     title: str
@@ -214,6 +222,36 @@ def series_progress(series_id: str, _: None = Depends(_get_require_admin())) -> 
     ]
     parts.sort(key=lambda x: (x.series_order is None, x.series_order or 0))
     return SeriesProgressOut(series_id=series_id, parts=parts)
+
+
+@router.post("/{series_id}/parts", status_code=202)
+async def add_series_part(
+    series_id: str, body: SeriesPartIn, _: None = Depends(_get_require_admin())
+) -> dict:
+    """Append a new part to a series' outline and generate it in the background (admin only).
+    Fills the gap where a series needs an extra part (e.g. a comparison chapter) after the
+    fact — without a raw DB edit or rebuilding the whole series."""
+    from routers.generate_api import SeriesPart, generate_series_part
+
+    with get_conn() as conn:
+        row = conn.execute("SELECT title, outline FROM series WHERE id = ?", (series_id,)).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Series not found")
+        outline = json.loads(row["outline"]) if row["outline"] else {"total": 0, "parts": []}
+        parts = outline.get("parts", [])
+        new_number = max((p["part_number"] for p in parts), default=0) + 1
+        parts.append({
+            "part_number": new_number, "title": body.title, "angle": body.angle,
+            "key_points": body.key_points, "suggested_tags": body.suggested_tags,
+        })
+        outline["parts"] = parts
+        outline["total"] = len(parts)
+        conn.execute("UPDATE series SET outline = ? WHERE id = ?", (json.dumps(outline), series_id))
+        series_title = row["title"]
+
+    all_parts = [SeriesPart(**p) for p in parts]
+    asyncio.create_task(asyncio.to_thread(generate_series_part, series_id, series_title, all_parts, new_number))
+    return {"series_id": series_id, "part_number": new_number, "title": body.title, "status": "generating"}
 
 
 @router.post("/{series_id}/parts/{part_number}/generate", status_code=202)
