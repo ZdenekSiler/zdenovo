@@ -413,9 +413,10 @@ def test_generate_post_sends_corpus_as_cached_system_block(test_db, monkeypatch)
   assert "<existing_posts>" not in kwargs["messages"][0]["content"]
 
 
-def test_series_generation_attempts_below_default():
+def test_series_generation_attempts_capped():
   from routers.generate_api import MAX_GENERATION_ATTEMPTS, SERIES_GENERATION_ATTEMPTS
-  assert SERIES_GENERATION_ATTEMPTS < MAX_GENERATION_ATTEMPTS
+  # Series never retries more than one-off generation (both are cost-capped at 2).
+  assert SERIES_GENERATION_ATTEMPTS <= MAX_GENERATION_ATTEMPTS
 
 
 def test_generate_series_caps_retry_attempts(test_db, monkeypatch):

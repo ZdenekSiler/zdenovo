@@ -27,9 +27,10 @@ PROMPTS_DIR = Path(__file__).parent.parent / "data" / "prompts"
 def _get_require_admin():
     from routers.auth import require_admin
     return require_admin
-MAX_GENERATION_ATTEMPTS = 3
-# Series generate N posts at once, so each wasted retry is multiplied by N. Cap series parts
-# to fewer attempts than one-off generation — the review loop still keeps the best attempt.
+# Drafts pass the slop review on the first attempt almost always (observed avg 8.29/10,
+# 100% >= 6), so a 3rd retry rarely fires — 2 attempts keeps the review loop's safety net
+# at ~⅔ the worst-case cost. The loop still keeps the best-scoring attempt.
+MAX_GENERATION_ATTEMPTS = 2
 SERIES_GENERATION_ATTEMPTS = 2
 
 # USD per MILLION tokens (input / output). Cache reads bill at 0.1x input, cache writes at 1.25x.
@@ -326,9 +327,10 @@ class BlogGenerator:
           {"type": "text", "text": self._sources_system_prompt, "cache_control": {"type": "ephemeral"}},
         ],
         tools=[
-          # 2 searches (was 5): each web search injects a large (~30-45k token) result
-          # payload, and sources was ~half the cost of a generation. 2 is enough for 3-5 refs.
-          {"type": "web_search_20250305", "name": "web_search", "max_uses": 2},
+          # 1 search (was 5, then 2): each web search injects a large (~30-45k token) result
+          # payload — the dominant cost of the sources step. One search returns enough results
+          # to extract 3-5 references; sources are a nice-to-have, not worth paying for breadth.
+          {"type": "web_search_20250305", "name": "web_search", "max_uses": 1},
           {**self._sources_tool, "cache_control": {"type": "ephemeral"}},
         ],
         tool_choice={"type": "any"},
