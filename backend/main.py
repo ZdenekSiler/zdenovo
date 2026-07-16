@@ -866,6 +866,26 @@ async def admin_stats(request: Request, _: None = Depends(require_admin)) -> str
     })
 
 
+@app.get("/api/costs/summary")
+async def api_costs_summary(request: Request, _: None = Depends(require_admin)):
+    """JSON snapshot of API spend + an internal quality signal, for the /cost-review skill.
+    Admin only. Spend comes from the api_costs table; quality from draft review scores."""
+    from fastapi.responses import JSONResponse
+    data = _api_cost_summary()
+    with get_conn() as conn:
+        q = conn.execute(
+            "SELECT COUNT(*) AS n, AVG(quality_score) AS avg,"
+            " SUM(CASE WHEN quality_score >= 6 THEN 1 ELSE 0 END) AS passing"
+            " FROM drafts WHERE quality_score IS NOT NULL"
+        ).fetchone()
+    data["quality"] = {
+        "drafts_scored": q["n"],
+        "avg_review_score": round(q["avg"], 2) if q["avg"] is not None else None,
+        "passing_ge6": q["passing"] or 0,
+    }
+    return JSONResponse(data)
+
+
 # ─── Admin Topics ─────────────────────────────────────────────────────────────
 
 @app.get("/admin/topics", response_class=HTMLResponse)

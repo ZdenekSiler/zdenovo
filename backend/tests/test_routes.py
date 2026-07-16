@@ -509,6 +509,20 @@ def test_prism_sql_component_is_loaded(client):
     assert b"prism-sql.min.js" in r.content
 
 
+def test_costs_summary_endpoint_returns_json(admin_client):
+    r = admin_client.get("/api/costs/summary")
+    assert r.status_code == 200
+    body = r.json()
+    for key in ("by_step", "by_model", "today", "all_total", "quality"):
+        assert key in body
+    assert "avg_review_score" in body["quality"]
+
+
+def test_costs_summary_requires_admin(client):
+    r = client.get("/api/costs/summary", follow_redirects=False)
+    assert r.status_code == 303
+
+
 # ── Series pages ──────────────────────────────────────────────────────────────
 
 def _make_series_with_parts(admin_client) -> str:
