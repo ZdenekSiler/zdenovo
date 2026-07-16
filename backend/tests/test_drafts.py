@@ -1,6 +1,11 @@
+import json
+import uuid
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+from db import get_conn
 
 
 MOCK_POST_DATA = {
@@ -275,6 +280,69 @@ def test_admin_drafts_page_status_approved_filters(admin_client, monkeypatch):
   html = resp.content.decode()
   assert f'id="draft-{approved_id}"' in html
   assert f'id="draft-{pending_id}"' not in html
+
+
+# ─── /admin/drafts series grouping ────────────────────────────────────────────
+
+def _seed_series_row(series_id: str, total: int) -> None:
+  import json
+  parts = [{"part_number": i, "title": f"Outline P{i}", "angle": "a", "key_points": [], "suggested_tags": []}
+           for i in range(1, total + 1)]
+  with get_conn() as conn:
+    conn.execute("INSERT INTO series (id, title, description, created_at, outline) VALUES (?,?,?,?,?)",
+                 (series_id, "My Series", "d", "2026-07-16", json.dumps({"total": total, "parts": parts})))
+
+
+def _insert_series_draft(series_id: str, order: int, status: str = "pending") -> str:
+  did = str(uuid.uuid4())
+  now = datetime.now(timezone.utc).isoformat()
+  with get_conn() as conn:
+    conn.execute(
+      "INSERT INTO drafts (id, slug, title, date, summary, tags, content, generated_at, topic_id,"
+      " status, sources, series_id, series_order) VALUES (?,?,?,?,?,?,?,?,?,?,'[]',?,?)",
+      (did, f"{series_id}-part-{order}", f"Part {order} Title", "2026-07-16", "s", '["t"]', "body",
+       now, f"series:{series_id}", status, series_id, order),
+    )
+  return did
+
+
+def test_admin_drafts_groups_series_parts_in_order(admin_client):
+  _seed_series_row("grp", 2)
+  d1 = _insert_series_draft("grp", 1)
+  d2 = _insert_series_draft("grp", 2)
+  html = admin_client.get("/admin/drafts?status=pending").content.decode()
+  assert "My Series" in html
+  assert html.index(f"draft-{d1}") < html.index(f"draft-{d2}")
+
+
+def test_admin_drafts_shows_missing_part_with_generate(admin_client):
+  _seed_series_row("grp", 3)
+  _insert_series_draft("grp", 1)
+  _insert_series_draft("grp", 2)  # Part 3 has no draft/post -> missing
+  html = admin_client.get("/admin/drafts?status=pending").content.decode()
+  assert "2 of 3 parts" in html
+  assert "missing" in html
+  assert "/api/series/grp/parts/3/generate" in html
+
+
+def test_admin_drafts_lists_standalone_separately(admin_client, monkeypatch):
+  _seed_series_row("grp", 1)
+  _insert_series_draft("grp", 1)
+  standalone_id = _insert_draft(admin_client, monkeypatch)  # non-series draft
+  html = admin_client.get("/admin/drafts?status=pending").content.decode()
+  assert "Standalone drafts" in html
+  assert f"draft-{standalone_id}" in html
+
+
+def test_admin_drafts_completeness_counts_published(admin_client):
+  _seed_series_row("grp", 2)
+  _insert_series_draft("grp", 2)  # Part 2 pending draft
+  with get_conn() as conn:  # Part 1 already published
+    conn.execute("INSERT INTO posts (slug, title, date, summary, tags, content, series_id, series_order)"
+                 " VALUES ('grp-part-1', 'P1', '2026-07-16', 's', '[\"t\"]', 'body', 'grp', 1)")
+  html = admin_client.get("/admin/drafts?status=pending").content.decode()
+  assert "2 of 2 parts" in html
+  assert "published" in html
 
 
 def test_admin_drafts_page_shows_filter_pill_counts(admin_client, monkeypatch):

@@ -29,7 +29,7 @@ load_dotenv()  # no-op if .env absent; prod uses file secrets
 from code_validator import validate_content
 from config import read_secret
 from data.analytics import refresh_popular_posts
-from data.drafts import get_draft_status_counts, get_drafts
+from data.drafts import get_draft_status_counts, get_drafts_grouped
 from data.posts import get_all_posts, get_all_tags, get_category_counts, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, get_series, get_series_list, get_series_siblings, search_posts, total_pages
 from data.projects import get_all_projects
 from db import comment_row_to_dict, deploy_row_to_dict, draft_row_to_dict, get_conn, init_db
@@ -609,9 +609,10 @@ async def admin_drafts(
     """List drafts, filtered by status. Defaults to pending-only (the actionable
     review queue) when no ?status= is given; ?status=all shows everything."""
     effective_status = status or "pending"
-    drafts = get_drafts(None if effective_status == "all" else effective_status)
+    grouped = get_drafts_grouped(None if effective_status == "all" else effective_status)
     return templates.TemplateResponse(request, "drafts_list.html", {
-        "drafts": drafts,
+        "series_groups": grouped["series_groups"],
+        "standalone": grouped["standalone"],
         "status_counts": get_draft_status_counts(),
         "current_status": effective_status,
     })
