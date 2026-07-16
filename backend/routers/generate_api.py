@@ -609,13 +609,18 @@ def _existing_series_sources(series_id: str) -> str | None:
   """Reuse a sibling's sources (published post or pending draft) so regenerating one part
   costs no extra web search. Returns a JSON sources string, or None."""
   with get_conn() as conn:
-    for table in ("posts", "drafts"):
-      row = conn.execute(
-        f"SELECT sources FROM {table} WHERE series_id = ? AND sources IS NOT NULL"
-        f" AND sources != '[]' LIMIT 1", (series_id,)
-      ).fetchone()
-      if row and row["sources"]:
-        return row["sources"]
+    row = conn.execute(
+      "SELECT sources FROM posts WHERE series_id = ? AND sources IS NOT NULL AND sources != '[]' LIMIT 1",
+      (series_id,),
+    ).fetchone()
+    if row and row["sources"]:
+      return row["sources"]
+    row = conn.execute(
+      "SELECT sources FROM drafts WHERE series_id = ? AND sources IS NOT NULL AND sources != '[]' LIMIT 1",
+      (series_id,),
+    ).fetchone()
+    if row and row["sources"]:
+      return row["sources"]
   return None
 
 
