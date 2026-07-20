@@ -836,3 +836,64 @@ def test_discovery_accepts_fresh_candidate_across_all_sources(client, test_db, m
   from routers.topics_api import _load_topics
   titles = [t["title_hint"] for t in _load_topics()]
   assert "Why Rust Ownership Beats Garbage Collection" in titles
+
+
+# ─── Auto-generation toggle ───────────────────────────────────────────────────
+
+def test_scheduled_generation_skips_when_auto_gen_off(test_db, monkeypatch):
+  # Default (no settings row) is OFF: the scheduled wrapper must no-op and touch no Claude.
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  from routers.drafts_api import run_scheduled_generation
+  with patch("routers.generate_api.anthropic.Anthropic") as mock_anthropic:
+    result = run_scheduled_generation()
+  assert result == {"generated": 0, "skipped": True}
+  mock_anthropic.assert_not_called()
+  with get_conn() as conn:
+    assert conn.execute("SELECT COUNT(*) FROM drafts").fetchone()[0] == 0
+
+
+def test_scheduled_generation_runs_when_auto_gen_on(test_db, monkeypatch):
+  import db
+  db.set_setting("auto_generation_enabled", "1")
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  mock_client = _make_mock_client()
+  from routers.drafts_api import run_scheduled_generation
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+    result = run_scheduled_generation()
+  assert result["generated"] == 1
+  with get_conn() as conn:
+    assert conn.execute("SELECT COUNT(*) FROM drafts").fetchone()[0] == 1
+
+
+def test_manual_generate_works_while_auto_gen_off(admin_client, monkeypatch):
+  # Requirement 4: the manual trigger must generate even when scheduled auto-gen is OFF.
+  monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+  mock_client = _make_mock_client()
+  with patch("routers.generate_api.anthropic.Anthropic", return_value=mock_client):
+    resp = admin_client.post("/api/drafts/generate")
+  assert resp.status_code == 201
+  assert resp.json()["generated"] == 1
+
+
+def test_toggle_auto_gen_requires_admin(client):
+  resp = client.post("/admin/drafts/toggle-auto-gen", follow_redirects=False)
+  assert resp.status_code == 303
+
+
+def test_toggle_auto_gen_flips_state(admin_client):
+  import db
+  # Starts OFF → first toggle turns it ON.
+  resp = admin_client.post("/admin/drafts/toggle-auto-gen")
+  assert resp.status_code == 200
+  assert "Auto: on" in resp.text
+  assert db.get_setting("auto_generation_enabled") == "1"
+  # Second toggle turns it back OFF.
+  resp = admin_client.post("/admin/drafts/toggle-auto-gen")
+  assert "Auto: off" in resp.text
+  assert db.get_setting("auto_generation_enabled") == "0"
+
+
+def test_admin_drafts_page_shows_auto_toggle_off_by_default(admin_client):
+  resp = admin_client.get("/admin/drafts")
+  assert resp.status_code == 200
+  assert b"Auto: off" in resp.content

@@ -183,3 +183,40 @@ def test_init_db_is_idempotent_does_not_duplicate_fts_rows(test_db):
     with db.get_conn() as conn:
         fts_after = conn.execute("SELECT COUNT(*) FROM posts_fts").fetchone()[0]
     assert fts_after == fts_before
+
+
+# ── settings (key/value store) ────────────────────────────────────────────────
+
+def test_settings_table_exists_after_init(test_db):
+    import db
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='settings'"
+        ).fetchone()
+    assert row is not None
+
+
+def test_get_setting_returns_default_when_absent(test_db):
+    import db
+    assert db.get_setting("nope") is None
+    assert db.get_setting("nope", "0") == "0"
+
+
+def test_set_then_get_setting_round_trips(test_db):
+    import db
+    db.set_setting("auto_generation_enabled", "1")
+    assert db.get_setting("auto_generation_enabled", "0") == "1"
+
+
+def test_set_setting_overwrites_existing(test_db):
+    import db
+    db.set_setting("auto_generation_enabled", "1")
+    db.set_setting("auto_generation_enabled", "0")
+    assert db.get_setting("auto_generation_enabled") == "0"
+
+
+def test_init_db_idempotent_preserves_settings(test_db):
+    import db
+    db.set_setting("auto_generation_enabled", "1")
+    db.init_db()  # second call must not drop the settings row
+    assert db.get_setting("auto_generation_enabled") == "1"

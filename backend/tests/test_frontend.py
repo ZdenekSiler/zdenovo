@@ -177,7 +177,9 @@ def test_blog_post_has_tldr(page: Page):
     tldr = page.locator(".tldr-card")
     if tldr.count() > 0:
         expect(tldr).to_be_visible()
-        expect(tldr.locator(".tldr-label")).to_have_text("TL;DR")
+        # Standalone posts label this "TL;DR"; series parts label it "⚡ In this part"
+        # (post.html). The first /blog post can be either, so accept both.
+        expect(tldr.locator(".tldr-label")).to_have_text(re.compile(r"TL;DR|In this part"))
 
 
 # ─── Code blocks & Mermaid ───────────────────────────────────────────────────

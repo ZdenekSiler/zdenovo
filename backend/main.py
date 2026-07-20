@@ -32,10 +32,10 @@ from data.analytics import refresh_popular_posts
 from data.drafts import get_draft_status_counts, get_drafts_grouped
 from data.posts import get_all_posts, get_all_tags, get_category_counts, get_popular_posts, get_post_by_slug, get_posts_page, get_related_posts, get_series, get_series_list, get_series_siblings, search_posts, total_pages
 from data.projects import get_all_projects
-from db import comment_row_to_dict, deploy_row_to_dict, draft_row_to_dict, get_conn, init_db
+from db import comment_row_to_dict, deploy_row_to_dict, draft_row_to_dict, get_conn, get_setting, init_db, set_setting
 from middleware.csrf import CSRFMiddleware
 from routers.comments_api import generate_pending_comments, router as comments_router
-from routers.drafts_api import _regenerate_draft, generate_daily_drafts, generate_single_topic, router as drafts_router
+from routers.drafts_api import AUTO_GEN_SETTING, _regenerate_draft, generate_single_topic, router as drafts_router, run_scheduled_generation
 from routers.generate_api import router as generate_router
 from routers.posts_api import router as posts_router
 from routers.series_api import router as series_router
@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
     init_db()
     refresh_popular_posts()
     scheduler = AsyncIOScheduler(timezone="UTC")
-    scheduler.add_job(generate_daily_drafts, "cron", hour=2, minute=0)
+    scheduler.add_job(run_scheduled_generation, "cron", hour=2, minute=0)
     scheduler.add_job(refresh_popular_posts, "cron", hour="6,14,22", minute=0)
     scheduler.add_job(generate_pending_comments, "interval", days=3)
     scheduler.start()
@@ -526,6 +526,27 @@ def _ai_toggle_btn(slug: str, enabled: bool) -> str:
     )
 
 
+@app.post("/admin/drafts/toggle-auto-gen", response_class=HTMLResponse)
+async def toggle_auto_gen(_: None = Depends(require_admin)) -> str:
+    """Toggle the scheduled daily draft generation on/off."""
+    new_val = "0" if get_setting(AUTO_GEN_SETTING, "0") == "1" else "1"
+    set_setting(AUTO_GEN_SETTING, new_val)
+    return _auto_gen_toggle_btn(new_val == "1")
+
+
+def _auto_gen_toggle_btn(enabled: bool) -> str:
+    """HTML for the scheduled-auto-generation toggle button."""
+    label = "Auto: on" if enabled else "Auto: off"
+    cls = "text-emerald-400 border-emerald-900/40 hover:border-emerald-700/60" if enabled else "text-zinc-500"
+    return (
+        f'<button hx-post="/admin/drafts/toggle-auto-gen" '
+        f'hx-target="this" hx-swap="outerHTML" '
+        f'class="btn-ghost text-xs {cls}" '
+        f'title="Daily 02:00 UTC auto-generation of drafts">'
+        f'{label}</button>'
+    )
+
+
 # ─── Admin Series ─────────────────────────────────────────────────────────────
 
 @app.get("/admin/series", response_class=HTMLResponse)
@@ -615,6 +636,7 @@ async def admin_drafts(
         "standalone": grouped["standalone"],
         "status_counts": get_draft_status_counts(),
         "current_status": effective_status,
+        "auto_gen_enabled": get_setting(AUTO_GEN_SETTING, "0") == "1",
     })
 
 

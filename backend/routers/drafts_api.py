@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from code_validator import ValidationSummary, validate_content
 from data.categories import categorize, load_categories
-from db import draft_row_to_dict, get_conn, row_to_dict
+from db import draft_row_to_dict, get_conn, get_setting, row_to_dict
 from routers.generate_api import (
   DraftOut,
   PostBrief,
@@ -25,6 +25,9 @@ from routers.generate_api import (
 from routers.topics_api import TopicIn, create_topics, _load_topics
 
 log = logging.getLogger(__name__)
+
+# Global setting gating the scheduled daily generation. Absent/"0" = off (the default).
+AUTO_GEN_SETTING = "auto_generation_enabled"
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"])
 
@@ -280,6 +283,15 @@ def generate_daily_drafts() -> dict:
     _insert_draft(post, topic_id=topic.id, review=review)
     generated += 1
   return {"generated": generated, "available": len(available) - generated, "total": len(topics)}
+
+
+def run_scheduled_generation() -> dict:
+  """Scheduler entry point. Gated by the auto_generation_enabled flag so only the cron run
+  is guarded — manual triggers call generate_daily_drafts() directly and stay unaffected."""
+  if get_setting(AUTO_GEN_SETTING, "0") != "1":
+    log.info("Scheduled draft generation skipped — auto_generation_enabled is off")
+    return {"generated": 0, "skipped": True}
+  return generate_daily_drafts()
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────

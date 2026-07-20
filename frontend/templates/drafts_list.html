@@ -71,13 +71,24 @@
 
 <div class="mb-6 flex items-center justify-between">
   <span class="text-xs text-zinc-600">{{ series_groups | length }} series · {{ standalone | length }} standalone</span>
-  <button
-    hx-post="/api/drafts/generate"
-    hx-swap="none"
-    hx-on::after-request="window.location.reload()"
-    class="btn-primary text-xs">
-    Generate today's drafts
-  </button>
+  <div class="flex items-center gap-2">
+    {% if auto_gen_enabled %}
+    <button hx-post="/admin/drafts/toggle-auto-gen" hx-target="this" hx-swap="outerHTML"
+            class="btn-ghost text-xs text-emerald-400 border-emerald-900/40 hover:border-emerald-700/60"
+            title="Daily 02:00 UTC auto-generation of drafts">Auto: on</button>
+    {% else %}
+    <button hx-post="/admin/drafts/toggle-auto-gen" hx-target="this" hx-swap="outerHTML"
+            class="btn-ghost text-xs text-zinc-500"
+            title="Daily 02:00 UTC auto-generation of drafts">Auto: off</button>
+    {% endif %}
+    <button
+      hx-post="/api/drafts/generate"
+      hx-swap="none"
+      hx-on::after-request="window.location.reload()"
+      class="btn-primary text-xs">
+      Generate today's drafts
+    </button>
+  </div>
 </div>
 
 <div class="mb-6 flex flex-wrap gap-1.5">

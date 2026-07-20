@@ -184,8 +184,13 @@ pool via trending-topic discovery when it runs low (see "Draft Generation Pipeli
 
 ## Draft Generation Pipeline
 
-1. **Scheduler** — `AsyncIOScheduler` (UTC) runs `generate_daily_drafts()` daily at 02:00,
-   set up in `main.py`'s `lifespan`. The same function backs `POST /api/drafts/generate`.
+1. **Scheduler** — `AsyncIOScheduler` (UTC) runs `run_scheduled_generation()` daily at 02:00,
+   set up in `main.py`'s `lifespan`. That wrapper is gated by the `auto_generation_enabled`
+   setting (default **off**): when off it logs and no-ops; when on it calls
+   `generate_daily_drafts()`. The manual `POST /api/drafts/generate` and the admin
+   "Generate today's drafts" button call `generate_daily_drafts()` directly, so they always
+   work regardless of the toggle. Admins flip the flag from `/admin/drafts`
+   (`POST /admin/drafts/toggle-auto-gen`).
 2. `generate_daily_drafts()` checks the available (unused) topic pool in the `topics`
    table. If it's below `POOL_MIN_THRESHOLD` (5), it calls
    `discover_and_replenish_topics()` first: picks the most under-represented of the 4
@@ -215,6 +220,8 @@ pool via trending-topic discovery when it runs low (see "Draft Generation Pipeli
   `image`, `generated_at`, `topic_id`, `status` (`pending` / `approved`), `sources` (JSON array)
 - **`topics`**: `id` (PK, slug), `title_hint`, `description`, `audience`, `tone`, `tags`
   (JSON array), `outline` (JSON array), `created_at` — the daily-generation topic pool
+- **`settings`**: `key` (PK), `value` — global key/value flags (e.g. `auto_generation_enabled`).
+  An absent key means unset, so callers pass their own default (auto-gen defaults to off)
 - **Seed**: three initial posts from `seed_posts.json` and the topic pool from
   `data/daily_topics.json`, each inserted on first startup only if its table is empty
 - `blog.db` is gitignored — delete it to reset to seed data; `init_db()` also migrates

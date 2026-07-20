@@ -30,6 +30,9 @@ Thumbs.db
 .vscode/settings.json
 .idea/
 
+# MCP tool artifacts
+.playwright-mcp/
+
 # Logs
 *.log
 npm-debug.log*

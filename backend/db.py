@@ -180,6 +180,15 @@ def init_db() -> None:
             )
         """)
 
+        # Global key/value settings (e.g. auto_generation_enabled). An absent key means
+        # "unset" — callers pass their own default. No seed rows, so defaults win on a fresh DB.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
+
         # ── FTS5 full-text search ──────────────────────────────────────────────
         conn.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS posts_fts USING fts5(
@@ -262,6 +271,23 @@ def init_db() -> None:
                     for t in _load_topics_seed()
                 ],
             )
+
+
+def get_setting(key: str, default: str | None = None) -> str | None:
+    """Return the stored value for key, or default if the key is not set."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row is not None else default
+
+
+def set_setting(key: str, value: str) -> None:
+    """Upsert a global setting."""
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
 
 
 def row_to_dict(row: sqlite3.Row) -> dict:
