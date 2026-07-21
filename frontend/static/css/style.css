@@ -774,6 +774,8 @@ html.light .prose-custom { color: #27272a; }
 html.light .prose-custom h2,
 html.light .prose-custom h3 { color: #18181b !important; }
 html.light .prose-custom a { color: #4f46e5; }
+/* Bold text: the base .prose-custom strong is #e4e4e7 (near-white) — invisible on a light bg */
+html.light .prose-custom strong { color: #18181b; }
 /* Code blocks: light gray background in light mode, Prism token colors override */
 html.light .prose-custom pre[class*="language-"] {
   background-color: #f6f8fa !important;
@@ -842,6 +844,20 @@ html.light .tldr-series {
 html.light .tldr-series .tldr-label { color: #a21caf; }
 html.light .tldr-series p { color: #6b21a8 !important; }
 html.light .tldr-label { color: #4f46e5; }
+
+/* ── Hardcoded dark-mode zinc text utilities are near-white on a light background.
+   Darken the too-light ones inside the content and sidebar regions — sources links,
+   related-post titles, "Most Popular" items, the profile card, /series cards. ── */
+html.light #main-content .text-zinc-100,
+html.light #main-content .text-zinc-200,
+html.light #main-content .text-zinc-300,
+html.light #sidebar .text-zinc-100,
+html.light #sidebar .text-zinc-200,
+html.light #sidebar .text-zinc-300 { color: #27272a; }
+html.light #main-content .text-zinc-400,
+html.light #sidebar .text-zinc-400 { color: #52525b; }
+/* Semi-dark utility cards → light surface in light mode (e.g. the /series list cards) */
+html.light #main-content .bg-zinc-900\/40 { background-color: #f8f8fb; }
 
 /* ── Sidebar ── */
 html.light aside { color: #3f3f46; }
