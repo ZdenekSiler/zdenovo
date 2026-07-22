@@ -1,8 +1,10 @@
 import json
 import logging
+import re
 import uuid
 from datetime import date as Date, datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import anthropic
 import httpx
@@ -656,16 +658,52 @@ def generate_series_part(series_id: str, series_title: str, parts: list[SeriesPa
     log.warning("Series %s: regenerating part %d failed: %s", series_id, part_number, exc)
 
 
-def _fetch_unsplash_image(query: str) -> str | None:
-  access_key = read_secret("unsplash_access_key", "UNSPLASH_ACCESS_KEY")
-  if not access_key:
+# A stored hero URL carries a per-request `ixid` query param that changes on every fetch, so the
+# SAME photo yields DIFFERENT URLs. De-duplication therefore keys on the stable `photo-<slug>`
+# path segment (Unsplash) rather than the full URL.
+_UNSPLASH_PHOTO_RE = re.compile(r"/(photo-[0-9a-z\-]+)", re.IGNORECASE)
+
+
+def image_dedup_key(url: str | None) -> str | None:
+  """Stable identity for a hero image, used to avoid reusing the same picture twice.
+  Unsplash → the `photo-…` path segment; other hosts (e.g. picsum) → host+path sans query
+  (picsum seeds are already per-slug unique). Empty/None → None."""
+  if not url:
     return None
+  m = _UNSPLASH_PHOTO_RE.search(url)
+  if m:
+    return m.group(1).lower()
+  parts = urlsplit(url)
+  if parts.netloc:
+    return f"{parts.netloc}{parts.path}".lower()
+  return url.lower()
+
+
+def used_image_keys() -> set[str]:
+  """Every hero image already reserved by a published post or any draft, as dedup keys."""
+  with get_conn() as conn:
+    rows = conn.execute("SELECT image FROM posts WHERE image IS NOT NULL").fetchall()
+    rows += conn.execute("SELECT image FROM drafts WHERE image IS NOT NULL").fetchall()
+  keys = {image_dedup_key(r["image"]) for r in rows}
+  keys.discard(None)
+  return keys
+
+
+def search_image_candidates(query: str, exclude: set[str] = frozenset(), count: int = 6) -> list[dict]:
+  """Search Unsplash and return up to `count` UNUSED landscape candidates as
+  [{key, alt, thumb, full}] — `full` is the URL to store, `thumb` drives the picker grid.
+  Over-fetches (per_page ~ count*2) so excluded photos still leave enough choices.
+  Returns [] when there's no Unsplash key or no query (→ picsum fallback upstream).
+  Note: Unsplash's demo tier allows ~50 requests/hour — fine for interactive admin use."""
+  access_key = read_secret("unsplash_access_key", "UNSPLASH_ACCESS_KEY")
+  if not access_key or not query:
+    return []
   try:
     resp = httpx.get(
       "https://api.unsplash.com/search/photos",
       params={
         "query": query,
-        "per_page": 1,
+        "per_page": min(30, max(count * 2, count + 4)),
         "orientation": "landscape",
         "content_filter": "high",
       },
@@ -674,21 +712,46 @@ def _fetch_unsplash_image(query: str) -> str | None:
     )
     resp.raise_for_status()
     results = resp.json().get("results", [])
-    if not results:
-      return None
-    photo = results[0]
-    raw_url = photo["urls"]["raw"]
-    return f"{raw_url}&w=800&h=400&fit=crop&q=80"
   except Exception as exc:
     log.warning("Unsplash search failed for %r: %s", query, exc)
-    return None
+    return []
+
+  candidates: list[dict] = []
+  seen = set(exclude)
+  for photo in results:
+    raw_url = photo.get("urls", {}).get("raw")
+    if not raw_url:
+      continue
+    full = f"{raw_url}&w=800&h=400&fit=crop&q=80"
+    key = image_dedup_key(full)
+    if key is None or key in seen:
+      continue
+    seen.add(key)
+    candidates.append({
+      "key": key,
+      "alt": photo.get("alt_description") or query,
+      "thumb": photo.get("urls", {}).get("thumb") or full,
+      "full": full,
+    })
+    if len(candidates) >= count:
+      break
+  return candidates
 
 
-def _get_hero_image(image_query: str, title: str, tags: list[str], slug: str) -> str:
+def _fetch_unsplash_image(query: str, exclude: set[str] = frozenset()) -> str | None:
+  candidates = search_image_candidates(query, exclude=exclude, count=1)
+  return candidates[0]["full"] if candidates else None
+
+
+def _get_hero_image(
+  image_query: str, title: str, tags: list[str], slug: str, exclude: set[str] | None = None
+) -> str:
+  if exclude is None:
+    exclude = used_image_keys()
   for query in [image_query, " ".join(tags[:3]), title]:
     if not query:
       continue
-    url = _fetch_unsplash_image(query)
+    url = _fetch_unsplash_image(query, exclude=exclude)
     if url:
       return url
   return f"https://picsum.photos/seed/{slug}/800/400"

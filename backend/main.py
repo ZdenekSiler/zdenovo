@@ -37,6 +37,7 @@ from middleware.csrf import CSRFMiddleware
 from routers.comments_api import generate_pending_comments, router as comments_router
 from routers.drafts_api import AUTO_GEN_SETTING, _regenerate_draft, generate_single_topic, router as drafts_router, run_scheduled_generation
 from routers.generate_api import router as generate_router
+from routers.generate_api import image_dedup_key, search_image_candidates, used_image_keys
 from routers.posts_api import router as posts_router
 from routers.series_api import router as series_router
 from routers.topics_api import _enrich_topics, _load_topics, _save_topics, _slugify, category_balance, create_topics, list_topics_for_admin, router as topics_router
@@ -692,6 +693,47 @@ async def admin_draft_regenerate(
         response.headers["HX-Redirect"] = f"/admin/drafts/{draft_id}"
         return response
     return RedirectResponse(f"/admin/drafts/{draft_id}", status_code=303)
+
+
+@app.get("/admin/drafts/{draft_id}/image-candidates", response_class=HTMLResponse)
+async def admin_draft_image_candidates(
+    request: Request, draft_id: str, query: str = "", _: None = Depends(require_admin)
+) -> str:
+    """Return a grid of unused Unsplash thumbnails for swapping a draft's hero image."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
+    if row is None:
+        return templates.TemplateResponse(request, "404.html", status_code=404)
+    draft = draft_row_to_dict(row)
+    q = query.strip() or " ".join(draft["tags"][:3]) or draft["title"]
+    candidates = search_image_candidates(q, exclude=used_image_keys(), count=6)
+    return templates.TemplateResponse(request, "_image_candidates.html", {
+        "draft": draft,
+        "candidates": candidates,
+        "query": q,
+    })
+
+
+@app.post("/admin/drafts/{draft_id}/image", response_class=HTMLResponse)
+async def admin_draft_set_image(
+    request: Request, draft_id: str, image: str = Form(...), _: None = Depends(require_admin)
+) -> str:
+    """Set a draft's hero image to an admin-chosen picture, refusing an already-used one."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
+        if row is None:
+            return templates.TemplateResponse(request, "404.html", status_code=404)
+        draft = draft_row_to_dict(row)
+        # Every reserved key EXCEPT this draft's current one (which we're replacing).
+        used = used_image_keys()
+        used.discard(image_dedup_key(draft.get("image")))
+        chosen_key = image_dedup_key(image)
+        if chosen_key is not None and chosen_key in used:
+            raise HTTPException(status_code=409, detail="That image is already used by another post or draft.")
+        conn.execute("UPDATE drafts SET image = ? WHERE id = ?", (image, draft_id))
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
+    return templates.TemplateResponse(request, "_draft_hero.html", {"draft": draft_row_to_dict(row)})
 
 
 # ─── Admin Comments ───────────────────────────────────────────────────────────

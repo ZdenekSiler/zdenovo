@@ -212,6 +212,25 @@ pool via trending-topic discovery when it runs low (see "Draft Generation Pipeli
    `POST /api/drafts/{id}/approve` (copies the row into `posts`, marks `status='approved'`)
    or `DELETE`s it.
 
+### Hero images — uniqueness & the admin picker
+
+Each post/draft gets a hero image from Unsplash at generation time
+(`_get_hero_image` → `search_image_candidates` in `generate_api.py`). Images are **de-duplicated
+so no picture is used twice** across published posts *and* all drafts.
+
+- **Identity:** a stored URL carries a per-request `ixid` query param that changes on every
+  fetch, so the same photo yields different URLs. Dedup keys on the stable `photo-<slug>` path
+  segment via `image_dedup_key(url)`; the "used set" is derived on the fly from `posts.image` +
+  `drafts.image` by `used_image_keys()` — no separate table, so swapping or deleting a draft
+  updates it automatically.
+- **At generation:** `_get_hero_image` passes `used_image_keys()` as an exclusion set; Unsplash
+  is over-fetched and the first *unused* candidate wins (picsum fallback stays per-slug unique).
+- **Admin picker:** in the draft review page, "Change image" calls
+  `GET /admin/drafts/{id}/image-candidates?query=` (renders `_image_candidates.html`, a grid of
+  unused Unsplash thumbnails), and clicking one `POST`s to `/admin/drafts/{id}/image`, which
+  refuses an already-used photo and re-renders the `_draft_hero.html` fragment in place. Both
+  routes are `require_admin`. Approve carries the chosen `draft.image` into `posts.image`.
+
 ## Database
 
 - **Engine**: SQLite (Python built-in, `blog.db` in `backend/`)

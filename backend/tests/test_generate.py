@@ -254,3 +254,58 @@ def test_generate_prompt_omits_existing_posts_tag_when_no_posts(admin_client, mo
   corpus_blocks = [b for b in generation_call.kwargs["system"] if b["text"].startswith("<existing_posts>")]
   assert not corpus_blocks
   assert "<existing_posts>" not in generation_call.kwargs["messages"][0]["content"]
+
+
+# ─── Hero image de-duplication ──────────────────────────────────────────────────
+
+def test_image_dedup_key_ignores_ixid():
+  """Same Unsplash photo with different per-request ixid → same key."""
+  from routers.generate_api import image_dedup_key
+  a = "https://images.unsplash.com/photo-123abc?ixid=AAA&ixlib=rb-4.1.0&w=800&h=400&fit=crop&q=80"
+  b = "https://images.unsplash.com/photo-123abc?ixid=BBB&w=400&fit=crop"
+  assert image_dedup_key(a) == image_dedup_key(b) == "photo-123abc"
+
+
+def test_image_dedup_key_picsum_and_empty():
+  from routers.generate_api import image_dedup_key
+  assert image_dedup_key("https://picsum.photos/seed/foo/800/400") == "picsum.photos/seed/foo/800/400"
+  assert image_dedup_key(None) is None
+  assert image_dedup_key("") is None
+
+
+def test_used_image_keys_covers_posts_and_drafts(test_db):
+  from db import get_conn
+  from routers.generate_api import used_image_keys
+  with get_conn() as conn:
+    conn.execute(
+      "INSERT INTO posts (slug, title, date, summary, tags, content, image) VALUES (?,?,?,?,?,?,?)",
+      ("s1", "T1", "2026-01-01", "sum", "[]", "body",
+       "https://images.unsplash.com/photo-postpic?ixid=x&w=800"),
+    )
+    conn.execute(
+      """INSERT INTO drafts (id, slug, title, date, summary, tags, content, image,
+                             generated_at, topic_id, status)
+         VALUES (?,?,?,?,?,?,?,?,?,?, 'pending')""",
+      ("d1", "s2", "T2", "2026-01-01", "sum", "[]", "body",
+       "https://images.unsplash.com/photo-draftpic?ixid=y&w=800",
+       "2026-01-01T00:00:00+00:00", "freeform"),
+    )
+  keys = used_image_keys()
+  assert "photo-postpic" in keys
+  assert "photo-draftpic" in keys
+
+
+def test_get_hero_image_skips_used(test_db, monkeypatch):
+  """When the top hit is already used, _get_hero_image picks the next unused candidate."""
+  from routers import generate_api as g
+
+  pool = [
+    {"key": "photo-aaa", "full": "https://images.unsplash.com/photo-aaa?ixid=1&w=800", "thumb": "t", "alt": "a"},
+    {"key": "photo-bbb", "full": "https://images.unsplash.com/photo-bbb?ixid=2&w=800", "thumb": "t", "alt": "b"},
+  ]
+  monkeypatch.setattr(
+    g, "search_image_candidates",
+    lambda query, exclude=frozenset(), count=6: [c for c in pool if c["key"] not in exclude][:count],
+  )
+  assert "photo-aaa" in g._get_hero_image("ai", "T", ["ai"], "slug", exclude=set())
+  assert "photo-bbb" in g._get_hero_image("ai", "T", ["ai"], "slug", exclude={"photo-aaa"})

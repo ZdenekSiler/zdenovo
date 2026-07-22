@@ -897,3 +897,68 @@ def test_admin_drafts_page_shows_auto_toggle_off_by_default(admin_client):
   resp = admin_client.get("/admin/drafts")
   assert resp.status_code == 200
   assert b"Auto: off" in resp.content
+
+
+# ─── Hero image picker ──────────────────────────────────────────────────────────
+
+def _draft_image(draft_id: str) -> str | None:
+  with get_conn() as conn:
+    row = conn.execute("SELECT image FROM drafts WHERE id = ?", (draft_id,)).fetchone()
+  return row["image"]
+
+
+def test_set_image_updates_draft(admin_client, monkeypatch):
+  draft_id = _insert_draft(admin_client, monkeypatch)
+  new_url = "https://images.unsplash.com/photo-chosen?ixid=z&w=800&h=400&fit=crop&q=80"
+  resp = admin_client.post(f"/admin/drafts/{draft_id}/image", data={"image": new_url})
+  assert resp.status_code == 200
+  assert "photo-chosen" in resp.text   # re-rendered hero fragment shows the new image (& is HTML-escaped)
+  assert _draft_image(draft_id) == new_url
+
+
+def test_set_image_rejects_already_used(admin_client, monkeypatch):
+  draft_id = _insert_draft(admin_client, monkeypatch)
+  # Another post already reserves photo-dup (different ixid, same photo).
+  with get_conn() as conn:
+    conn.execute(
+      "INSERT INTO posts (slug, title, date, summary, tags, content, image) VALUES (?,?,?,?,?,?,?)",
+      ("taken", "Taken", "2026-01-01", "s", "[]", "b",
+       "https://images.unsplash.com/photo-dup?ixid=AAA&w=800"),
+    )
+  resp = admin_client.post(
+    f"/admin/drafts/{draft_id}/image",
+    data={"image": "https://images.unsplash.com/photo-dup?ixid=BBB&w=800&h=400&fit=crop&q=80"},
+  )
+  assert resp.status_code == 409
+
+
+def test_image_candidates_excludes_used(admin_client, monkeypatch):
+  draft_id = _insert_draft(admin_client, monkeypatch)
+  with get_conn() as conn:
+    conn.execute(
+      "INSERT INTO posts (slug, title, date, summary, tags, content, image) VALUES (?,?,?,?,?,?,?)",
+      ("p", "P", "2026-01-01", "s", "[]", "b",
+       "https://images.unsplash.com/photo-used?ixid=x&w=800"),
+    )
+  captured = {}
+
+  def fake_search(query, exclude=frozenset(), count=6):
+    captured["exclude"] = set(exclude)
+    return [{"key": "photo-new", "full": "https://images.unsplash.com/photo-new?w=800",
+             "thumb": "https://images.unsplash.com/photo-new?w=200", "alt": "new"}]
+
+  monkeypatch.setattr("main.search_image_candidates", fake_search)
+  resp = admin_client.get(f"/admin/drafts/{draft_id}/image-candidates", params={"query": "servers"})
+  assert resp.status_code == 200
+  assert "photo-used" in captured["exclude"]   # the used post image was excluded
+  assert "photo-new" in resp.text              # the candidate thumbnail rendered
+
+
+def test_image_candidates_requires_admin(client):
+  resp = client.get("/admin/drafts/whatever/image-candidates", follow_redirects=False)
+  assert resp.status_code == 303   # redirect to /admin/login
+
+
+def test_set_image_requires_admin(client):
+  resp = client.post("/admin/drafts/whatever/image", data={"image": "x"}, follow_redirects=False)
+  assert resp.status_code == 303

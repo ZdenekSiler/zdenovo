@@ -1,0 +1,19 @@
+<div id="draft-hero">
+  {% if draft.image %}
+  <img src="{{ draft.image }}" alt="{{ draft.title }}" class="post-hero" loading="lazy">
+  {% else %}
+  <div class="post-hero flex items-center justify-center bg-zinc-900/40 text-zinc-600 text-sm">No image</div>
+  {% endif %}
+
+  <div class="flex items-center gap-3 -mt-4 mb-8">
+    <button type="button"
+      hx-get="/admin/drafts/{{ draft.id }}/image-candidates"
+      hx-target="#image-candidates"
+      hx-swap="innerHTML"
+      hx-indicator="#image-candidates-spinner"
+      class="btn-ghost text-xs">Change image</button>
+    <span id="image-candidates-spinner" class="htmx-indicator text-xs text-indigo-400">Searching Unsplash…</span>
+  </div>
+
+  <div id="image-candidates"></div>
+</div>

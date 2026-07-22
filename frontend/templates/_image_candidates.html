@@ -1,0 +1,33 @@
+<div class="mb-8 p-4 rounded-lg border border-zinc-800/60 bg-zinc-900/30">
+  <form hx-get="/admin/drafts/{{ draft.id }}/image-candidates"
+        hx-target="#image-candidates"
+        hx-swap="innerHTML"
+        hx-indicator="#image-candidates-spinner"
+        class="flex items-center gap-2 mb-4">
+    <input type="search" name="query" value="{{ query }}"
+      placeholder="Search Unsplash — e.g. snowflake, servers, neural network…"
+      class="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-indigo-500/60">
+    <button type="submit" class="btn-ghost text-xs">Search</button>
+  </form>
+
+  {% if candidates %}
+  <p class="text-xs text-zinc-500 mb-3">Click a picture to set it as the hero. Already-used images are hidden.</p>
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+    {% for c in candidates %}
+    <button type="button"
+      hx-post="/admin/drafts/{{ draft.id }}/image"
+      hx-vals='{"image": {{ c.full | tojson }}}'
+      hx-target="#draft-hero"
+      hx-swap="outerHTML"
+      class="group relative block overflow-hidden rounded-lg border border-zinc-800 hover:border-indigo-500/60 focus:outline-none focus:border-indigo-500 transition-colors"
+      title="{{ c.alt }}">
+      <img src="{{ c.thumb }}" alt="{{ c.alt }}" loading="lazy"
+        class="w-full h-24 object-cover transition-transform group-hover:scale-105">
+      <span class="absolute inset-x-0 bottom-0 px-2 py-1 text-[10px] text-zinc-100 bg-black/60 truncate">{{ c.alt }}</span>
+    </button>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-xs text-zinc-500">No new images found for "{{ query }}" — try a different search term (all top results may already be in use, or the Unsplash key isn't configured).</p>
+  {% endif %}
+</div>
