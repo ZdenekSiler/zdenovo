@@ -191,6 +191,12 @@ DRY_RUN=1 ./scripts/draft-to-prod.sh copy <draft_id>
 DEBUG=1   ./scripts/draft-to-prod.sh copy <draft_id>
 ```
 
+`scripts/draft-to-prod.sh` and its `scripts/lib/` helpers are **tracked in git**. When a
+session that touched `main` used this tooling, its exact commands are also saved as a runnable
+per-session replay under **`scripts/command-log/session-<date>-replay.sh`** (with a companion
+annotated log `session-<date>-commands.md`). Those per-session files are **git-ignored**
+(`scripts/command-log/session-*`) since they're personal and specific to one run.
+
 ---
 
 ## Rollback

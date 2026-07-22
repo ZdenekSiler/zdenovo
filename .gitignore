@@ -55,9 +55,9 @@ __pycache__/
 tmp/
 temp/
 
-# Local-only dev→prod draft tooling (writes directly to the prod DB — kept out of git)
-scripts/draft-to-prod.sh
-scripts/lib/
+# Per-session command-log replays & logs (session-specific, personal — not shared).
+# The reusable tooling (scripts/draft-to-prod.sh, scripts/lib/) IS tracked in git.
+scripts/command-log/session-*
 
 # pdf
 
