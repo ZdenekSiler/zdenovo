@@ -108,10 +108,28 @@ Deploy the current branch to https://zdenovo.com on the Hetzner VPS.
    "
    ```
 
-6. **Report the result:**
+6. **Record the deploy audit trail (REQUIRED — do not skip).**
+   Append a dated entry (newest first) to `scripts/command-log/deploy-log.md` capturing the
+   full, ordered command log for THIS deploy, following the command-log rules in
+   `.claude/rules/debugging.md`:
+   - the exact commands run, in order, each with a one-line purpose + outcome;
+   - **flag every prod-mutating / live-server command with ⚠️** (the `ssh … make prod`, any
+     `docker compose … exec`);
+   - **redact secrets** — never echo `.env`/`secrets/`; show `<redacted>`;
+   - the deployed commit hash + subject, the verification result (post count / HTTP status and
+     prod `BUILD_COMMIT`), and success/failure.
+
+   Create the file with a short header if it doesn't exist. This is the human-readable audit
+   trail for **every** prod deploy (it complements the JSON deploy-event `make prod` records).
+   It is tracked in git (NOT a `session-*` file, so not gitignored). Then commit just this log
+   (`git add scripts/command-log/deploy-log.md && git commit -m "docs(deploy): audit <hash>"`);
+   no extra push needed — it rides along on the next deploy's push.
+
+7. **Report the result:**
    - Commit hash deployed (`git -C /home/zdenek/projects/zdenovo/backend rev-parse --short HEAD`)
    - Build success/failure
    - Verification: post count + status code
+   - The audit-trail entry appended to `scripts/command-log/deploy-log.md`
    - Link: https://zdenovo.com
 
 ### If something goes wrong
@@ -131,3 +149,4 @@ Deploy the current branch to https://zdenovo.com on the Hetzner VPS.
 - Deploy from a branch other than `main`
 - Stage `.env`, `secrets/`, `*.db`, or `*.bak` files
 - Push to the server without committing first (the server does `git pull`)
+- Finish a prod deploy without recording the audit-trail entry (step 6)
