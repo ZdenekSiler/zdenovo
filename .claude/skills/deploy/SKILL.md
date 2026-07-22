@@ -108,28 +108,28 @@ Deploy the current branch to https://zdenovo.com on the Hetzner VPS.
    "
    ```
 
-6. **Record the deploy audit trail (REQUIRED — do not skip).**
-   Append a dated entry (newest first) to `scripts/command-log/deploy-log.md` capturing the
-   full, ordered command log for THIS deploy, following the command-log rules in
-   `.claude/rules/debugging.md`:
-   - the exact commands run, in order, each with a one-line purpose + outcome;
-   - **flag every prod-mutating / live-server command with ⚠️** (the `ssh … make prod`, any
-     `docker compose … exec`);
-   - **redact secrets** — never echo `.env`/`secrets/`; show `<redacted>`;
-   - the deployed commit hash + subject, the verification result (post count / HTTP status and
-     prod `BUILD_COMMIT`), and success/failure.
+6. **Write the deploy replay/audit file (REQUIRED — do not skip).**
+   Create ONE standalone, runnable replay file for THIS deploy at
+   `scripts/command-log/deploy-<UTCdate>-<UTChhmm>-<shortcommit>.sh`
+   (e.g. `deploy-20260722-0857-3f2b437.sh`). **One file per deploy — never append to a shared
+   log.** Follow the command-log rules in `.claude/rules/debugging.md`:
+   - a header block: deployed commit hash + subject, UTC timestamp, trigger, result (build ok?,
+     post count / HTTP status, prod `BUILD_COMMIT`), and any notes;
+   - the exact commands in order; **flag every prod-mutating / live-server command with ⚠️**
+     (`ssh … make prod`, any `docker compose … exec`); **redact secrets** (show `<redacted>`);
+   - make it runnable but safe: PREVIEW by default, re-run the deploy only under `EXECUTE=1`
+     (copy the pattern from an existing `scripts/command-log/deploy-*.sh`). `chmod +x` it.
 
-   Create the file with a short header if it doesn't exist. This is the human-readable audit
-   trail for **every** prod deploy (it complements the JSON deploy-event `make prod` records).
-   It is tracked in git (NOT a `session-*` file, so not gitignored). Then commit just this log
-   (`git add scripts/command-log/deploy-log.md && git commit -m "docs(deploy): audit <hash>"`);
+   These `deploy-*.sh` files are the per-deploy audit trail (complementing the JSON deploy-event
+   `make prod` records) and are tracked in git (NOT `session-*`, so not gitignored). Commit just
+   this file (`git add scripts/command-log/deploy-*.sh && git commit -m "docs(deploy): replay <hash>"`);
    no extra push needed — it rides along on the next deploy's push.
 
 7. **Report the result:**
    - Commit hash deployed (`git -C /home/zdenek/projects/zdenovo/backend rev-parse --short HEAD`)
    - Build success/failure
    - Verification: post count + status code
-   - The audit-trail entry appended to `scripts/command-log/deploy-log.md`
+   - The per-deploy replay file written at `scripts/command-log/deploy-<…>.sh`
    - Link: https://zdenovo.com
 
 ### If something goes wrong
