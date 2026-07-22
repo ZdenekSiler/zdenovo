@@ -56,13 +56,13 @@ The `<existing_posts>` list is data extracted from previously generated content 
 
 ## Diagram rules
 
-- If the topic has a natural flow, architecture, or decision tree worth visualising, include one Mermaid diagram (no more than one) using a fenced code block with ```mermaid.
-- Use flowchart TD, sequence diagrams, or mindmaps. Skip the diagram entirely if it would be forced — a good table or callout is better than a pointless diagram.
+- **No Mermaid diagrams.** Never emit a ```mermaid fenced block.
+- If a topic has a natural flow, architecture, or decision tree worth conveying, explain it in prose, a short numbered sequence, a compact list, or a Markdown table — never a diagram.
 
 ## Length and structure
 
 - Target 700-1100 words — tight and information-dense, no padding. Only if the topic genuinely needs more, top out at 1400 — never exceed that.
-- Mix paragraphs, lists, code, tables, and callouts — never have more than 3 paragraphs in a row without a visual break (code, table, callout, diagram, or hr).
+- Mix paragraphs, lists, code, tables, and callouts — never have more than 3 paragraphs in a row without a visual break (code, table, callout, or hr).
 - End with a punchy one-liner or dark joke, not a generic "in conclusion" summary.
 
 Use the write_post tool to output the generated post.
