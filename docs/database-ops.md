@@ -112,6 +112,22 @@ curl -X DELETE https://yourdomain.com/api/posts/<slug>
 
 The API is the safest way to modify prod data — it respects validation and won't corrupt the schema.
 
+### Moving a draft (or fixing a hero image) dev → prod
+
+A generated draft is a **row**, not a file, so `make prod` (git pull + rebuild) never carries
+it over. To copy the exact reviewed draft into the prod DB — or swap a wrong hero image — use
+the annotated **[draft dev→prod playbook](playbooks/draft-dev-to-prod.md)** and its runnable
+wrapper `scripts/draft-to-prod.sh`:
+
+```bash
+./scripts/draft-to-prod.sh copy <draft_id>                        # dev row → prod drafts table
+./scripts/draft-to-prod.sh set-image <draft_id> "<query>" [id]    # replace hero image (dev + prod)
+DRY_RUN=1 ./scripts/draft-to-prod.sh copy <draft_id>             # print the commands, run nothing
+```
+
+Both back up `blog.db` before writing. The playbook explains every `docker compose cp`/`exec -T`
+step and the secret-handling rules.
+
 ### Backup
 
 ```bash
@@ -133,12 +149,19 @@ docker compose -f docker-compose.prod.yml cp ./backups/blog_20260620.db web:/dat
 ## Schema
 
 ```
-posts:    slug (PK), title, date, summary, tags (JSON), content, image
+posts:    slug (PK), title, date, summary, tags (JSON), content, image, sources (JSON),
+          series_id, series_order
 drafts:   id (PK/UUID), slug, title, date, summary, tags (JSON), content, image,
           generated_at, topic_id, status, quality_score, quality_issues (JSON),
-          quality_strengths (JSON), admin_remarks
+          quality_strengths (JSON), admin_remarks, sources (JSON), series_id,
+          series_order, gen_cost_usd
 comments: id (PK/UUID), post_slug, author, body, created_at
 ```
+
+> **Schema drift to know about:** the dev DB may carry an extra `drafts.related_posts` column
+> that prod lacks. The `copy` playbook intersects columns, so it just drops that field on
+> transfer — harmless. `init_db()` in `db.py` migrates each environment independently via
+> `ALTER TABLE`, so column sets can differ until both have restarted on the same code.
 
 ## Danger Zone
 

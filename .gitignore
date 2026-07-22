@@ -55,5 +55,9 @@ __pycache__/
 tmp/
 temp/
 
+# Local-only dev→prod draft tooling (writes directly to the prod DB — kept out of git)
+scripts/draft-to-prod.sh
+scripts/lib/
+
 # pdf
 
