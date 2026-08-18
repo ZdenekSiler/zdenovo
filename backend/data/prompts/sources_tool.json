@@ -1,6 +1,6 @@
 {
   "name": "suggest_sources",
-  "description": "Return 3-5 authoritative sources related to the blog post topic. Each source must be a real, existing URL you found via web search.",
+  "description": "Return 1-5 authoritative sources related to the blog post topic. Every URL must be copied verbatim from a web search result on this call — never reconstructed, edited, or recalled from memory. Returning fewer sources, or an empty list, is correct when search surfaced nothing solid; padding the list with guessed URLs is not.",
   "input_schema": {
     "type": "object",
     "properties": {
@@ -11,22 +11,22 @@
           "properties": {
             "title": {
               "type": "string",
-              "description": "Title of the source article or documentation page"
+              "description": "The page's actual title, as shown in the search result"
             },
             "url": {
               "type": "string",
-              "description": "Full URL to the source"
+              "description": "Full URL, copied character-for-character from a web search result. Do not edit version numbers, slugs, hashes, or paths."
             },
             "summary": {
               "type": "string",
-              "description": "1-2 sentence summary of what this source covers and why it's relevant"
+              "description": "1-2 sentences on what this source covers and why it is relevant to this post"
             }
           },
           "required": ["title", "url", "summary"]
         },
-        "minItems": 3,
+        "minItems": 0,
         "maxItems": 5,
-        "description": "3-5 authoritative sources: official docs, well-known blog posts, or conference talks related to the post topic"
+        "description": "0-5 sources, preferring stable homes (official docs, GitHub, PyPI, arXiv) over aggregators like Medium or DataCamp that rot and block automated readers"
       }
     },
     "required": ["sources"]
