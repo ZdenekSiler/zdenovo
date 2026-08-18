@@ -11,9 +11,14 @@
 #   DB backup taken before every write.
 #
 # SUBCOMMANDS
-#   generate  "<description>" [tag1,tag2]   Generate a draft on dev via the authed API (calls Claude)
-#   copy      <draft_id>                    Copy that draft row from dev DB -> prod DB
-#   set-image <draft_id> "<query>" [id]     Swap the hero image (dev + prod) to an Unsplash pick
+#   generate    "<description>" [tag1,tag2]  Generate a draft on dev via the authed API (calls Claude)
+#   copy        <draft_id>                   Copy that draft row from dev DB -> prod DB
+#   copy-series <series_id>                  Copy the series HEADER row (id/title/description)
+#   set-image   <draft_id> "<query>" [id]    Swap the hero image (dev + prod) to an Unsplash pick
+#
+# MOVING A WHOLE SERIES: copy each part with `copy`, then `copy-series` once. A draft row
+# carries series_id/series_order, but the series header lives in its own table — without it
+# /series/{id} 404s and the "Part N of M" strip on each post has no title to link back to.
 #
 # EVERY command is echoed before it runs. PROD/DEV writes are flagged. Secrets are read from
 # .env into shell vars and never printed (login shows `password=<redacted>`).
@@ -118,6 +123,28 @@ cmd_copy() {
 
   warn "3/3  PROD-MUTATION: back up blog.db, then INSERT the draft row"
   exec_in_container "insert_draft.py /tmp/row.json"
+
+  # A draft carries series_id, but the series header row is a separate table — without it
+  # /series/{id} 404s and the "Part N of M" strip has no title. Nudge, don't do it silently.
+  local sid
+  sid="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("series_id") or "")' "$SCRATCH/row.json")"
+  [ -n "$sid" ] && info "note: this draft belongs to series '$sid' — run: $0 copy-series $sid"
+}
+
+# ── Subcommand: copy-series ─────────────────────────────────────────────────────
+cmd_copy_series() {
+  local id="${1:?usage: copy-series <series_id>}"
+
+  step "1/3  Export series $id from the dev DB (read-only)"
+  info "\$ python3 lib/export_series.py $DEV_DB $id series.json"
+  python3 "$LIB/export_series.py" "$DEV_DB" "$id" "$SCRATCH/series.json"
+
+  step "2/3  Ship the row + loader into the prod container"
+  push_into_container "$SCRATCH/series.json" "/tmp/series.json"
+  push_into_container "$LIB/insert_series.py" "/tmp/insert_series.py"
+
+  warn "3/3  PROD-MUTATION: back up blog.db, then INSERT the series row"
+  exec_in_container "insert_series.py /tmp/series.json"
 }
 
 # ── Subcommand: set-image ───────────────────────────────────────────────────────
@@ -149,8 +176,9 @@ cmd_set_image() {
 # ── Dispatch ────────────────────────────────────────────────────────────────────
 sub="${1:-}"; shift || true
 case "$sub" in
-  generate)  cmd_generate "$@" ;;
-  copy)      cmd_copy "$@" ;;
-  set-image) cmd_set_image "$@" ;;
-  *) die "usage: $0 {generate|copy|set-image} ...  (see the header comment for details)" ;;
+  generate)    cmd_generate "$@" ;;
+  copy)        cmd_copy "$@" ;;
+  copy-series) cmd_copy_series "$@" ;;
+  set-image)   cmd_set_image "$@" ;;
+  *) die "usage: $0 {generate|copy|copy-series|set-image} ...  (see the header comment for details)" ;;
 esac
