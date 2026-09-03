@@ -119,7 +119,7 @@ cert-init: _require-env
 	@echo "→ [2/3] Waiting for nginx to be ready..."
 	@sleep 3
 	@echo "→ [3/3] Requesting certificate for $(DOMAIN) and www.$(DOMAIN)..."
-	$(COMPOSE_PROD) run --rm certbot certonly \
+	$(COMPOSE_PROD) run --rm --entrypoint certbot certbot certonly \
 		--webroot \
 		--webroot-path=/var/www/certbot \
 		--email $(CERTBOT_EMAIL) \
@@ -133,7 +133,7 @@ cert-init: _require-env
 	@echo "✓ Certificate installed for $(DOMAIN). Run 'make prod' to start all services."
 
 cert-renew: _require-env
-	$(COMPOSE_PROD) run --rm certbot renew --quiet
+	$(COMPOSE_PROD) run --rm --entrypoint certbot certbot renew --quiet
 	$(COMPOSE_PROD) exec nginx nginx -s reload
 	@echo "✓ Certificate renewed."
 
@@ -292,7 +292,7 @@ FAKTURANT_COMPOSE = docker compose -f docker-compose.yml -f docker-compose.prod.
 
 cert-init-fakturant: _require-env
 	@echo "→ Requesting certificate for fakturant.$(DOMAIN)..."
-	$(COMPOSE_PROD) run --rm certbot certonly \
+	$(COMPOSE_PROD) run --rm --entrypoint certbot certbot certonly \
 		--webroot \
 		--webroot-path=/var/www/certbot \
 		--email $(CERTBOT_EMAIL) \
@@ -328,7 +328,7 @@ fakturant-check: _require-env
 
 cert-init-terraform-quiz: _require-env
 	@echo "→ Requesting certificate for terraform-quiz.$(DOMAIN)..."
-	$(COMPOSE_PROD) run --rm certbot certonly \
+	$(COMPOSE_PROD) run --rm --entrypoint certbot certbot certonly \
 		--webroot \
 		--webroot-path=/var/www/certbot \
 		--email $(CERTBOT_EMAIL) \
