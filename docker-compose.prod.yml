@@ -45,7 +45,9 @@ services:
       - internal
       - zdenovo_public
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO /dev/null http://localhost:80/ || exit 1"]
+      # "localhost" resolves to [::1]; nginx listens on IPv4 only, so the old
+      # check was refused. Hit the loopback health block directly by IP.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8081/healthz | grep -q ok"]
       interval: 15s
       timeout: 5s
       retries: 3
