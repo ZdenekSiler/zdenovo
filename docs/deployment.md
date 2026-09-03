@@ -374,6 +374,37 @@ What it does:
 |------|------|---------|-------|
 | A | `@` (apex) | `<server-ip>` | Proxied (orange cloud) |
 | CNAME | `www` | `<your-domain>` | Proxied (orange cloud) |
+| A | `fakturant` | `<server-ip>` | Proxied (orange cloud) |
+| A | `terraform-quiz` | `<server-ip>` | Proxied (orange cloud) |
+
+Subdomains are first-level, so Cloudflare's free Universal SSL covers their edge certificate
+automatically — no Advanced Certificate Manager needed.
+
+#### Adding a subdomain
+
+1. **Create the A record grey-clouded** (Proxy status: *DNS only*). `Always Use HTTPS` is ON
+   for this zone and would 301 the ACME HTTP-01 challenge before it reaches the origin, so
+   certbot can fail on a proxied record. Grey cloud avoids the question entirely.
+   Confirm with `dig +short <sub>.<domain>` — it must return the origin IP, not a Cloudflare one.
+2. **Pull on the server, but don't run `make prod` yet.** `make prod` regenerates
+   `nginx/app.conf` from the template and restarts nginx; if the new server block references a
+   certificate that doesn't exist, **nginx refuses to start and the whole site goes down**.
+3. **Issue the certificate** — `make cert-init-fakturant` / `make cert-init-terraform-quiz`.
+   These run certbot, regenerate the conf, `nginx -t` it, and reload. If certbot fails, make
+   stops before touching `app.conf` and nginx keeps serving the working config.
+4. **Flip the record to Proxied** (orange cloud).
+5. **`make prod`**, then `make check`.
+
+Renewals are handled by the `certbot` container (`certbot renew` every 12 h) and work through
+the proxied record. If one ever fails, grey-cloud the record, run `make cert-renew`, re-proxy.
+
+#### Caching a static subdomain
+
+`terraform-quiz.<domain>` serves one HTML file straight off disk (`frontend/static/quiz/`).
+Cloudflare's default cache level does not cache `.html`, and the nginx block adds
+`Cache-Control: no-cache`, so a redeploy is visible immediately. If a stale page ever shows up,
+purge that URL under **Caching → Configuration**. (This is the opposite of `style.css`, which
+*is* edge-cached — bump its `?v=` query string instead.)
 
 ### SSL/TLS Settings
 

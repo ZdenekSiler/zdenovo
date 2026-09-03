@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terraform Associate (004) practice</title>
+<meta name="description" content="205 practice questions with explanations for the HashiCorp Terraform Associate (004), plus a timed 57-question mock exam.">
+<link rel="canonical" href="https://terraform-quiz.zdenovo.com/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F6F5FA; --panel: #FFFFFF; --ink: #1D1B2E; --muted: #6B6880; --line: #E3E0EE;
+    --tf: #7B42BC; --tf-soft: #EFE7F8; --ok: #1E7F52; --ok-soft: #E4F4EB; --bad: #B83A3A; --bad-soft: #FBE7E7; --code: #F0EEF6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 16px; line-height: 1.5; }
+  code { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 0.9em; background: var(--code); padding: 1px 5px; border-radius: 4px; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--tf); outline-offset: 2px; }
+
+  header { padding: 18px 28px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 1.2rem; font-weight: 600; letter-spacing: -0.01em; }
+  header .total { color: var(--muted); font-size: 0.9rem; flex: 1; }
+  header label { font-size: 0.88rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+
+  .layout { display: grid; grid-template-columns: 310px 1fr; min-height: calc(100vh - 62px); }
+  nav { border-right: 1px solid var(--line); background: var(--panel); padding: 14px 12px; }
+  nav .objective { display: grid; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 9px 12px; margin-bottom: 3px; grid-template-columns: 26px 1fr auto; gap: 8px; align-items: center; }
+  nav .objective:hover { background: var(--bg); }
+  nav .objective.active { background: var(--tf-soft); }
+  nav .objective .num { color: var(--tf); font-weight: 600; font-family: 'IBM Plex Mono', monospace; font-size: 0.9rem; }
+  nav .objective .name { font-size: 0.93rem; }
+  nav .objective .score { color: var(--muted); font-size: 0.8rem; font-family: 'IBM Plex Mono', monospace; }
+  nav .objective .score.done { color: var(--ok); }
+  nav .bar { grid-column: 2 / 4; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  nav .bar i { display: block; height: 100%; width: 0; background: var(--tf); }
+  nav .divider { border-top: 1px solid var(--line); margin: 12px 8px; }
+  nav .exam { border: 1.5px solid var(--tf); }
+  nav .exam .num { font-size: 1rem; }
+
+  main { padding: 28px 40px 60px; max-width: 840px; }
+  .section-head { margin-bottom: 18px; }
+  .section-head h2 { margin: 0 0 4px; font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; }
+  .section-head p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+  .section-head .weight { color: var(--tf); }
+
+  .qcard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px 28px; }
+  .qmeta { color: var(--muted); font-size: 0.83rem; margin-bottom: 10px; font-family: 'IBM Plex Mono', monospace; display: flex; justify-content: space-between; gap: 12px; }
+  .qmeta .timer.warn { color: var(--bad); font-weight: 600; }
+  .qtext { font-size: 1.08rem; font-weight: 500; margin: 0 0 16px; }
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .opt { text-align: left; background: var(--bg); border: 1.5px solid var(--line); border-radius: 8px; padding: 11px 14px; display: flex; gap: 12px; align-items: flex-start; transition: border-color .12s, background .12s; }
+  .opt .key { font-family: 'IBM Plex Mono', monospace; color: var(--muted); flex: 0 0 18px; }
+  .opt:hover:not(:disabled) { border-color: var(--tf); background: #fff; }
+  .opt:disabled { cursor: default; }
+  .opt.selected { border-color: var(--tf); background: var(--tf-soft); }
+  .opt.correct { border-color: var(--ok); background: var(--ok-soft); }
+  .opt.correct .key { color: var(--ok); font-weight: 600; }
+  .opt.wrong { border-color: var(--bad); background: var(--bad-soft); }
+  .opt.wrong .key { color: var(--bad); font-weight: 600; }
+  .opt.dim { opacity: .55; }
+
+  .feedback { margin-top: 16px; border-radius: 8px; padding: 14px 18px; border-left: 4px solid; }
+  .feedback.ok { background: var(--ok-soft); border-color: var(--ok); }
+  .feedback.bad { background: var(--bad-soft); border-color: var(--bad); }
+  .feedback .verdict { font-weight: 600; margin: 0 0 6px; }
+  .feedback.ok .verdict { color: var(--ok); }
+  .feedback.bad .verdict { color: var(--bad); }
+  .feedback p { margin: 0; }
+
+  .actions { margin-top: 18px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn { border: 1.5px solid var(--tf); background: var(--tf); color: #fff; border-radius: 8px; padding: 9px 18px; font-weight: 500; }
+  .btn:hover { background: #6A36A6; }
+  .btn.ghost { background: transparent; color: var(--tf); }
+  .btn.ghost:hover { background: var(--tf-soft); }
+  .btn.danger { border-color: var(--bad); background: var(--bad); }
+  .hint { color: var(--muted); font-size: 0.88rem; }
+  .spacer { flex: 1; }
+
+  .summary { text-align: center; padding: 30px 10px 10px; }
+  .summary .big { font-size: 3rem; font-weight: 600; color: var(--tf); font-family: 'IBM Plex Mono', monospace; line-height: 1; }
+  .summary .big.pass { color: var(--ok); }
+  .summary .big.fail { color: var(--bad); }
+  .summary p { color: var(--muted); }
+  .breakdown { text-align: left; margin: 24px auto 0; max-width: 520px; }
+  .breakdown .row { display: grid; grid-template-columns: 1fr 70px 90px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 0.92rem; }
+  .breakdown .row .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .breakdown .row .bar i { display: block; height: 100%; background: var(--tf); }
+  .review { text-align: left; margin-top: 28px; border-top: 1px solid var(--line); padding-top: 18px; }
+  .review h3 { font-size: 1rem; margin: 0 0 12px; }
+  .review .item { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .review .item .q { font-weight: 500; margin: 0 0 6px; }
+  .review .item .ans { font-size: 0.9rem; margin: 0 0 4px; }
+  .review .item .ans .you { color: var(--bad); }
+  .review .item .ans .right { color: var(--ok); }
+  .review .item .exp { font-size: 0.9rem; color: var(--muted); margin: 0; }
+  .intro { padding: 10px 0; }
+  .intro ul { margin: 8px 0 18px; padding-left: 20px; color: var(--muted); }
+  .intro li { margin: 4px 0; }
+
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+    nav { border-right: 0; border-bottom: 1px solid var(--line); display: flex; overflow-x: auto; gap: 6px; padding: 10px; }
+    nav .objective { grid-template-columns: 22px 1fr; min-width: 210px; margin: 0; }
+    nav .objective .score { grid-column: 2; }
+    nav .bar { grid-column: 1 / 3; }
+    nav .divider { display: none; }
+    main { padding: 20px 16px 40px; }
+    .qcard { padding: 18px; }
+    .breakdown .row { grid-template-columns: 1fr 60px 70px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Terraform Associate (004) practice</h1>
+  <span class="total" id="totalScore"></span>
+  <label><input type="checkbox" id="shuffleOpts" checked> Shuffle answers</label>
+  <label><input type="checkbox" id="shuffleQs"> Shuffle questions</label>
+</header>
+
+<div class="layout">
+  <nav id="nav" aria-label="Exam objectives"></nav>
+  <main id="main"></main>
+</div>
+
+<script>
+// Helpers: Q(question, options, correctIndex, explanation) and TF(statement, isTrue, explanation)
+const Q  = (q, opts, a, exp) => ({ q, opts, a, exp });
+const TF = (q, t, exp) => ({ q, opts: ["True", "False"], a: t ? 0 : 1, exp, tf: true });
+
+const SECTIONS = [
+{
+  id: 1, name: "Infrastructure as Code concepts",
+  blurb: "What Terraform is, why IaC matters, declarative vs imperative, desired state, and how Terraform compares to other tools.",
+  questions: [
+    Q("Which of the following is <em>not</em> a benefit of Infrastructure as Code that the course lists?",
+      ["Version control and auditability", "Consistency and repeatability", "Automation and efficiency", "Eliminating the need to understand the target platform"],
+      3, "IaC brings versioning, collaboration, automation, scalability and consistency. The course stresses the opposite of the last option: before using Terraform you must be proficient on the target platform, because Terraform is not magic."),
+    Q("Terraform is best described as which kind of tool?",
+      ["Imperative: you write the steps to create each resource in order", "Declarative: you describe the desired end state and Terraform works out the steps", "Configuration management: it installs packages and manages files inside servers", "A cloud-specific provisioning service for one provider"],
+      1, "Terraform is declarative. You describe what you want (\"an EC2 instance with these properties\"), not the step-by-step how. Configuration management tools like Ansible or Chef are different but complementary."),
+    Q("What does the course mean by <em>desired state</em>?",
+      ["The contents of the state file after a successful apply", "The resources, properties and relationships written in your Terraform configuration", "The current real-world infrastructure", "The output of terraform plan"],
+      1, "Desired state is the blueprint in your .tf files. Terraform compares it with the current state of real-world resources and makes the changes needed to match."),
+    Q("Which pair of tools does the course classify as <em>similar</em> to Terraform (infrastructure provisioning tools)?",
+      ["Ansible and Chef", "AWS CloudFormation and Azure Bicep", "Docker and Kubernetes", "Jenkins and GitHub Actions"],
+      1, "CloudFormation, Bicep and Pulumi are IaC provisioning tools like Terraform. Configuration management tools (Ansible, Chef, Puppet) install packages, manage files and automate routine tasks; they are different but complementary."),
+    Q("Which characteristic belongs to configuration management tools rather than to Terraform?",
+      ["Declarative language", "Immutable infrastructure", "Installing packages and managing files inside a system", "Modular design"],
+      2, "Installing packages, managing files and automating routine tasks on running systems is the job of configuration management tools. Terraform focuses on provisioning and managing infrastructure declaratively with immutable patterns."),
+    Q("What are the core components of Terraform named in the course?",
+      ["Terraform Core, Providers, Resources, State, Modules", "CLI, Registry, Sentinel, Agents, Workspaces", "Plan, Apply, Destroy, Validate, Format", "HCL, JSON, YAML, Go, Python"],
+      0, "The five core components are Terraform Core (the engine), Providers (plugins for platforms), Resources (what you manage), State (the mapping to real objects) and Modules (reusable packages)."),
+    Q("What does it mean that Terraform is <em>platform agnostic</em>?",
+      ["A single configuration can only target one cloud at a time", "It can manage infrastructure on any cloud platform, data center or API-driven service through providers", "It automatically converts CloudFormation templates into HCL", "It runs only on Linux"],
+      1, "Terraform uses one language (HCL) and one workflow for any platform that has a provider: AWS, Azure, GCP, VMware, Kubernetes, GitHub, and so on."),
+    Q("Which language is used to write Terraform configuration?",
+      ["YAML", "HashiCorp Configuration Language (HCL)", "Go", "Python"],
+      1, "Terraform configurations are written in HCL, a declarative, human-readable language also used in other HashiCorp products. JSON is also accepted but HCL is the primary interface."),
+    Q("Which statement about immutable infrastructure is correct?",
+      ["Resources are patched in place whenever a change is required", "Components are replaced with new versions rather than modified after deployment", "The state file is stored read-only", "Resources can never be destroyed"],
+      1, "Immutable infrastructure means you replace rather than modify. Terraform embraces this: when an attribute cannot be updated in place, the plan shows the resource being replaced."),
+    Q("The course describes three Terraform editions. Which list matches them?",
+      ["Community (CLI), HCP Terraform (SaaS), Terraform Enterprise (self-hosted)", "Free, Pro, Ultimate", "Local, Remote, Hybrid", "Sentinel, OPA, Vault"],
+      0, "Terraform Community Edition is command-line based, HCP Terraform is the SaaS platform, and Terraform Enterprise is the self-hosted and managed edition."),
+    TF("With Terraform, the network team, cloud ops team and Kubernetes team can each work on a branch and propose infrastructure changes through pull requests, just like application code.",
+      true, "Treating infrastructure as code means branching, pull requests and reviews apply to infrastructure changes, improving collaboration and transparency."),
+    TF("Because Terraform is declarative, resource order in your .tf files determines the order in which resources are created.",
+      false, "Order in the files does not matter. Terraform builds a dependency graph from resource references and decides the creation order (and parallelism) itself."),
+    Q("A team wants to quickly spin up identical dev, QA and production environments from one set of code. Which Terraform feature makes that possible?",
+      ["Hardcoding different values in three copies of the configuration", "Input variables that parameterize one configuration to produce many unique environments", "Running terraform destroy between environments", "Using a different provider per environment"],
+      1, "A single configuration with input variables can produce many environments: larger VMs and multi-database setups for production, smaller ones for development, all from the same code."),
+  ]
+},
+{
+  id: 2, name: "Terraform fundamentals",
+  blurb: "HCL syntax, block types, providers, the terraform block, version constraints, the lock file, the .terraform directory, and what state is.",
+  questions: [
+    Q("What is the correct syntax structure of a resource block in HCL?",
+      ["<code>resource aws_vpc vpc {}</code>", "<code>resource \"aws_vpc\" \"vpc\" { ... }</code> where the first label is the type and the second is the name", "<code>resource \"vpc\" \"aws_vpc\" { ... }</code> where the first label is the name", "<code>aws_vpc \"vpc\" { ... }</code>"],
+      1, "A block has a type (resource), a resource type defined by the provider (aws_vpc), and a user-chosen name (vpc). It is referenced as aws_vpc.vpc."),
+    Q("Which character starts a single-line comment in HCL according to the course's style guide?",
+      ["<code>//</code> only", "<code>#</code>", "<code>--</code>", "<code>;</code>"],
+      1, "The style guide recommends # for single-line and multi-line comments. (// and /* */ also work, but # is the recommended style.) Other style rules: two-space indentation, aligned equals signs, underscores in names."),
+    Q("Which file extension must Terraform configuration files use so that Terraform and related tools recognize them?",
+      [".hcl", ".tf", ".tfstate", ".terraform"],
+      1, "Configuration files use .tf (or .tf.json). terraform.tfstate is the state file and .terraform is the working directory cache."),
+    Q("What does <code>terraform fmt</code> do?",
+      ["Validates syntax and references", "Rewrites configuration files into the canonical HCL format and style", "Compresses the state file", "Formats plan output as JSON"],
+      1, "fmt only reformats code for consistent, readable style. Use -recursive to include subdirectories. Linters and editor extensions complement it with real-time checks."),
+    Q("How is a resource referenced elsewhere in the configuration?",
+      ["<code>&lt;name&gt;.&lt;type&gt;</code>", "<code>&lt;type&gt;.&lt;name&gt;</code>, for example <code>aws_instance.web</code>", "<code>resource.&lt;type&gt;.&lt;name&gt;</code>", "<code>var.&lt;type&gt;.&lt;name&gt;</code>"],
+      1, "Resources are referenced by type and name: aws_lb.public_load_balancer, aws_instance.web. Attributes follow: aws_instance.web.id."),
+    Q("What rules apply to resource names?",
+      ["They may contain spaces if quoted", "They must start with a letter or underscore and may contain only letters, digits, underscores and dashes; they must be unique per type in a configuration", "They must be globally unique across all Terraform configurations", "They must match the cloud resource's tag Name"],
+      1, "Resource names are user-provided strings that must start with a letter or underscore and use only letters, digits, underscores and dashes."),
+    Q("What is the purpose of the <code>provider</code> block?",
+      ["To define infrastructure resources to create", "To configure a plugin that connects Terraform to an API-driven platform such as AWS, Azure or GitHub", "To store the state file", "To declare reusable variables"],
+      1, "Providers are plugins that extend Terraform to talk to cloud platforms, SaaS and other API-supported services. Arguments (region, profile, etc.) are provider-specific and documented on the Terraform Registry."),
+    Q("Where does the course recommend supplying provider authentication details such as an Azure client secret?",
+      ["Hardcoded in the provider block", "Via environment variables (or roles), not in the configuration file", "In outputs.tf", "In the state file"],
+      1, "Authentication arguments should be provided through environment variables or platform roles because hardcoding credentials in .tf files is a security risk and ends up in version control."),
+    Q("Where are provider binaries and documentation found?",
+      ["Providers live only on your laptop", "Source code is on GitHub; documentation is on the Terraform Registry (registry.terraform.io); the binary is downloaded during init", "Both are on HCP Terraform only", "Providers are compiled into the Terraform binary"],
+      1, "Provider code is hosted on GitHub, documentation is on registry.terraform.io, and when declared in configuration the provider is downloaded to the machine running Terraform at init time."),
+    Q("What is the difference between a <code>resource</code> block and a <code>data</code> block?",
+      ["Data blocks create infrastructure; resource blocks read it", "Resource blocks create, update and delete infrastructure; data blocks only read information about existing resources without creating anything", "They are interchangeable", "Data blocks are only available in HCP Terraform"],
+      1, "Data blocks retrieve information (existing VPC, AMI, resource group, Kubernetes namespace) so it can be referenced. They never change infrastructure."),
+    Q("How do you reference the CIDR block of a data source declared as <code>data \"aws_vpc\" \"prd\"</code>?",
+      ["<code>aws_vpc.prd.cidr_block</code>", "<code>data.aws_vpc.prd.cidr_block</code>", "<code>var.aws_vpc.prd.cidr_block</code>", "<code>prd.cidr_block</code>"],
+      1, "Data block attributes are referenced as data.<type>.<name>.<attribute>."),
+    Q("Which block sets global settings such as required Terraform version, required providers and backend configuration?",
+      ["provider", "terraform", "locals", "module"],
+      1, "The terraform block holds required_version, required_providers and the backend block. It ensures consistency across teams and environments."),
+    Q("Given <code>required_version = \"~> 1.11.0\"</code>, which Terraform versions are allowed?",
+      ["Only exactly 1.11.0", "1.11.x (1.11.0 and any later patch release, but not 1.12)", "Any version greater than or equal to 1.11.0, including 2.0", "Any 1.x version"],
+      1, "The ~> (pessimistic) operator allows only the right-most version component to increment, so ~> 1.11.0 permits 1.11.0, 1.11.5, and so on, but not 1.12.0."),
+    Q("Given a provider constraint <code>version = \">= 5.77.0\"</code>, what does Terraform install?",
+      ["Exactly 5.77.0", "Any AWS provider version greater than or equal to 5.77.0", "The version 5.77.0 or lower", "Nothing; >= is not a valid operator"],
+      1, "The >= operator accepts 5.77.0 or any later release. Contrast with \"5.77.0\" (exact) and \"~> 5.77.0\" (5.77.x only)."),
+    Q("Why does the course say pinning provider versions matters?",
+      ["Because providers cannot be downloaded without a pinned version", "Because a colleague pulling the code could download a newer provider with changed behavior, causing errors or unexpected results", "Because unpinned providers are not encrypted", "Because the Terraform Registry requires it"],
+      1, "The scenario shows one team adding a newly released service after downloading the latest GCP provider while another team is on an older one, leading to failures. Version constraints keep everyone consistent."),
+    Q("What does the <code>.terraform.lock.hcl</code> file record and what should you do with it?",
+      ["The provider versions Terraform selected; commit it to version control so future inits make the same selections", "The state of your resources; keep it out of version control", "Module source code; delete it after each run", "The CLI's credentials; never share it"],
+      0, "Every terraform init creates or updates the lock file with the provider selections. The init output itself tells you to include it in version control so Terraform guarantees the same selections next time."),
+    Q("What is stored in the <code>.terraform</code> directory?",
+      ["The state file and its backups", "Cached provider binaries (.terraform/providers) and downloaded modules (.terraform/modules)", "Your .tfvars files", "The dependency lock file"],
+      1, "The working directory's .terraform folder caches providers and modules. It should be in .gitignore and can safely be deleted; terraform init recreates it."),
+    TF("The .terraform directory should be committed to version control so teammates get the same providers.",
+      false, "Add it to .gitignore. It contains easily recreatable, platform-specific and potentially large files. The lock file, not the .terraform directory, is what guarantees the same provider selections."),
+    Q("What does Terraform state do?",
+      ["Stores a copy of your .tf files", "Maps the resources in your configuration to real-world infrastructure and tracks metadata such as dependencies and the provider used", "Caches provider binaries", "Records the output of terraform validate"],
+      1, "State is a JSON file that acts as a database mapping configuration to real objects, plus metadata for order of operations. Terraform cannot operate without state."),
+    Q("By default, where is Terraform state stored and in what format?",
+      ["In HCP Terraform as encrypted binary", "In the working directory as a JSON file named terraform.tfstate", "In the .terraform directory as HCL", "In the provider's API"],
+      1, "Local state is the default: terraform.tfstate in the current working directory, JSON-formatted. A backend configuration changes where state is stored."),
+    TF("Before any operation, Terraform performs a refresh to update state with the real-world infrastructure.",
+      true, "plan and apply refresh state first so the comparison between desired and current state is accurate. You can see 'Refreshing state...' lines at the start of plan output."),
+    Q("Which of the following is <em>not</em> one of the common Terraform file names listed in the course?",
+      ["main.tf", "variables.tf", "providers.tf", "resources.yaml"],
+      3, "Common files are main.tf, variables.tf, outputs.tf, providers.tf and terraform.tfvars. Names are conventions, not requirements, and Terraform processes all .tf files in the directory together."),
+    Q("Terraform is run in a directory containing <code>network.tf</code>, <code>dns.tf</code> and <code>outputs.tf</code>. How are these files processed?",
+      ["Only main.tf is read; the others are ignored", "All .tf files in the working directory are combined and processed together", "Files are processed alphabetically and can conflict", "Only the file passed on the command line is used"],
+      1, "Terraform loads every .tf file in the working directory as one configuration. Splitting resources across files is purely for organization."),
+    Q("Why does the course recommend using subdirectories to split up Terraform configurations?",
+      ["Terraform requires one resource per directory", "To better organize code and reduce the blast radius of changes", "Because state files must be under 1 MB", "To speed up terraform fmt"],
+      1, "Terraform only processes the current working directory, so separate directories (each with their own state) limit how much infrastructure a single change or mistake can affect."),
+    Q("A single <code>provider \"aws\"</code> block is declared. Which statement is true?",
+      ["A separate provider block is needed for each resource type (EC2, S3, EKS)", "That one provider block lets Terraform manage many resource types on that platform", "Provider blocks can only manage one resource each", "The provider block must be repeated in every .tf file"],
+      1, "One AWS provider configuration enables EC2 instances, S3 buckets, EKS clusters and every other AWS resource type."),
+    Q("Which block type is used to make code reusable by defining values that can be customized for each run?",
+      ["output", "variable", "data", "provider"],
+      1, "Variable blocks define inputs. Provider blocks connect to platforms, resource blocks create infrastructure, data blocks read existing information, and output blocks display information."),
+  ]
+},
+{
+  id: 3, name: "Core Terraform workflow",
+  blurb: "init, validate, plan, apply, destroy, saved plans, the resource graph, CLI conventions, environment variables and debugging.",
+  questions: [
+    Q("What is the official three-stage Terraform workflow?",
+      ["Write, Plan, Apply", "Init, Validate, Destroy", "Code, Test, Deploy", "Build, Ship, Run"],
+      0, "The workflow is Write (configuration in HCL), Plan (preview) and Apply (make changes), with terraform init preparing the directory in between."),
+    Q("What does <code>terraform init</code> do?",
+      ["Creates the execution plan", "Sets up the working directory: initializes the backend, downloads providers and modules, and creates or updates the lock file", "Formats the code", "Destroys the previous deployment"],
+      1, "init is the first command in a new project. Rerun it whenever you change modules or backend configuration; other commands will remind you if you forget."),
+    Q("You must run which command before <code>terraform validate</code> will work?",
+      ["terraform apply", "terraform init", "terraform plan", "terraform fmt"],
+      1, "The working directory must be initialized first so Terraform has the providers needed to know each resource's schema."),
+    Q("What does <code>terraform validate</code> check?",
+      ["Whether the real infrastructure matches the configuration", "That configuration is syntactically valid, structurally sound and references variables and resources correctly, without contacting providers", "That your cloud credentials are valid", "That state is unlocked"],
+      1, "validate does not communicate with providers, so it cannot catch every error (for example an invalid AMI ID). It is a fast early check before plan and apply."),
+    Q("In plan output, what does <code>~</code> in front of a resource mean?",
+      ["Create", "Update in place", "Destroy", "Destroy and then create replacement"],
+      1, "Symbols: + create, ~ update in-place, - destroy, -/+ destroy and then create replacement."),
+    Q("A plan shows <code>length = 2 -> 3 # forces replacement</code> next to a resource. What will happen?",
+      ["The resource is updated in place", "The resource is destroyed and a new one created (-/+)", "Only the state file changes", "Nothing; comments are ignored"],
+      1, "'forces replacement' means the attribute cannot be changed in place, so the plan marks the resource as 'must be replaced' with the -/+ symbol."),
+    Q("Why does plan output warn that Terraform \"can't guarantee to take exactly these actions\" when you later run apply?",
+      ["Because the plan was not saved with -out", "Because validate was skipped", "Because the state is locked", "Because the provider is out of date"],
+      0, "Without -out the plan is discarded; a later apply re-plans and could differ if anything changed. Save it with terraform plan -out=myplan.tfplan and apply that file."),
+    Q("Which command sequence applies exactly the reviewed plan?",
+      ["<code>terraform plan</code> then <code>terraform apply</code>", "<code>terraform plan -out=myplan.tfplan</code> then <code>terraform apply myplan.tfplan</code>", "<code>terraform plan -save</code> then <code>terraform apply -load</code>", "<code>terraform apply -plan</code>"],
+      1, "Applying a saved plan file executes only the actions in that plan and does not prompt for confirmation, since review already happened."),
+    Q("What does the resource graph enable?",
+      ["Sequential execution in file order", "Determining the correct order of operations and running independent resources in parallel", "Encryption of state", "Automatic cost estimation"],
+      1, "Terraform builds a dependency graph from references between resources. It decides ordering and lets non-dependent resources be created in parallel."),
+    Q("Which of the following creates an <em>implicit</em> dependency?",
+      ["Adding depends_on to a resource", "Referencing another resource's attribute, such as <code>vpc_id = aws_vpc.main.id</code>", "Placing resources in the same file", "Naming resources alphabetically"],
+      1, "A reference to another resource's attribute automatically creates a dependency. depends_on creates an explicit dependency when no reference exists."),
+    Q("Which flag skips the interactive approval prompt on <code>terraform apply</code>?",
+      ["-yes", "-auto-approve", "-force", "-no-prompt"],
+      1, "terraform apply -auto-approve skips confirmation and should be used carefully. -input=false is also helpful for automation and CI/CD pipelines where no prompts can be answered."),
+    Q("What does <code>terraform destroy -target=aws_instance.web</code> do?",
+      ["Destroys all managed resources", "Destroys only aws_instance.web (and anything that depends on it)", "Removes the resource from state without destroying it", "Marks the instance for replacement"],
+      1, "By default destroy removes everything Terraform manages. -target narrows it to a specific resource. Destroy operations are irreversible, so always review the plan."),
+    Q("Which command destroys all resources managed by the configuration?",
+      ["terraform delete", "terraform destroy (equivalent to terraform apply -destroy)", "terraform state rm -all", "terraform remove"],
+      1, "terraform destroy is the destroy planning mode. It prompts for confirmation unless -auto-approve is given."),
+    Q("What is the general structure of a Terraform CLI command?",
+      ["<code>terraform [options] &lt;subcommand&gt;</code>", "<code>terraform &lt;subcommand&gt; [options or flags]</code>, e.g. <code>terraform plan -out=planfile</code>", "<code>tf &lt;subcommand&gt;</code>", "<code>terraform --run &lt;subcommand&gt;</code>"],
+      1, "The base command is followed by a subcommand and then optional flags. terraform --help lists subcommands; terraform plan --help shows plan's options."),
+    Q("How do you enable tab completion for the Terraform CLI?",
+      ["terraform enable-completion", "terraform -install-autocomplete", "terraform completion bash", "It is on by default"],
+      1, "terraform -install-autocomplete adds completion to shells like Bash or Zsh (a ~/.bashrc must exist). Then terraform s <tab> suggests show and state."),
+    Q("Which environment variable sets the value of a Terraform input variable named <code>svr_name</code>?",
+      ["TERRAFORM_svr_name", "TF_VAR_svr_name", "TF_svr_name", "VAR_svr_name"],
+      1, "Input variables can be set with environment variables prefixed TF_VAR_ followed by the variable name. This keeps sensitive values out of files."),
+    Q("Which environment variable enables detailed Terraform logging?",
+      ["TF_DEBUG", "TF_LOG", "TERRAFORM_VERBOSE", "TF_TRACE"],
+      1, "TF_LOG accepts levels TRACE (most verbose), DEBUG, INFO, WARN, ERROR, and JSON. Example: export TF_LOG=TRACE."),
+    Q("Which TF_LOG level is the most verbose?",
+      ["ERROR", "DEBUG", "TRACE", "INFO"],
+      2, "From most to least verbose: TRACE, DEBUG, INFO, WARN, ERROR. JSON outputs logs in JSON format at TRACE level."),
+    Q("You want verbose logs from provider plugins only, not Terraform Core. Which variable do you set?",
+      ["TF_LOG_CORE=TRACE", "TF_LOG_PROVIDER=TRACE", "TF_LOG=PROVIDER", "TF_PLUGIN_LOG=TRACE"],
+      1, "TF_LOG_PROVIDER enables logging for providers only (useful for provider developers), while TF_LOG_CORE targets Terraform Core itself. Both take the same level arguments."),
+    Q("How do you persist Terraform logs to a file?",
+      ["Set TF_LOG_PATH (together with TF_LOG); logs are appended to the file, which is created automatically", "Run terraform plan > terraform.log", "Set TF_LOG=FILE", "Set TF_OUTPUT=terraform.log"],
+      0, "TF_LOG_PATH=terraform.log persists logs, but TF_LOG (or TF_LOG_CORE / TF_LOG_PROVIDER) must also be set for anything to be logged."),
+    Q("Which command should you run after adding a new module or changing the backend configuration?",
+      ["terraform refresh", "terraform init", "terraform validate", "terraform fmt"],
+      1, "init installs modules and initializes backends. Terraform's own init output says to rerun it whenever modules or backend configuration change."),
+    TF("terraform validate can detect that an AMI ID does not exist in your AWS account.",
+      false, "validate never communicates with providers, so it cannot check real-world values. Only plan (which refreshes and calls provider APIs) can surface that kind of error."),
+    Q("Which best practice does the course list for <em>after</em> an apply?",
+      ["Delete the state file", "Verify the changes, commit your configuration and document significant changes", "Run terraform destroy", "Disable state locking"],
+      1, "Before: review the plan, check you are in the right directory, test in non-production. During: read the plan carefully and watch for unexpected changes. After: verify, commit, document."),
+    Q("What does <code>terraform plan -destroy</code> do?",
+      ["Immediately destroys everything", "Creates a plan to destroy all objects currently managed by the configuration, without executing it", "Deletes the plan file", "Removes providers"],
+      1, "Destroy planning mode shows what would be destroyed. Applying it (or running terraform destroy) performs the destruction."),
+    Q("Which flag makes <code>terraform fmt</code> also format files in subdirectories?",
+      ["-all", "-recursive", "-deep", "-r"],
+      1, "By default fmt only formats the current directory; -recursive includes subdirectories, which is useful for module folders."),
+  ]
+},
+{
+  id: 4, name: "Terraform configuration",
+  blurb: "Variables and precedence, outputs, interpolation, locals, functions, count/for_each, depends_on, lifecycle rules, validation layers, and protecting secrets (sensitive, ephemeral, write-only).",
+  questions: [
+    Q("Which variable types does the course list?",
+      ["string, number, bool, list, map, set", "int, float, char, array", "text, integer, boolean only", "json, yaml, hcl"],
+      0, "Primitive types are string, number and bool; collection types are list, map and set (plus object and tuple)."),
+    Q("How do you reference the first element of <code>variable \"vsphere_networks\"</code> of type <code>list(string)</code>?",
+      ["<code>var.vsphere_networks[0]</code>", "<code>vsphere_networks.0</code>", "<code>var.vsphere_networks.first</code>", "<code>list.vsphere_networks[1]</code>"],
+      0, "Variables are referenced with var.<name>; list elements are zero-indexed with square brackets. Map values use var.course_details.instructor style."),
+    Q("A variable has a default, a value in terraform.tfvars, a TF_VAR_ environment variable and a -var flag on the command line. Which wins?",
+      ["The default", "TF_VAR_ environment variable", "terraform.tfvars", "The -var command-line flag"],
+      3, "Precedence from highest to lowest: command-line flags (-var/-var-file), *.auto.tfvars files, *.tfvars files, environment variables, variable block defaults."),
+    Q("Which value source has the <em>lowest</em> precedence?",
+      ["Environment variables (TF_VAR_)", "Variable block defaults", "*.auto.tfvars files", "terraform.tfvars"],
+      1, "The default in the variable block is used only when nothing else provides a value. Environment variables override defaults, tfvars files override env vars, and CLI flags override everything."),
+    Q("What is true about <code>terraform.tfvars</code>?",
+      ["It must be passed explicitly with -var-file", "Terraform automatically loads it, values use key = value syntax, and it is usually excluded from version control", "It is required for every configuration", "It stores state"],
+      1, "terraform.tfvars (and *.auto.tfvars) are loaded automatically. Because they often contain environment-specific or sensitive values, they are commonly git-ignored."),
+    Q("Which command-line usage correctly sets a variable?",
+      ["<code>terraform apply -var region=us-west-2 vm_image=x</code>", "<code>terraform apply -var=\"region=us-west-2\" -var=\"vm_image=image-x3f83j2sv3\"</code>", "<code>terraform apply --set region=us-west-2</code>", "<code>terraform apply region=us-west-2</code>"],
+      1, "Use -var=\"key=value\" once per variable. This is handy for quick, temporary overrides without editing files."),
+    Q("What does an <code>output</code> block do?",
+      ["Writes values to the provider", "Displays key information such as IPs, DNS names or IDs after deployment and can pass data between modules", "Defines input parameters", "Stores secrets"],
+      1, "Outputs expose values after apply so you don't have to look them up in the console. They are also how child modules return data to their caller."),
+    Q("What does the expression <code>\"server-${data.aws_region.current.name}-${var.environment}\"</code> produce when the region is us-east-1 and environment is dev?",
+      ["server-${data.aws_region.current.name}-dev", "server-us-east-1-dev", "An error; strings cannot contain expressions", "server-aws_region-environment"],
+      1, "The ${...} sequence is interpolation: the expression is evaluated and inserted into the string."),
+    Q("What are local values (locals) used for?",
+      ["Passing values into the configuration from outside", "Naming and centralizing values or expressions used in several places to avoid duplication", "Storing state locally", "Declaring provider credentials"],
+      1, "Locals are like short-term memory: define a prefix, environment name, common tags or a computed expression once, then reference it as local.<name>. Changing it in one place is the key advantage."),
+    Q("Which statement about <code>count</code> and <code>for_each</code> instance addressing is correct?",
+      ["Both use numeric indexes", "count instances are addressed like <code>example[0]</code>; for_each instances are addressed by key like <code>example[\"vm1\"]</code>", "for_each uses numeric indexes and count uses keys", "Neither can be addressed individually"],
+      1, "count produces resource.name[0], [1]...; for_each produces resource.name[\"key\"] using map keys or set values, which is more stable when items are added or removed."),
+    Q("You need one IAM user per name in a set, and removing one name must not affect the others. Which meta-argument fits best?",
+      ["count", "for_each", "depends_on", "provider"],
+      1, "for_each keys each instance by value, so removing one leaves others untouched. With count, removing an element shifts indexes and can cause unintended destroy/recreate."),
+    Q("When should you use <code>depends_on</code>?",
+      ["Whenever two resources are in the same file", "When a resource must be created after another but no attribute reference exists to create an implicit dependency", "To speed up parallel execution", "To reference a module output"],
+      1, "Implicit dependencies come from references. depends_on creates an explicit dependency for ordering that Terraform cannot detect automatically."),
+    Q("A load balancer must keep serving traffic while its security group is replaced. Which lifecycle setting on the security group helps?",
+      ["prevent_destroy = true", "ignore_changes = all", "create_before_destroy = true", "replace_triggered_by = [...]"],
+      2, "create_before_destroy tells Terraform to create the replacement before destroying the old resource, enabling zero-downtime replacements."),
+    Q("Which lifecycle rule protects a production database from accidental deletion?",
+      ["ignore_changes", "prevent_destroy", "create_before_destroy", "replace_triggered_by"],
+      1, "prevent_destroy = true makes Terraform error out on any plan that would destroy the resource."),
+    Q("An external system modifies the <code>tags</code> of an instance and you don't want Terraform to revert them. Which lifecycle option do you use?",
+      ["<code>ignore_changes = [tags]</code>", "<code>prevent_destroy = true</code>", "<code>create_before_destroy = true</code>", "<code>replace_triggered_by = [tags]</code>"],
+      0, "ignore_changes tells Terraform to ignore differences in the listed attributes, which is ideal when other systems manage them."),
+    Q("What does <code>replace_triggered_by</code> do?",
+      ["Prevents replacement", "Forces the resource to be replaced when the referenced resources or attributes change", "Ignores changes to the listed attributes", "Creates the resource before destroying it"],
+      1, "Useful when a dependency should cause a replacement but does not do so automatically, e.g. replace an instance when its security group changes."),
+    Q("Which are the four validation mechanisms the course describes, in order of when they run?",
+      ["Variable validation, preconditions, postconditions, checks", "Checks, postconditions, preconditions, variable validation", "fmt, validate, plan, apply", "Sentinel, OPA, run tasks, checks"],
+      0, "Variable validation runs first on inputs, preconditions before a resource is created, postconditions after, and check blocks last as non-blocking assertions."),
+    Q("Where do you write a rule that rejects an instance type not starting with <code>t3.</code> before planning?",
+      ["A validation block inside the variable block", "A check block", "A postcondition on the output", "The provider block"],
+      0, "Variable validation blocks (condition + error_message) verify input values meet format or range requirements and stop the operation if they fail."),
+    Q("What is the difference between a precondition and a postcondition?",
+      ["Preconditions run after apply; postconditions run before", "Preconditions verify assumptions BEFORE Terraform creates something; postconditions verify results AFTER creation", "There is no difference", "Postconditions are only for data sources"],
+      1, "Example precondition: check an AMI has the right architecture before launching. Example postcondition: ensure an instance actually got a private DNS record."),
+    Q("What happens when a <code>check</code> block's assertion fails?",
+      ["The plan is aborted", "Terraform reports a warning and continues the operation", "The resource is tainted", "State is locked"],
+      1, "Check blocks are non-blocking: they run as the last step of plan or apply and only produce warnings. They are top-level blocks, not nested inside resources."),
+    Q("Which validation type should you use to monitor infrastructure health without blocking operations?",
+      ["Variable validation", "Precondition", "Postcondition", "Check block"],
+      3, "Decision guide: validate input before planning → variable validation; verify before creating → precondition; verify after creating → postcondition; monitor without blocking → check."),
+    Q("What does marking a variable <code>sensitive = true</code> actually do?",
+      ["Encrypts the value in state", "Redacts the value in plan/apply output, logs and error messages, but it is still stored in plain text in state", "Removes the value from state", "Prevents the value being sent to the provider"],
+      1, "Sensitive is 'hide from logs', not 'encrypt the data'. The value still ends up in the state file and is still transmitted to providers."),
+    Q("Where can sensitive data end up, according to the course?",
+      ["Only in the state file", "State files, plan output and saved plan files, CI/CD logs, and version control history", "Only in CI/CD logs", "Nowhere if you use sensitive = true"],
+      1, "Secrets can leak into terraform.tfstate, plan output and plan files, console/CI logs and permanently into git history if committed in .tfvars or .tf files."),
+    Q("Which approach keeps a database password out of your files and out of git, while still being readable by Terraform?",
+      ["Hardcode it in terraform.tfvars", "Set it with an environment variable such as <code>TF_VAR_db_password</code>", "Put it in an output", "Store it in the lock file"],
+      1, "Environment variables are never stored in files or committed, and work well in CI/CD (for example injected from GitHub Secrets). They still do not keep the value out of state."),
+    Q("What does the course call the best practice for secrets?",
+      ["Store them in Terraform variables with defaults", "Don't store secrets in Terraform at all: retrieve them at run time from a dedicated secrets manager (Vault, AWS Secrets Manager, Azure Key Vault, GCP Secret Manager)", "Encrypt the .tf files", "Only use local state"],
+      1, "External secret sources give centralized rotation and access control and one source of truth. Note that a value read via a regular data source still ends up in state."),
+    Q("What is an <em>ephemeral</em> value in Terraform?",
+      ["A value cached in the .terraform directory", "A value that exists only in memory during a run and is never written to state or plan files (Terraform 1.10+)", "A value that expires after 24 hours in HCP Terraform", "A deprecated alias for sensitive"],
+      1, "Ephemeral values are recalculated on each run and discarded afterwards. Mark a variable with ephemeral = true to omit it from state and plan files."),
+    Q("Which Terraform version introduced ephemeral values?",
+      ["0.12", "1.5", "1.10", "1.12"],
+      2, "Ephemeral values, ephemeral resources and (later) write-only arguments arrived in Terraform 1.10+."),
+    Q("Why does <code>administrator_login_password = var.db_password</code> fail when <code>db_password</code> is an ephemeral variable?",
+      ["Ephemeral variables must be strings", "Ephemeral values are not valid in regular resource arguments, because resource instances must persist between phases; write-only arguments are needed instead", "The provider is too old", "The variable must also be sensitive"],
+      1, "Resources need values that persist in state, but ephemeral values disappear after use. Write-only arguments solve this."),
+    Q("What are write-only arguments?",
+      ["Arguments that can only be set once", "Provider-defined resource arguments that accept temporary values during an operation without persisting them to state or plan files", "Arguments stored in a separate encrypted file", "Outputs that cannot be read"],
+      1, "Each provider decides which resource arguments are write-only. Combined with an ephemeral resource that fetches the secret, the secret never lands in state."),
+    Q("What is an ephemeral resource?",
+      ["A data source with a short TTL in state", "A new block type using the <code>ephemeral</code> keyword that fetches data at run time, keeps it in memory and never persists it to state", "A resource with prevent_destroy", "A resource created in a temporary workspace"],
+      1, "Syntax is nearly identical to data sources, but the result is opened and closed during execution and flushed when the operation ends. Typical uses: fetching secrets from Vault, temporary credentials, dynamic tokens."),
+    Q("Where can ephemeral values be used?",
+      ["Only in outputs", "Local values, provider blocks, ephemeral outputs, ephemeral resources, provisioner blocks, ephemeral variables and write-only arguments", "Anywhere, including all resource arguments", "Only in HCP Terraform"],
+      1, "They can flow through locals, provider configuration, provisioners and ephemeral outputs/variables, but not into regular (persisted) resource arguments."),
+    Q("Why does the course recommend the Vault provider for dynamic credentials?",
+      ["Vault makes credentials permanent", "Credentials are generated on demand, short-lived (e.g. 120 seconds), automatically revoked after their TTL, and never stored on developer laptops", "It removes the need for a provider block", "It replaces the state file"],
+      1, "Dynamic credentials reduce attack surface: a compromised credential is only valid for minutes. With ephemeral resources they are not written to state either."),
+    Q("Which built-in function call returns <code>2</code>?",
+      ["<code>max(4,7,2,9,5)</code>", "<code>min(4,7,2,9,5)</code>", "<code>length(\"2\")</code>", "<code>upper(2)</code>"],
+      1, "min returns the smallest number. Other examples from the course: upper(\"hello\") → \"HELLO\", join(\"-\", ...) concatenates with a separator."),
+    Q("Which functions convert collections between types?",
+      ["toset, tolist, tomap, tostring", "convert, cast, parse", "set(), list(), map()", "as_set, as_list"],
+      0, "Type conversion functions ensure consistent data structures and avoid type mismatch errors, e.g. toset(var.names) for for_each."),
+    Q("Which category of built-in functions helps you calculate subnet CIDR blocks without hand-calculating IP ranges?",
+      ["String functions", "Numeric functions", "Network (IP) functions such as cidrsubnet", "Type conversion functions"],
+      2, "Network functions automate CIDR calculations, reduce manual errors and scale subnet design."),
+    TF("Terraform supports user-defined functions written in HCL.",
+      false, "Only built-in functions are available (numeric, string, collection, network, type conversion, etc.). You can experiment with them interactively in terraform console."),
+    Q("What is the recommended pattern for sensitive outputs?",
+      ["Never output sensitive values", "Mark the output <code>sensitive = true</code> so it displays as &lt;sensitive&gt; after apply", "Base64-encode the value", "Write it to a file"],
+      1, "Sensitive outputs are redacted in CLI output (shown as <sensitive>). The value is still in state and can be read with terraform output -raw when needed."),
+    Q("Which technique protects secrets from git commits AND removes them from state?",
+      ["sensitive = true", "Environment variables", "Ephemeral values with write-only arguments", "Local state"],
+      2, "The course's quick reference: sensitive variables hide output only; environment variables keep secrets out of files; only ephemeral values / write-only arguments keep them out of state."),
+  ]
+},
+{
+  id: 5, name: "Modules",
+  blurb: "Parent and child modules, sources, versioning, variable scope, outputs, and the public and private registries.",
+  questions: [
+    Q("What is a Terraform module?",
+      ["A provider plugin", "A container for related resources used together; the primary way to package and reuse configurations", "A state backend", "A Sentinel policy"],
+      1, "Modules improve organization, make collaboration easier through shared building blocks, and enforce consistent patterns."),
+    Q("What is the difference between a parent (root/calling) module and a child module?",
+      ["The parent module contains only variables", "The parent module references and configures other modules; the child module is the reusable component being called", "Child modules cannot have outputs", "There is no difference"],
+      1, "The root module is where you run Terraform. It calls child modules with module blocks. Modules can come from a registry, a repository or a local path."),
+    Q("Which files make up a very simple child module?",
+      ["main.tf, variables.tf, outputs.tf", "module.tf only", "terraform.tfvars and backend.tf", "state.tf and lock.tf"],
+      0, "A child module typically has resources in main.tf, inputs in variables.tf and exported values in outputs.tf. Reusable modules should not contain backend configuration."),
+    Q("In <code>module \"vpc\" { source = \"terraform-aws-modules/vpc/aws\"  version = \"4.0.1\"  ... }</code>, what does <code>source</code> mean?",
+      ["The name of the provider", "Where the module is located so Terraform can download it (here the public registry)", "The path to state", "The Terraform version"],
+      1, "source tells Terraform where to fetch the module; version pins which release to use; the remaining arguments are values passed into the module's variables."),
+    Q("The <code>version</code> argument in a module block works for which sources?",
+      ["Local paths", "Registry modules (public or private)", "Any source", "Git URLs only"],
+      1, "Only registry sources support version constraints. Git sources pin a revision with ?ref= in the URL; local paths use what is on disk."),
+    Q("Why pin a module to a specific version?",
+      ["Terraform requires it", "So that new module releases (new functionality or provider API changes) don't unexpectedly alter your infrastructure", "To make init faster", "To enable state locking"],
+      1, "Modules evolve (v5.10.0 → v5.14.0 in the course's example). Pinning gives you control over when you adopt changes."),
+    Q("A root module declares <code>variable \"environment\"</code>. How does a child module use that value?",
+      ["Automatically; child modules see all root variables", "The child must declare its own variable and the root passes it in the module block, e.g. <code>env = var.environment</code>", "By reading terraform.tfvars", "Via terraform_remote_state"],
+      1, "Each module has an isolated variable scope. Data crosses the boundary only through module arguments (in) and outputs (out)."),
+    Q("How does the root module read a value produced by a child module named <code>network</code> with <code>output \"subnet_1\"</code>?",
+      ["<code>module.network.subnet_1</code>", "<code>output.network.subnet_1</code>", "<code>network.subnet_1</code>", "<code>var.network.subnet_1</code>"],
+      0, "Child module outputs are referenced as module.<name>.<output>. By default the root module has no access to anything else inside the child."),
+    TF("By default, the root module can read any variable or resource attribute inside a child module without an output.",
+      false, "Module scope is isolated. Only outputs are exposed to the caller."),
+    Q("Which is <em>not</em> a valid module source?",
+      ["A local path such as ./modules/vpc", "A Git repository", "The Terraform Registry", "A Docker image"],
+      3, "Supported sources include local paths, public/private registries, Git/Mercurial repos, HTTP URLs and S3/GCS buckets. Container images are not module sources."),
+    Q("What is the source format for a module in an HCP Terraform private registry?",
+      ["<code>terraform-aws-modules/vpc/aws</code>", "<code>app.terraform.io/&lt;ORG&gt;/&lt;MODULE&gt;/&lt;PROVIDER&gt;</code>", "<code>github.com/org/module</code>", "<code>private://org/module</code>"],
+      1, "Private registry sources include the hostname and organization, for example app.terraform.io/krausen-hcp/webapp/gcp. Public registry sources are namespace/name/provider."),
+    Q("How are new versions of a private-registry module created?",
+      ["By editing the version in the UI", "Automatically from Git tags (v1.0.0, v1.1.0) in the connected VCS repository", "By running terraform publish", "By uploading a zip"],
+      1, "Private modules are published from VCS repos that follow the standard module structure; tagging a release creates a new version."),
+    Q("After adding a new module block, what must you run before plan?",
+      ["terraform refresh", "terraform init (or terraform get) to download the module", "terraform fmt", "Nothing; modules download during plan"],
+      1, "Modules are installed into .terraform/modules by init. terraform get installs only modules."),
+    Q("What does the private registry let you do that the public registry does not?",
+      ["Use version constraints", "Share modules and providers only with members of your organization and curate approved public modules", "Download providers", "Write modules in YAML"],
+      1, "Same experience as the public registry, different audience. Publishing requires Manage Private Registry permissions; all org members can browse and use it."),
+    Q("Provider configuration in a root module with an <code>aws</code> provider block: how do child modules get a provider?",
+      ["Each child must declare its own provider block with credentials", "Providers are inherited from the parent by default", "Providers must be passed as variables", "Child modules cannot use providers"],
+      1, "Unlike variables, provider configurations are inherited by child modules by default. You can pass specific (aliased) providers explicitly with the providers argument."),
+  ]
+},
+{
+  id: 6, name: "State management",
+  blurb: "Local vs remote state, backends, locking, inspecting state, securing state, legacy state commands and CLI workspaces.",
+  questions: [
+    Q("Why does the course say Terraform cannot operate without state?",
+      ["State stores the provider binaries", "State is the single source of truth mapping configuration to real resources; without it Terraform doesn't know what exists", "State contains the HCL syntax rules", "State is where credentials live"],
+      1, "State provides resource management, dependency management and collaboration. It maps each resource block to the real object plus metadata like order of operations and provider used."),
+    Q("Which are limitations of local state listed in the course?",
+      ["Encrypted at rest, hard to read", "No team collaboration, no locking, plaintext security risk, no automatic backups", "Too slow for small projects", "Requires a paid subscription"],
+      1, "Local state is fine for learning and solo experiments. Remote state with locking is the recommended approach and industry standard for teams and production."),
+    Q("Where is the backend block placed?",
+      ["Inside the provider block", "Inside the terraform block", "In terraform.tfvars", "In a separate backend.json"],
+      1, "backend \"s3\" { ... } goes in the terraform block, not a provider block, and you must run terraform init after adding or changing it."),
+    Q("In the S3 backend example, which argument enables state locking in the course's recommended way?",
+      ["dynamodb_table", "use_lockfile = true", "lock = true", "locking = \"s3\""],
+      1, "The course notes DynamoDB-based locking is deprecated; the S3 backend now supports native locking with use_lockfile = true."),
+    Q("In the S3 backend, what does the <code>key</code> argument specify?",
+      ["The KMS key ID", "The S3 object path (file) used to store the state, e.g. prod/terraform.tfstate", "The AWS access key", "The bucket name"],
+      1, "bucket is the bucket name, key is the object path, region is the bucket's region, use_lockfile enables locking."),
+    Q("Why does the course warn against putting tenant_id/client_id in the azurerm backend block?",
+      ["The arguments are not supported", "Authentication should come from roles or environment variables, not be committed in configuration", "Azure Blob does not need auth", "Backends cannot authenticate"],
+      1, "Backend authentication in the file ends up in version control. Use environment variables or platform identities instead."),
+    Q("What is the purpose of state locking?",
+      ["To encrypt state", "To prevent concurrent operations from writing to the state at the same time and corrupting it", "To speed up plan", "To keep old versions"],
+      1, "Terraform locks state for any operation that might write. Remote backends provide this (lockfile for S3, built-in for others)."),
+    Q("Which command lists only the addresses of resources in state?",
+      ["terraform show", "terraform state list", "terraform state show", "terraform output"],
+      1, "terraform state list returns addresses only (including data sources and indexed instances like aws_subnet.public[0])."),
+    Q("Which command shows all attributes of a single resource from state?",
+      ["terraform state list aws_vpc.vpc", "terraform state show aws_vpc.vpc", "terraform output aws_vpc.vpc", "terraform describe aws_vpc.vpc"],
+      1, "Pro tip from the course: use terraform state list to get the exact address, then terraform state show <address> to inspect it."),
+    Q("What does <code>terraform show</code> display?",
+      ["Only resource addresses", "Human-readable output of the entire state or of a saved plan file", "The provider documentation", "The dependency graph"],
+      1, "Use it to see all attributes, review planned changes in a saved plan, and inspect computed values and metadata."),
+    Q("The course describes some state commands as legacy. Which mapping is correct?",
+      ["terraform state mv → import block", "terraform state mv → moved block; terraform state rm → removed block", "terraform state rm → moved block", "terraform state pull → check block"],
+      1, "HashiCorp is moving toward configuration-driven state operations that are version-controlled and reviewable. Know the CLI commands exist, but focus on the block alternatives for 004."),
+    Q("What does <code>terraform state rm aws_s3_bucket.logs</code> do?",
+      ["Deletes the bucket and removes it from state", "Removes the bucket from state only; the real bucket keeps existing", "Marks it for replacement", "Moves it to another workspace"],
+      1, "state rm makes Terraform forget the object. The declarative equivalent is a removed block with destroy = false."),
+    Q("Which are benefits of remote state over local state that the course lists?",
+      ["Stored on your laptop, easy to commit", "Centralized team access, encryption at rest, access controlled via IAM/RBAC, audit logging, never on a local filesystem", "Requires no setup", "Disables locking"],
+      1, "Always use remote state with encryption for production workloads."),
+    Q("Which items are on the course's state security checklist?",
+      ["Use local state, disable locking", "Always use remote state for production, enable encryption at rest, implement access controls, enable state locking", "Commit state to git, rotate weekly", "Store state in outputs"],
+      1, "State files will contain secrets; your job is to protect where they're stored and who can access them. Defense in depth: encryption + access controls + audit logging."),
+    Q("What is a CLI workspace?",
+      ["A directory on HCP Terraform", "A named container for a separate instance of your Terraform state, using the same configuration and backend", "A separate git branch", "A Sentinel policy scope"],
+      1, "Workspaces let one configuration manage dev, QA and test with isolated state files and no code duplication."),
+    Q("Where are non-default CLI workspace state files stored locally?",
+      ["In terraform.tfstate with a suffix", "In terraform.tfstate.d/&lt;workspace&gt;/terraform.tfstate", "In .terraform/workspaces/", "In ~/.terraform.d/"],
+      1, "The default workspace state stays in the root directory; each additional workspace gets its own subdirectory under terraform.tfstate.d/."),
+    Q("Which command creates a workspace named dev and switches to it?",
+      ["terraform workspace select dev", "terraform workspace new dev", "terraform workspace create dev", "terraform new workspace dev"],
+      1, "workspace subcommands: list, new, select, show, delete. new creates and switches; select changes to an existing one; show displays the current workspace."),
+    Q("In <code>terraform workspace list</code> output, how is the current workspace indicated?",
+      ["It is listed first", "It is prefixed with an asterisk (*)", "It is shown in bold", "It has (current) appended"],
+      1, "The selected workspace is marked with *, e.g. '* qa'."),
+    Q("You switch to a new workspace and run <code>terraform state list</code>. What do you see?",
+      ["All resources from the default workspace", "No state file was found (the new workspace has an empty, isolated state)", "An error saying workspaces need a backend", "The lock file contents"],
+      1, "Each workspace maintains its own isolated state, so a freshly created workspace has nothing in it until you apply."),
+    Q("What is the key difference between CLI workspaces and HCP Terraform workspaces?",
+      ["They are identical", "CLI workspaces are multiple state files for one configuration; HCP Terraform workspaces are complete working environments with their own config, variables, state, credentials and run history", "HCP workspaces don't store state", "CLI workspaces require VCS"],
+      1, "Same name, fundamentally different concept. Don't get them confused on the exam."),
+    Q("What does <code>terraform state pull</code> / <code>push</code> do?",
+      ["Downloads/uploads provider plugins", "Manually reads or writes the raw state to/from the backend (rare, manual state operations)", "Syncs workspaces", "Refreshes state from the provider"],
+      1, "These are low-level manual operations; the course describes them as rare and legacy-style."),
+    Q("After changing from local state to an S3 backend, what happens when you run <code>terraform init</code>?",
+      ["State is deleted", "Terraform detects the backend change and offers to migrate the existing state to the new backend", "Nothing; backends are read at apply", "The lock file is removed"],
+      1, "init handles backend initialization and state migration (terraform init -migrate-state)."),
+  ]
+},
+{
+  id: 7, name: "Maintaining infrastructure",
+  blurb: "Drift (revert vs accept), refresh-only mode, refactoring with moved, removed and import blocks, and the legacy terraform import command.",
+  questions: [
+    Q("What is infrastructure drift?",
+      ["A version mismatch between CLI and provider", "A difference between real infrastructure and what Terraform's state/configuration expects, caused by changes made outside Terraform", "Growth of the state file", "Provider deprecation warnings"],
+      1, "Example: someone changes a VM in the Azure portal. Terraform detects drift when it refreshes state during plan."),
+    Q("A change was made manually in the cloud console and it was a mistake. According to the course, how do you revert it?",
+      ["terraform apply -refresh-only", "A regular terraform apply, because your configuration (desired state) hasn't changed", "terraform state rm", "terraform import"],
+      1, "Revert: your .tf files are the source of truth, so a normal apply overwrites the real-world change. Accept: use refresh-only mode."),
+    Q("A manual change is valid and you want to keep it. How do you make Terraform's state reflect it without changing infrastructure?",
+      ["terraform apply -refresh-only", "terraform apply", "terraform destroy -target", "terraform validate"],
+      0, "Refresh-only mode reconciles state with the drifted remote objects. terraform plan -refresh-only previews; terraform apply -refresh-only actually updates state."),
+    Q("What is the difference between <code>terraform plan -refresh-only</code> and <code>terraform apply -refresh-only</code>?",
+      ["They are identical", "plan -refresh-only previews what would change in state and makes no changes; apply -refresh-only actually updates the state file", "plan -refresh-only changes infrastructure", "apply -refresh-only destroys drifted resources"],
+      1, "Use plan to investigate drift safely, then apply after you've reviewed and decided to accept it."),
+    Q("What is state refactoring?",
+      ["Rewriting the state file by hand", "Reorganizing how Terraform tracks infrastructure (renames, moving into modules, adopting or releasing resources) without changing the infrastructure itself", "Migrating to a new backend", "Deleting unused providers"],
+      1, "Without refactoring tools, Terraform thinks a renamed resource is a destroy plus a create."),
+    Q("You rename <code>resource \"aws_vpc\" \"vpc\"</code> to <code>\"sbx_vpc\"</code> and run plan. What does Terraform show without a moved block?",
+      ["An in-place update", "1 to add, 1 to destroy: it plans to destroy aws_vpc.vpc and create aws_vpc.sbx_vpc", "No changes", "A refresh-only change"],
+      1, "Terraform matches configuration to state by address, so a new name looks like a brand new resource and the old one is 'not in configuration'."),
+    Q("Which block prevents the destroy/recreate when renaming a resource?",
+      ["<code>moved { from = aws_instance.server  to = aws_instance.web_server }</code>", "<code>removed { from = aws_instance.server }</code>", "<code>import { to = aws_instance.web_server }</code>", "<code>lifecycle { prevent_destroy = true }</code>"],
+      0, "The moved block tells Terraform the resource has a new address; state is updated during plan/apply without touching real infrastructure."),
+    Q("Which moved block moves a resource into a module?",
+      ["<code>moved { from = aws_s3_bucket.data  to = module.storage.aws_s3_bucket.data }</code>", "<code>moved { from = module.storage  to = aws_s3_bucket.data }</code>", "<code>import { to = module.storage.aws_s3_bucket.data }</code>", "<code>removed { from = aws_s3_bucket.data }</code>"],
+      0, "from is where the original resource block lived, to is the new address. Whole modules can be moved too: from = module.old_app, to = module.new_app."),
+    Q("What is the full refactoring workflow for a moved block described in the course?",
+      ["Add moved block, apply, done", "Add the new resource blocks, add moved blocks, plan (validate), apply (updates state), then delete the moved blocks", "Delete the old resource, apply, re-import", "Run terraform state mv, then commit"],
+      1, "After the state update has been applied, the moved blocks have done their job and can be removed."),
+    Q("The DBA team wants to take over a database that Terraform created, keeping it running. What should you do?",
+      ["Delete the resource block and apply", "Add a <code>removed</code> block with <code>lifecycle { destroy = false }</code> and remove the resource block from the configuration", "Add prevent_destroy", "Run terraform destroy -target"],
+      1, "Simply deleting the resource block would DELETE the database. The removed block removes it from state while leaving the real resource intact."),
+    TF("When using a removed block, you must also delete the resource block from your configuration.",
+      true, "The removed block replaces the resource block; it instructs Terraform to stop managing the object (and with destroy = false, to keep it running)."),
+    Q("According to the course's decision tree, which block do you use when reorganizing resources into modules?",
+      ["removed", "moved", "import", "check"],
+      1, "Renaming or reorganizing into modules → moved. Stopping management, handing off to another team, or splitting configurations → removed."),
+    Q("Which block is used when splitting one configuration into two?",
+      ["moved", "removed (in the old configuration) followed by import (in the new one)", "check", "data"],
+      1, "The decision tree lists splitting configurations under removed; the new configuration then adopts the resources with import blocks."),
+    Q("What does the <code>import</code> block do?",
+      ["Downloads a module", "Brings existing infrastructure under Terraform management by mapping a real-world ID to a resource address", "Imports variables from another workspace", "Loads a saved plan"],
+      1, "Example: import { to = azurerm_resource_group.prd-rg  id = \"/subscriptions/1234/rg/my-rg\" }. to is the resource block address, id is the real resource identifier."),
+    Q("What must exist before an import block can be applied?",
+      ["A moved block", "A resource block that will manage the imported resource, written manually or generated with <code>terraform plan -generate-config-out=PATH</code>", "A removed block", "An HCP Terraform workspace"],
+      1, "Terraform needs the target resource block. -generate-config-out writes a starting configuration for you."),
+    Q("How does the legacy <code>terraform import</code> command differ from the import block?",
+      ["It generates configuration automatically", "It modifies state immediately with no plan step and still requires you to write the resource block manually first", "It works without a resource block", "It is the recommended approach for 004"],
+      1, "Syntax: terraform import aws_instance.web i-1234567890abcdef0. For the exam, know it exists but focus on the import block."),
+    Q("Why does the course prefer configuration blocks (moved, removed, import) over CLI state commands?",
+      ["CLI commands are slower", "Blocks are declared in .tf files, version-controlled, reviewable in PRs, part of the normal plan/apply workflow and can be tested before applying", "CLI commands are no longer installed", "Blocks encrypt state"],
+      1, "CLI commands run outside the configuration, aren't version-controlled, are hard to review and risky: one wrong command permanently modifies state."),
+    Q("Which is the current recommended way to force replacement of a specific resource on the next apply?",
+      ["terraform taint", "terraform apply -replace=ADDRESS", "terraform state rm then apply", "Comment out the resource and apply twice"],
+      1, "-replace marks the resource for replacement within a normal, reviewable plan. terraform taint is deprecated because it modifies state outside of a plan."),
+    Q("What is the workflow for applying a removed block?",
+      ["Apply first, then add the block", "Add the removed block(s), remove the resource block(s), plan, apply (updates state), then delete the removed block(s)", "Only run terraform state rm", "Run terraform destroy"],
+      1, "Like moved blocks, removed blocks are temporary refactoring instructions and are deleted after the state update is applied."),
+  ]
+},
+{
+  id: 8, name: "HCP Terraform",
+  blurb: "Value of HCP Terraform, execution modes, cloud block and authentication, workspaces, projects, variable sets, teams and permissions, private registry, Sentinel/OPA policies, health assessments and run triggers.",
+  questions: [
+    Q("What is HCP Terraform?",
+      ["A different configuration language", "A hosted service that helps teams use Terraform: collaboration, managed remote state and automated workflows", "A self-hosted only product", "A replacement for providers"],
+      1, "It adds remote state storage, remote execution, RBAC, policy enforcement, cost estimation, audit logs, drift detection and a private registry on top of Terraform Community Edition."),
+    Q("Which features does HCP Terraform add over Terraform Community Edition?",
+      ["The ability to plan changes", "Managed remote state, consistent execution environments, RBAC, policy enforcement (Sentinel/OPA), cost estimation, audit logs, private module registry", "Providers and the public registry", "The HCL language"],
+      1, "Community Edition already has IaC, providers, public modules, plan and local execution. HCP Terraform layers collaboration and governance on top."),
+    TF("Moving to HCP Terraform requires rewriting your Terraform configuration.",
+      false, "Your code still works. HCP Terraform changes where and how the code runs, not the language. CLI commands work the same way."),
+    Q("Where do plan and apply run by default with HCP Terraform?",
+      ["On your local machine", "Remotely on HCP Terraform's infrastructure, with results streamed back to the CLI (remote execution)", "On the cloud provider", "In a GitHub Actions runner"],
+      1, "Remote execution is the default and recommended for teams. Local execution mode is available for flexibility."),
+    Q("In Local execution mode, what does HCP Terraform do?",
+      ["Runs plan and apply remotely", "Only stores and synchronizes state; plan and apply run on your machine and workspace variables/variable sets are NOT evaluated", "Runs Sentinel policies", "Nothing"],
+      1, "Local mode gives limited access to HCP features. Remote mode unlocks Sentinel, cost estimation and notifications."),
+    Q("What is Agent execution mode for?",
+      ["Running Terraform in a browser", "Running plans and applies on self-hosted agents inside private or on-premises networks that HCP Terraform can't reach directly", "Local development only", "Running policies faster"],
+      1, "Agents are lightweight, self-hosted runners. HCP Terraform and Terraform Enterprise use the same agent to evaluate policies and run operations."),
+    Q("At which level is execution mode configured?",
+      ["Only at the organization", "Per workspace (with inheritance from project and organization)", "Per resource", "Per provider"],
+      1, "Each workspace can be Remote, Local or Agent. Projects can set a mode that workspaces inherit; projects inherit from the organization."),
+    Q("Which block connects a configuration to HCP Terraform?",
+      ["backend \"hcp\"", "The <code>cloud</code> block inside the terraform block, with organization and a workspaces block", "provider \"hcp\"", "module \"hcp\""],
+      1, "cloud { organization = \"...\"  workspaces { name = \"...\" } }. The workspaces block can target by name/project or by tags."),
+    Q("In the cloud block, what are the two ways to select workspaces?",
+      ["id and arn", "name (optionally with project) for a specific workspace, or tags to match workspaces with given tags", "path and branch", "region and zone"],
+      1, "Specifying a project in the cloud block requires Terraform 1.6+."),
+    Q("What does <code>terraform login</code> do?",
+      ["Logs into AWS", "Requests an API token for app.terraform.io via the browser and stores it in plain text in ~/.terraform.d/credentials.tfrc.json", "Creates a workspace", "Encrypts state"],
+      1, "The token is stored locally in credentials.tfrc.json. For CI/CD where a browser isn't available, set TF_TOKEN_app_terraform_io instead."),
+    Q("Which environment variable provides an HCP Terraform API token without <code>terraform login</code>?",
+      ["TF_TOKEN", "TF_TOKEN_app_terraform_io", "HCP_TOKEN", "TF_VAR_token"],
+      1, "This is important for pipelines and automation where interactive browser login isn't possible."),
+    Q("Which HCP Terraform token type can access multiple organizations?",
+      ["Organization token", "Team token", "User token", "Audit token"],
+      2, "User tokens have the same permissions as your user account and are the only type that can access multiple organizations."),
+    Q("Which token type is used to manage teams, membership and workspaces but cannot run plans and applies?",
+      ["Organization token", "Team token", "User token", "Audit token"],
+      0, "Organization tokens manage org-level objects only. Team tokens are for automation like CI/CD and can run operations. Audit tokens are read-only for the audit trail API."),
+    Q("What does an HCP Terraform workspace contain?",
+      ["Only a state file", "Configuration (VCS or CLI upload), state with version history, variables, run history, execution settings, and team access", "Only variables", "Only run history"],
+      1, "A workspace is everything Terraform needs to manage a collection of infrastructure."),
+    Q("Which workspace workflow type triggers runs from commits and pull requests in a repository?",
+      ["CLI-driven", "Version control (VCS) workflow", "API-driven", "Agent workflow"],
+      1, "VCS workflow is best for traceability. CLI-driven suits people comfortable with the CLI; API-driven suits custom integrations and pipelines."),
+    Q("What are HCP Terraform runs called when they execute on HCP Terraform's infrastructure?",
+      ["Local operations", "Remote operations", "Agent jobs", "Pipelines"],
+      1, "Remote operations let the team review and collaborate on runs in the app, with full feature access."),
+    Q("What is a project in HCP Terraform?",
+      ["A Terraform run", "An organizational layer between the organization and workspaces that groups related workspaces and scopes permissions, variable sets and execution mode", "A git repository", "A policy set"],
+      1, "Projects solve workspace sprawl. Every workspace belongs to exactly one project."),
+    Q("Which statement about projects is correct?",
+      ["A workspace can belong to several projects", "Every organization gets a Default Project that can be renamed but not deleted", "Projects can be deleted while they contain workspaces", "Projects replace workspaces"],
+      1, "Only empty projects can be deleted. Workspaces can be moved between projects."),
+    Q("What are variable sets?",
+      ["Variables defined in .tfvars files", "Reusable collections of Terraform and environment variables defined once and applied to many workspaces; updates propagate automatically", "Sentinel parameters", "CLI workspace variables"],
+      1, "Typical use: cloud credentials shared across all workspaces in a project, so rotating them happens in one place."),
+    Q("What are the three variable set scopes?",
+      ["Local, remote, agent", "Global (all current and future workspaces), project-scoped, workspace-scoped", "Read, write, admin", "Advisory, soft, hard"],
+      1, "Global applies organization-wide; project-scoped applies to all current and future workspaces in selected projects; workspace-scoped applies only to selected workspaces."),
+    Q("A variable set defines db_read_capacity = 1 and the workspace defines db_read_capacity = 10. Which value is used?",
+      ["1, variable sets always win", "10, workspace-specific variables override variable set values (unless the set is flagged as priority)", "An error is raised", "The lower value"],
+      1, "HCP Terraform uses workspace-specific variables over variable sets. Priority variable sets can be flagged to override more specific scopes."),
+    Q("Two variable sets at the same scope define the same variable. How is the conflict resolved?",
+      ["The newest set wins", "Lexical (alphabetical) order of the set names", "Both values are merged", "The run fails"],
+      1, "Also note: in CLI-driven workflows, CLI flags and TF_VAR_ environment variables override workspace and variable set values."),
+    Q("How do permissions combine in HCP Terraform when a user is in multiple teams?",
+      ["The most restrictive applies", "They are additive; the highest permission level always wins", "Only the first team counts", "Permissions are averaged"],
+      1, "Users can belong to multiple teams and organizations; grant least privilege because the highest permission wins."),
+    Q("What is the Owners team?",
+      ["A team with read-only access", "The default team in every organization with full admin access to everything (policies, overrides, workspaces, private registry, VCS settings, run tasks)", "A team for billing only", "An optional team"],
+      1, "Every organization has an Owners team by default."),
+    Q("At which levels can permissions be granted?",
+      ["Only workspace", "Organization, project and workspace", "Only organization", "Provider and module"],
+      1, "Organization-level: broad permissions like Manage all workspaces. Project-level: Read, Write, Maintain, Admin or Custom. Workspace-level: Admin, Write, Plan, Read or Custom."),
+    Q("What does 'Secret' team visibility mean?",
+      ["The team's tokens are encrypted", "The team is only visible to its members and organization owners", "The team cannot run applies", "The team is hidden from audit logs"],
+      1, "Visible teams are seen by every member of the organization; secret teams only by their members and owners."),
+    Q("What are team API tokens designed for?",
+      ["Managing the organization", "Performing API operations on workspaces with the same access level the team has; commonly used by CI/CD pipelines", "Read-only audit access", "Logging in to the UI"],
+      1, "Team tokens can run plans and applies on the workspaces the team can access."),
+    Q("When do policies run in a Terraform run on HCP Terraform?",
+      ["Before the plan", "After the plan and before the apply; if the plan fails, policies are never evaluated", "After the apply", "Continuously after deployment"],
+      1, "Policies evaluate plan data before any infrastructure is created, so failed policies can block the apply entirely."),
+    Q("Which two policy frameworks does HCP Terraform support?",
+      ["Sentinel (HashiCorp) and Open Policy Agent (CNCF, Rego language)", "Sentinel and Vault", "OPA and Kyverno", "Rego and YAML"],
+      0, "Sentinel uses the Sentinel language with HashiCorp-provided pre-written policies; OPA uses Rego with community-driven policies. Both can be used in the same workspace."),
+    Q("What are Sentinel's three enforcement levels?",
+      ["Low, medium, high", "Advisory, soft mandatory, hard mandatory", "Warn, block, delete", "Read, write, admin"],
+      1, "Advisory warns and continues; soft mandatory stops the run but can be overridden (Manage Policy Overrides permission, logged); hard mandatory cannot be overridden."),
+    Q("What is the default enforcement level for Sentinel policies?",
+      ["Advisory", "Soft mandatory", "Hard mandatory", "None"],
+      2, "Hard mandatory is the default: the violation must be fixed in configuration before the run can proceed."),
+    Q("Which permission is required to override a failed soft-mandatory policy?",
+      ["Manage Workspaces", "Manage Policy Overrides", "Manage VCS Settings", "Read"],
+      1, "All overrides are logged for auditing."),
+    Q("How many enforcement levels does OPA have in HCP Terraform?",
+      ["One", "Two: advisory and mandatory", "Three", "Four"],
+      1, "OPA: advisory (warn and continue) and mandatory (stop the run). Sentinel has three."),
+    Q("Which statement about policy sets is correct?",
+      ["A policy set can mix Sentinel and OPA policies", "Each policy set uses one framework only, and sets can be scoped globally, to projects, or to specific workspaces", "Policy sets apply only to one workspace", "Policy sets cannot exclude workspaces"],
+      1, "Policies are grouped into sets; you can exclude workspaces from a set; sets are managed via UI, VCS or API."),
+    Q("Which of the following can policies NOT do?",
+      ["Block public S3 buckets", "Enforce tagging", "Continuously monitor infrastructure after deployment or remove existing violating resources", "Restrict instance types"],
+      2, "Policies evaluate plans. They don't analyze runtime behavior or fix existing resources. Health assessments cover ongoing drift and validation."),
+    Q("Which policy framework's checks have access to cost estimation data?",
+      ["OPA", "Sentinel", "Both", "Neither"],
+      1, "Sentinel policy checks can use cost estimation data, e.g. to enforce budget limits."),
+    Q("What do health assessments do?",
+      ["Run policies before apply", "Automatically (roughly every 24 hours) run drift detection comparing real infrastructure against state, and continuous validation of check blocks and pre/postconditions", "Encrypt state", "Format code"],
+      1, "If something is wrong the workspace shows a Health warning status. Available in Standard and Premium editions; enabled per workspace or enforced org-wide."),
+    Q("What are run triggers?",
+      ["Scheduled runs", "Connections from a workspace to up to 20 source workspaces so a successful apply in a source automatically queues a run downstream", "Sentinel hooks", "VCS webhooks for pull requests"],
+      1, "Example: the networking workspace applies, triggering the firewall workspace that reads subnets from its state."),
+    Q("When does a run trigger fire?",
+      ["On any plan", "On a successful apply in a source workspace", "On a failed policy", "Every 24 hours"],
+      1, "Run triggers enable workspace-to-workspace automation, firing only after successful applies."),
+    Q("What is the top-level unit in HCP Terraform that holds teams, projects and workspaces?",
+      ["Project", "Organization", "Workspace", "Registry"],
+      1, "Hierarchy: Organization → Project → Workspace. Organization-wide settings live at the organization level."),
+    Q("Which HCP Terraform feature lets an admin attach to-do items (updates, upgrades, fixes) to workspaces at scale?",
+      ["Run tasks", "Change requests", "Run triggers", "Variable sets"],
+      1, "Change requests help track work across hundreds of workspaces. The Explorer provides visibility across workspaces."),
+    Q("Which HCP Terraform tier is the free one and what does it include?",
+      ["Premium: unlimited applies", "Free tier: state storage and basic features with 500 managed resources at no charge", "Standard: drift detection", "Essentials: Stacks"],
+      1, "Per the course (subject to change): Free includes 500 managed resources; Standard adds drift detection, audit events, policy enforcement; Premium adds private VCS, run tasks, module revocation."),
+    Q("Which of the following is stored encrypted-at-rest with version history in an HCP Terraform workspace?",
+      ["The .terraform directory", "The state file", "The lock file only", "The provider binaries"],
+      1, "HCP Terraform provides secure remote state storage: single source of truth, encrypted at rest, built-in locking, version history and rollback."),
+    Q("Where is the private registry hosted?",
+      ["registry.terraform.io", "Inside your HCP Terraform organization (app.terraform.io/&lt;org&gt;/...)", "GitHub", "Your laptop"],
+      1, "Public registry: registry.terraform.io, visible to anyone. Private registry: inside your organization, visible only to members, containing private modules plus curated public ones."),
+    Q("Who can publish modules to the private registry?",
+      ["Any organization member", "Users with Manage Private Registry permissions", "Only HashiCorp", "Only the Owners team, and only via API"],
+      1, "All org members can view and use the registry; publishing requires Manage Private Registry permissions (which the Owners team has)."),
+    TF("With HCP Terraform, you can start with just remote state storage and adopt other features over time.",
+      true, "Adopt at your own pace: keep local execution if you want, or switch to remote when ready. It scales from solo practitioners to large teams."),
+    Q("Which HCP Terraform feature estimates the cost of a change before apply?",
+      ["Health assessments", "Cost estimation", "Run triggers", "Change requests"],
+      1, "Cost estimation is part of the governance features, and Sentinel policies can use its data."),
+  ]
+}
+];
+
+
+// ---------- State ----------
+const EXAM_SIZE = 57, EXAM_MINUTES = 60, PASS_PCT = 70;
+const KEYS = ['A','B','C','D','E'];
+const progress = SECTIONS.map(s => freshProgress(s.questions.length));
+let current = 0;                    // index into SECTIONS, or 'exam'
+let exam = null;                    // { items:[{s,qi,order}], idx, answers:[], deadline, finished }
+let timerHandle = null;
+
+function freshProgress(n) { return { idx: 0, answers: Array(n).fill(null), order: [...Array(n).keys()], optOrder: Array(n).fill(null) }; }
+function shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function optionOrder(q, slot) {
+  if (slot.optOrder) return slot.optOrder;
+  const base = [...Array(q.opts.length).keys()];
+  slot.optOrder = (document.getElementById('shuffleOpts').checked && !q.tf) ? shuffle(base) : base;
+  return slot.optOrder;
+}
+
+const navEl = document.getElementById('nav');
+const mainEl = document.getElementById('main');
+const totalEl = document.getElementById('totalScore');
+document.getElementById('shuffleQs').onchange = e => {
+  progress.forEach((p, i) => { if (p.answers.every(a => a === null)) p.order = e.target.checked ? shuffle(p.order) : [...Array(SECTIONS[i].questions.length).keys()]; });
+  if (current !== 'exam') render();
+};
+
+// ---------- Nav ----------
+function renderNav() {
+  navEl.innerHTML = '';
+  SECTIONS.forEach((s, i) => {
+    const p = progress[i];
+    const answered = p.answers.filter(a => a !== null).length;
+    const correct = p.answers.filter((a, qi) => a === s.questions[qi].a).length;
+    const btn = document.createElement('button');
+    btn.className = 'objective' + (current === i ? ' active' : '');
+    btn.innerHTML = `<span class="num">${s.id}</span><span class="name">${s.name}</span>
+      <span class="score ${answered === s.questions.length ? 'done' : ''}">${answered ? correct + '/' + answered : s.questions.length + ' q'}</span>
+      <span class="bar"><i style="width:${(answered / s.questions.length) * 100}%"></i></span>`;
+    btn.onclick = () => { current = i; render(); };
+    navEl.appendChild(btn);
+  });
+  const div = document.createElement('div'); div.className = 'divider'; navEl.appendChild(div);
+  const ex = document.createElement('button');
+  ex.className = 'objective exam' + (current === 'exam' ? ' active' : '');
+  ex.innerHTML = `<span class="num">⏱</span><span class="name">Mock exam</span><span class="score">${EXAM_SIZE} q · ${EXAM_MINUTES} min</span>`;
+  ex.onclick = () => { current = 'exam'; render(); };
+  navEl.appendChild(ex);
+
+  const all = progress.flatMap((p, i) => p.answers.map((a, qi) => a === null ? null : a === SECTIONS[i].questions[qi].a));
+  const done = all.filter(a => a !== null).length, ok = all.filter(a => a === true).length;
+  totalEl.textContent = done ? `Practice: ${ok} of ${done} correct` : `${all.length} practice questions across 8 objectives`;
+}
+
+// ---------- Render ----------
+function render() {
+  renderNav();
+  mainEl.innerHTML = '';
+  if (current === 'exam') return renderExam();
+  const s = SECTIONS[current], p = progress[current];
+
+  const head = document.createElement('div');
+  head.className = 'section-head';
+  head.innerHTML = `<h2><span class="weight">${s.id}.</span> ${s.name}</h2><p>${s.blurb}</p>`;
+  mainEl.appendChild(head);
+
+  const card = document.createElement('div'); card.className = 'qcard'; mainEl.appendChild(card);
+  if (p.idx >= s.questions.length) return renderSectionSummary(card, s, p);
+
+  const qi = p.order[p.idx], q = s.questions[qi], chosen = p.answers[qi];
+  const slot = { get optOrder() { return p.optOrder[qi]; }, set optOrder(v) { p.optOrder[qi] = v; } };
+  const order = optionOrder(q, slot);
+
+  card.innerHTML = `<div class="qmeta"><span>Question ${p.idx + 1} of ${s.questions.length}${q.tf ? ' · true or false' : ''}</span></div><p class="qtext">${q.q}</p>`;
+  const opts = document.createElement('div'); opts.className = 'options';
+  order.forEach((oi, pos) => {
+    const b = document.createElement('button'); b.className = 'opt';
+    b.innerHTML = `<span class="key">${KEYS[pos]}</span><span>${q.opts[oi]}</span>`;
+    if (chosen !== null) {
+      b.disabled = true;
+      b.classList.add(oi === q.a ? 'correct' : oi === chosen ? 'wrong' : 'dim');
+    } else b.onclick = () => { p.answers[qi] = oi; render(); };
+    opts.appendChild(b);
+  });
+  card.appendChild(opts);
+
+  const actions = document.createElement('div'); actions.className = 'actions';
+  if (chosen !== null) {
+    const right = chosen === q.a, fb = document.createElement('div');
+    fb.className = 'feedback ' + (right ? 'ok' : 'bad'); fb.setAttribute('role', 'status');
+    fb.innerHTML = `<p class="verdict">${right ? 'Correct.' : 'Not quite. The correct answer is ' + KEYS[order.indexOf(q.a)] + '.'}</p><p>${q.exp}</p>`;
+    card.appendChild(fb);
+    const next = document.createElement('button'); next.className = 'btn';
+    next.textContent = p.idx + 1 < s.questions.length ? 'Next question' : 'See section results';
+    next.onclick = () => { p.idx++; render(); };
+    actions.appendChild(next);
+    setTimeout(() => next.focus(), 0);
+  } else {
+    const hint = document.createElement('span'); hint.className = 'hint';
+    hint.textContent = 'Pick an answer. A wrong pick shows the correct one with an explanation.';
+    actions.appendChild(hint);
+  }
+  if (p.idx > 0) { const back = document.createElement('button'); back.className = 'btn ghost'; back.textContent = 'Previous'; back.onclick = () => { p.idx--; render(); }; actions.appendChild(back); }
+  card.appendChild(actions);
+}
+
+function renderSectionSummary(card, s, p) {
+  const correct = p.answers.filter((a, qi) => a === s.questions[qi].a).length;
+  const missed = p.order.map(qi => ({ q: s.questions[qi], qi })).filter(({ q, qi }) => p.answers[qi] !== q.a);
+  card.innerHTML = `<div class="summary">
+      <div class="big">${correct}/${s.questions.length}</div>
+      <p>${correct === s.questions.length ? 'Every question right in this objective.' : 'Review what you missed below, then retry the section.'}</p>
+      <div class="actions" style="justify-content:center">
+        <button class="btn" id="retry">Retry this section</button>
+        ${current + 1 < SECTIONS.length ? '<button class="btn ghost" id="nextSec">Go to objective ' + (current + 2) + '</button>' : ''}
+      </div>
+      ${missed.length ? `<div class="review"><h3>Missed questions (${missed.length})</h3>${missed.map(({ q, qi }) => reviewItem(q, p.answers[qi])).join('')}</div>` : ''}
+    </div>`;
+  card.querySelector('#retry').onclick = () => { progress[current] = freshProgress(s.questions.length); if (document.getElementById('shuffleQs').checked) progress[current].order = shuffle(progress[current].order); render(); };
+  const ns = card.querySelector('#nextSec'); if (ns) ns.onclick = () => { current++; render(); };
+}
+
+function reviewItem(q, chosen) {
+  return `<div class="item"><p class="q">${q.q}</p>
+    ${chosen === null ? '<p class="ans"><span class="you">Not answered</span></p>' : `<p class="ans"><span class="you">Your answer:</span> ${q.opts[chosen]}</p>`}
+    <p class="ans"><span class="right">Correct:</span> ${q.opts[q.a]}</p><p class="exp">${q.exp}</p></div>`;
+}
+
+// ---------- Mock exam ----------
+function buildExam() {
+  // Weight roughly like the real exam: draw proportionally from each objective, then top up randomly.
+  const total = SECTIONS.reduce((n, s) => n + s.questions.length, 0);
+  let items = [];
+  SECTIONS.forEach((s, si) => {
+    const take = Math.max(3, Math.round(EXAM_SIZE * s.questions.length / total));
+    shuffle([...Array(s.questions.length).keys()]).slice(0, take).forEach(qi => items.push({ s: si, qi }));
+  });
+  items = shuffle(items).slice(0, EXAM_SIZE);
+  items.forEach(it => { const q = SECTIONS[it.s].questions[it.qi]; const base = [...Array(q.opts.length).keys()]; it.order = (document.getElementById('shuffleOpts').checked && !q.tf) ? shuffle(base) : base; });
+  return { items, idx: 0, answers: Array(items.length).fill(null), deadline: Date.now() + EXAM_MINUTES * 60000, finished: false };
+}
+function fmtTime(ms) { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+function stopTimer() { if (timerHandle) { clearInterval(timerHandle); timerHandle = null; } }
+
+function renderExam() {
+  const head = document.createElement('div'); head.className = 'section-head';
+  head.innerHTML = `<h2><span class="weight">⏱</span> Mock exam</h2><p>${EXAM_SIZE} questions drawn across all objectives, ${EXAM_MINUTES} minutes, answers revealed at the end. Pass mark used here: ${PASS_PCT}%.</p>`;
+  mainEl.appendChild(head);
+  const card = document.createElement('div'); card.className = 'qcard'; mainEl.appendChild(card);
+
+  if (!exam) {
+    card.innerHTML = `<div class="intro"><p>This simulates exam conditions: no feedback until you finish, a countdown, and a per-objective breakdown at the end. You can move back and forth between questions and change answers before finishing.</p>
+      <ul><li>Real exam: about 57 questions in 60 minutes, single- and multiple-choice plus true/false.</li><li>Questions here are drawn at random from the practice bank, so each attempt is different.</li></ul>
+      <button class="btn" id="start">Start mock exam</button></div>`;
+    card.querySelector('#start').onclick = () => { exam = buildExam(); stopTimer(); timerHandle = setInterval(tick, 1000); render(); };
+    return;
+  }
+  if (exam.finished) return renderExamResults(card);
+
+  const it = exam.items[exam.idx], q = SECTIONS[it.s].questions[it.qi], chosen = exam.answers[exam.idx];
+  card.innerHTML = `<div class="qmeta"><span>Question ${exam.idx + 1} of ${exam.items.length}${q.tf ? ' · true or false' : ''}</span><span class="timer" id="timer">${fmtTime(exam.deadline - Date.now())}</span></div><p class="qtext">${q.q}</p>`;
+  const opts = document.createElement('div'); opts.className = 'options';
+  it.order.forEach((oi, pos) => {
+    const b = document.createElement('button'); b.className = 'opt' + (oi === chosen ? ' selected' : '');
+    b.innerHTML = `<span class="key">${KEYS[pos]}</span><span>${q.opts[oi]}</span>`;
+    b.onclick = () => { exam.answers[exam.idx] = oi; if (exam.idx + 1 < exam.items.length) exam.idx++; render(); };
+    opts.appendChild(b);
+  });
+  card.appendChild(opts);
+
+  const actions = document.createElement('div'); actions.className = 'actions';
+  const back = document.createElement('button'); back.className = 'btn ghost'; back.textContent = 'Previous'; back.disabled = exam.idx === 0; back.onclick = () => { exam.idx--; render(); };
+  const next = document.createElement('button'); next.className = 'btn ghost'; next.textContent = 'Next'; next.disabled = exam.idx + 1 >= exam.items.length; next.onclick = () => { exam.idx++; render(); };
+  const unanswered = exam.answers.filter(a => a === null).length;
+  const status = document.createElement('span'); status.className = 'hint'; status.textContent = unanswered ? `${unanswered} unanswered` : 'All answered';
+  const finish = document.createElement('button'); finish.className = 'btn'; finish.textContent = 'Finish exam';
+  finish.onclick = () => { if (!unanswered || confirm(`${unanswered} question(s) are unanswered and will count as wrong. Finish anyway?`)) finishExam(); };
+  const sp = document.createElement('span'); sp.className = 'spacer';
+  actions.append(back, next, status, sp, finish);
+  card.appendChild(actions);
+}
+
+function tick() {
+  if (!exam || exam.finished) return stopTimer();
+  const left = exam.deadline - Date.now();
+  const t = document.getElementById('timer');
+  if (t) { t.textContent = fmtTime(left); t.classList.toggle('warn', left < 5 * 60000); }
+  if (left <= 0) { finishExam(); alert('Time is up. The exam has been submitted.'); }
+}
+function finishExam() { exam.finished = true; stopTimer(); if (current === 'exam') render(); }
+
+function renderExamResults(card) {
+  const results = exam.items.map((it, i) => ({ it, q: SECTIONS[it.s].questions[it.qi], chosen: exam.answers[i], ok: exam.answers[i] === SECTIONS[it.s].questions[it.qi].a }));
+  const correct = results.filter(r => r.ok).length, pct = Math.round(100 * correct / results.length), pass = pct >= PASS_PCT;
+  const perSec = SECTIONS.map((s, si) => { const r = results.filter(x => x.it.s === si); return { s, n: r.length, ok: r.filter(x => x.ok).length }; }).filter(x => x.n);
+  const missed = results.filter(r => !r.ok);
+  card.innerHTML = `<div class="summary">
+      <div class="big ${pass ? 'pass' : 'fail'}">${pct}%</div>
+      <p>${correct} of ${results.length} correct · ${pass ? 'above' : 'below'} the ${PASS_PCT}% pass mark</p>
+      <div class="breakdown">${perSec.map(x => `<div class="row"><span>${x.s.id}. ${x.s.name}</span><span class="bar"><i style="width:${100 * x.ok / x.n}%"></i></span><span style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:.85rem">${x.ok}/${x.n}</span></div>`).join('')}</div>
+      <div class="actions" style="justify-content:center;margin-top:22px"><button class="btn" id="again">Take another mock exam</button></div>
+      ${missed.length ? `<div class="review"><h3>Missed questions (${missed.length})</h3>${missed.map(r => `<p class="hint" style="margin:0">${SECTIONS[r.it.s].id}. ${SECTIONS[r.it.s].name}</p>` + reviewItem(r.q, r.chosen)).join('')}</div>` : ''}
+    </div>`;
+  card.querySelector('#again').onclick = () => { exam = null; render(); };
+}
+
+// Deep link: terraform-quiz.zdenovo.com/#exam opens straight on the mock exam.
+// hashchange too, so the link works from a tab already on the quiz (a fragment
+// navigation does not re-run this script).
+function applyHash() { if (location.hash === '#exam' && current !== 'exam') { current = 'exam'; render(); } }
+window.addEventListener('hashchange', applyHash);
+if (location.hash === '#exam') current = 'exam';
+render();
+</script>
+</body>
+</html>

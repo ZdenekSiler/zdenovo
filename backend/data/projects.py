@@ -16,6 +16,15 @@ PROJECTS = [
         "internal": True,
         "icon": "receipt",
     },
+    {
+        "name": "Terraform Quiz",
+        "description": "Practice app for the HashiCorp Terraform Associate (004) — 205 explained questions and a timed mock exam.",
+        "tags": ["terraform", "javascript", "certification"],
+        "url": "/projects/terraform-quiz",
+        "featured": True,
+        "internal": True,
+        "icon": "quiz",
+    },
 ]
 
 

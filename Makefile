@@ -50,6 +50,10 @@ help:
 	@echo "    make fakturant-deploy     Deploy fakturant app on server"
 	@echo "    make fakturant-check      Health check fakturant subdomain"
 	@echo ""
+	@echo "  TERRAFORM QUIZ (static subdomain, ships with 'make prod')"
+	@echo "    make cert-init-terraform-quiz  Bootstrap SSL cert for terraform-quiz.DOMAIN"
+	@echo "    make terraform-quiz-check      Health check terraform-quiz subdomain"
+	@echo ""
 	@echo "  Prerequisites: copy .env.example → .env and fill in values"
 	@echo ""
 
@@ -153,6 +157,10 @@ check: _require-env
 	@curl -sf -o /dev/null https://fakturant.$(DOMAIN)/health \
 		&& echo "  ✓ Fakturant HTTPS + health OK" \
 		|| echo "  ✗ Fakturant health check failed"
+	@echo "Checking terraform-quiz.$(DOMAIN)..."
+	@curl -sf -o /dev/null https://terraform-quiz.$(DOMAIN)/ \
+		&& echo "  ✓ Terraform Quiz HTTPS OK" \
+		|| echo "  ✗ Terraform Quiz check failed"
 
 # ─── Remote deployment (run locally) ──────────────────────────────────────────
 
@@ -253,6 +261,10 @@ _check-certs:
 		test -f /certs/live/fakturant.$(DOMAIN)/fullchain.pem 2>/dev/null \
 		&& echo "  ✓ SSL cert found for fakturant.$(DOMAIN)" \
 		|| echo "  ⚠ SSL cert MISSING for fakturant.$(DOMAIN) — run: make cert-init-fakturant"
+	@docker run --rm -v zdenovo_certbot_conf:/certs alpine \
+		test -f /certs/live/terraform-quiz.$(DOMAIN)/fullchain.pem 2>/dev/null \
+		&& echo "  ✓ SSL cert found for terraform-quiz.$(DOMAIN)" \
+		|| echo "  ⚠ SSL cert MISSING for terraform-quiz.$(DOMAIN) — run: make cert-init-terraform-quiz"
 
 _post-deploy-check:
 	@echo "→ Post-deploy health check..."
@@ -306,3 +318,31 @@ fakturant-check: _require-env
 	@curl -sf -o /dev/null https://fakturant.$(DOMAIN)/health \
 		&& echo "  ✓ HTTPS + health OK" \
 		|| echo "  ✗ Health check failed"
+
+# ─── Terraform Quiz (static subdomain) ───────────────────────────────────────
+# The quiz is a single HTML file in this repo (frontend/static/quiz/index.html),
+# served straight off disk by the zdenovo nginx — no container, no deploy target.
+# 'make prod' ships it; only the certificate needs a one-time bootstrap.
+
+.PHONY: cert-init-terraform-quiz terraform-quiz-check
+
+cert-init-terraform-quiz: _require-env
+	@echo "→ Requesting certificate for terraform-quiz.$(DOMAIN)..."
+	$(COMPOSE_PROD) run --rm certbot certonly \
+		--webroot \
+		--webroot-path=/var/www/certbot \
+		--email $(CERTBOT_EMAIL) \
+		--agree-tos \
+		--no-eff-email \
+		-d terraform-quiz.$(DOMAIN)
+	$(MAKE) _gen-nginx-conf
+	@echo "→ Validating nginx config before reloading..."
+	$(COMPOSE_PROD) exec nginx nginx -t
+	$(COMPOSE_PROD) exec nginx nginx -s reload
+	@echo "✓ Certificate issued for terraform-quiz.$(DOMAIN)."
+
+terraform-quiz-check: _require-env
+	@echo "Checking terraform-quiz.$(DOMAIN)..."
+	@curl -sf -o /dev/null https://terraform-quiz.$(DOMAIN)/ \
+		&& echo "  ✓ HTTPS OK" \
+		|| echo "  ✗ Check failed"

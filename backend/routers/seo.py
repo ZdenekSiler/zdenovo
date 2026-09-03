@@ -27,6 +27,7 @@ async def sitemap() -> Response:
         ("/about", "monthly", "0.7"),
         ("/projects", "monthly", "0.6"),
         ("/projects/fakturant", "monthly", "0.5"),
+        ("/projects/terraform-quiz", "monthly", "0.5"),
     ]
     for path, freq, prio in static_pages:
         lines.append(

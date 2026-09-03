@@ -42,6 +42,17 @@ def test_projects_lists_project_names(client):
     assert b"zdenovo" in r.content
 
 
+def test_project_fakturant_returns_200(client):
+    r = client.get("/projects/fakturant")
+    assert r.status_code == 200
+
+
+def test_project_terraform_quiz_returns_200(client):
+    r = client.get("/projects/terraform-quiz")
+    assert r.status_code == 200
+    assert b"Terraform Quiz" in r.content
+
+
 # ── Blog list ─────────────────────────────────────────────────────────────────
 
 def test_blog_returns_200(client):

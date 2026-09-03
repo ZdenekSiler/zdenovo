@@ -225,6 +225,12 @@ async def project_fakturant(request: Request) -> str:
     return templates.TemplateResponse(request, "fakturant.html", {})
 
 
+@app.get("/projects/terraform-quiz", response_class=HTMLResponse)
+async def project_terraform_quiz(request: Request) -> str:
+    """Terraform Quiz project details page."""
+    return templates.TemplateResponse(request, "terraform_quiz.html", {})
+
+
 _BOT_UA_PATTERNS = ("bot", "crawler", "spider", "googlebot", "bingbot", "slurp", "duckduckbot", "curl", "wget", "python-")
 
 
