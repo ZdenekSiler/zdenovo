@@ -55,6 +55,7 @@ services:
 
   certbot:
     image: certbot/certbot:latest
+    restart: unless-stopped
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_conf:/etc/letsencrypt
